@@ -1,0 +1,28 @@
+services:
+  coreutils-fuzzer:
+    build:
+      context: ../..
+      dockerfile: tools/coreutils_fuzzer/docker/Dockerfile
+    image: "${COREUTILS_FUZZER_IMAGE:-dafnyutils-coreutils-fuzzer:latest}"
+    pull_policy: never
+    init: true
+    network_mode: none
+    read_only: true
+    user: "0:0"
+    working_dir: /fuzz
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - DAC_READ_SEARCH
+      - FOWNER
+      - SETGID
+      - SETUID
+    tmpfs:
+      - /opt/coreutils-fuzzer-staging:rw,exec,nosuid,nodev,mode=0755
+      - /fuzz:rw,nosuid,nodev,mode=0755
+      - /tmp:rw,nosuid,nodev,mode=1777
+    command: ["sleep", "infinity"]

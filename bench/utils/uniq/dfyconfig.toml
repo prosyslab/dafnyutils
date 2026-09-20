@@ -1,0 +1,6 @@
+includes = ["UniqCli.dfy"]
+
+[options]
+target = "cs"
+no-verify = true
+standard-libraries = false

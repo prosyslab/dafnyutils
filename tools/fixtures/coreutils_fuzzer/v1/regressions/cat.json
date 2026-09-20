@@ -1,0 +1,6 @@
+{
+    "schema_version": "coreutils-fuzzer.regression-suite.v1",
+    "util": "cat",
+    "case_set": "../cases/cat.json",
+    "expectations": [{"case_id": "stdin-only", "expect": "match"}],
+}

@@ -1,0 +1,39 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.venv/
+venv/
+env/
+.env/
+pip-wheel-metadata/
+
+# Rust
+target/
+Cargo.lock
+!tools/coreutils_fuzzer/Cargo.lock
+
+# Fuzzer Artifacts
+coreutils_fuzzer_repro_*.txt
+
+# Secrets
+.env*
+
+# build files
+_build
+
+# zvec
+.zvec-grep
+
+# experiments
+experiments
+
+# Local self-reference from the former Dafny submodule
+/dafny/dafny

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Build the managed startup library when its source or header changes.
+set -euo pipefail
+
+cd -- "$(dirname -- "$0")/.."
+output=${BUILD_DIR:-_build}/startup_runtime/libdafnyutils_startup.so
+if [[ ! -f "$output" || bench/core/IOStartup.c -nt "$output" || bench/core/IOStartup.h -nt "$output" ]]; then
+    mkdir -p -- "$(dirname -- "$output")"
+    read -r -a compiler <<< "${CC:-cc}"
+    "${compiler[@]}" -std=c11 -O2 -fPIC -fvisibility=hidden -Wall -Wextra -Werror \
+        -shared -Wl,-z,defs -Wl,-soname,libdafnyutils_startup.so \
+        -o "$output" bench/core/IOStartup.c -ldl
+fi

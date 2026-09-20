@@ -1,0 +1,445 @@
+{
+  "problem_id": "100",
+  "parser": "def parser(input: str, output: str) -> tuple[int, int, list[str], list[str]]:\n    in_lines = input.splitlines()\n    idx = 0\n    while idx < len(in_lines) and in_lines[idx].strip() == '':\n        idx += 1\n    n = 0\n    m = 0\n    if idx < len(in_lines):\n        header = in_lines[idx].lstrip('\\ufeff').strip()\n        parts = header.split()\n        if len(parts) >= 2:\n            n, m = (int(parts[0]), int(parts[1]))\n        else:\n            nums = re.findall('-?\\\\d+', header)\n            if len(nums) >= 2:\n                n, m = (int(nums[0]), int(nums[1]))\n    screen: list[str] = []\n    for i in range(n):\n        line_index = idx + 1 + i\n        if line_index < len(in_lines):\n            screen.append(in_lines[line_index].rstrip('\\r'))\n        else:\n            screen.append('')\n    output_lines = [line.rstrip('\\r') for line in output.splitlines()]\n    return (n, m, screen, output_lines)",
+  "input_count": 3,
+  "parameters": [
+    {
+      "name": "n",
+      "python_type": "int"
+    },
+    {
+      "name": "m",
+      "python_type": "int"
+    },
+    {
+      "name": "screen",
+      "python_type": "list[str]"
+    },
+    {
+      "name": "output_lines",
+      "python_type": "list[str]"
+    }
+  ],
+  "positive": [
+    {
+      "input": "4 8\n..w..w..\n........\n........\n..w..w..\n",
+      "output": "..w++w..\n..+..+..\n..+..+..\n..w++w..\n"
+    },
+    {
+      "input": "5 6\n......\n.w....\n......\n..w...\n......\n",
+      "output": "......\n+w+...\n+.+...\n++w...\n......\n"
+    },
+    {
+      "input": "2 4\n....\n.w..\n",
+      "output": "....\n.w..\n"
+    },
+    {
+      "input": "2 6\nw..w.w\n...w..\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "9 4\n....\n....\n....\n....\n....\n..w.\n....\n....\n.w..\n",
+      "output": "....\n....\n....\n....\n....\n++w+\n+..+\n+..+\n+w++\n"
+    },
+    {
+      "input": "10 4\n....\n.w..\n....\n....\n.w..\n....\n....\n....\n....\n....\n",
+      "output": "....\n+w++\n+..+\n+..+\n+w++\n....\n....\n....\n....\n....\n"
+    },
+    {
+      "input": "4 10\n..........\n..........\n.w..w.....\n..........\n",
+      "output": ".++++.....\n.+..+.....\n.w..w.....\n.++++.....\n"
+    },
+    {
+      "input": "3 3\n...\nw.w\n...\n",
+      "output": "+++\nw.w\n+++\n"
+    },
+    {
+      "input": "1 1\nw\n",
+      "output": "w\n"
+    },
+    {
+      "input": "2 1\nw\n.\n",
+      "output": "w\n.\n"
+    },
+    {
+      "input": "2 1\nw\nw\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "1 2\nww\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "2 2\nww\n..\n",
+      "output": "ww\n++\n"
+    },
+    {
+      "input": "2 2\n.w\n.w\n",
+      "output": "+w\n+w\n"
+    },
+    {
+      "input": "2 2\n..\nww\n",
+      "output": "++\nww\n"
+    },
+    {
+      "input": "2 2\nw.\nw.\n",
+      "output": "w+\nw+\n"
+    },
+    {
+      "input": "2 2\nw.\n.w\n",
+      "output": "w+\n+w\n"
+    },
+    {
+      "input": "2 2\n..\nw.\n",
+      "output": "..\nw.\n"
+    },
+    {
+      "input": "3 3\n...\n..w\nw..\n",
+      "output": "+++\n+.w\nw++\n"
+    },
+    {
+      "input": "3 3\n.w.\n..w\n...\n",
+      "output": ".w+\n.+w\n...\n"
+    },
+    {
+      "input": "4 4\nw...\n..w.\n....\n....\n",
+      "output": "w++.\n+.w.\n+++.\n....\n"
+    },
+    {
+      "input": "4 6\n....w.\n......\n.w....\n......\n",
+      "output": ".+++w.\n.+..+.\n.w..+.\n.++++.\n"
+    },
+    {
+      "input": "4 6\n....w.\n......\n......\n.w....\n",
+      "output": ".+++w.\n.+..+.\n.+..+.\n.w+++.\n"
+    },
+    {
+      "input": "4 6\nw...w.\n......\n......\n.w....\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "4 6\nw.....\n......\n......\n.w....\n",
+      "output": "w+++..\n+..+..\n+..+..\n+w++..\n"
+    },
+    {
+      "input": "4 6\nw....w\n......\n.....w\n.w....\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "7 3\n...\n...\n...\n..w\n...\nw..\n...\n",
+      "output": "...\n...\n...\n++w\n+.+\nw++\n...\n"
+    },
+    {
+      "input": "7 3\n...\n...\n...\n.w.\n..w\nw..\n...\n",
+      "output": "...\n...\n...\n+w+\n+.w\nw++\n...\n"
+    },
+    {
+      "input": "7 3\n...\n...\n...\n.w.\nw.w\nw..\n...\n",
+      "output": "...\n...\n...\n+w+\nw.w\nw++\n...\n"
+    },
+    {
+      "input": "5 7\n.......\n.......\n.......\n.www...\n.......\n",
+      "output": ".......\n.+++...\n.+.+...\n.www...\n.......\n"
+    },
+    {
+      "input": "5 7\n.......\n.wwww..\n.......\n.......\n.......\n",
+      "output": ".......\n.wwww..\n.+..+..\n.+..+..\n.++++..\n"
+    },
+    {
+      "input": "5 7\n.......\n.w.....\n.w.....\n.w.....\n.w.....\n",
+      "output": ".......\n.w+++..\n.w..+..\n.w..+..\n.w+++..\n"
+    },
+    {
+      "input": "1 7\nw.....w\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "6 9\n.w.......\n.........\n.........\n.........\n.w.......\n......w..\n",
+      "output": ".w+++++..\n.+....+..\n.+....+..\n.+....+..\n.w....+..\n.+++++w..\n"
+    },
+    {
+      "input": "6 9\n...ww....\n.........\n.........\n.........\n.........\n......w..\n",
+      "output": "...ww++++\n...+....+\n...+....+\n...+....+\n...+....+\n...+++w++\n"
+    },
+    {
+      "input": "6 9\n.......w.\n.........\n.........\n.........\n.........\n......w..\n",
+      "output": "..+++++w.\n..+....+.\n..+....+.\n..+....+.\n..+....+.\n..++++w+.\n"
+    },
+    {
+      "input": "8 10\n..........\n...w......\n.....w....\n.w........\n....w.....\n..........\n..........\n..........\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "8 10\n..........\n...w......\n.....w....\n.w........\n..........\n....w.....\n..........\n..........\n",
+      "output": "..........\n.++w++....\n.+...w....\n.w...+....\n.+...+....\n.+++w+....\n..........\n..........\n"
+    },
+    {
+      "input": "8 10\n..........\n...w......\n..........\n.w........\n..........\n....w.....\n..........\n..........\n",
+      "output": "..........\n.++w++....\n.+...+....\n.w...+....\n.+...+....\n.+++w+....\n..........\n..........\n"
+    },
+    {
+      "input": "8 10\n..........\n..........\n.....w....\n.w........\n..........\n....w.....\n..........\n..........\n",
+      "output": "..........\n.+++++....\n.+...w....\n.w...+....\n.+...+....\n.+++w+....\n..........\n..........\n"
+    },
+    {
+      "input": "8 10\n..........\n...w......\n..........\n..........\n..........\n....w.....\n..........\n..........\n",
+      "output": "..........\n+++w+.....\n+...+.....\n+...+.....\n+...+.....\n++++w.....\n..........\n..........\n"
+    },
+    {
+      "input": "5 4\n....\n....\n....\nw...\n....\n",
+      "output": "....\n....\n....\nw...\n....\n"
+    },
+    {
+      "input": "5 4\n....\nw...\n...w\n.w..\n..w.\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "5 4\nw..w\n...w\nw...\n..w.\n....\n",
+      "output": "w++w\n+..w\nw..+\n++w+\n....\n"
+    },
+    {
+      "input": "5 4\nwwww\nwwww\nwwww\nwwww\nwwww\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "5 4\n..w.\n..ww\n.www\n.w..\nwwww\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "5 4\n....\n.w..\n....\n.w..\n....\n",
+      "output": "....\n+w+.\n+.+.\n+w+.\n....\n"
+    },
+    {
+      "input": "5 4\nw...\n....\n...w\n....\n....\n",
+      "output": "w+++\n+..+\n+..w\n++++\n....\n"
+    },
+    {
+      "input": "5 4\nwwww\nw..w\nwwww\n.www\n..ww\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "5 4\n..w.\n....\n...w\n..w.\nw...\n",
+      "output": "-1\n"
+    },
+    {
+      "input": "6 5\n.w...\n.....\n.....\n.....\nw....\n.....\n",
+      "output": "+w+++\n+...+\n+...+\n+...+\nw++++\n.....\n"
+    },
+    {
+      "input": "8 16\n................\n................\n................\n................\n............w...\n................\n................\n..............w.\n",
+      "output": "................\n................\n................\n................\n............w+++\n............+..+\n............+..+\n............++w+\n"
+    },
+    {
+      "input": "3 10\n.......w..\n........w.\n......w...\n",
+      "output": "......+w+.\n......+.w.\n......w++.\n"
+    },
+    {
+      "input": "10 3\n...\n...\n...\n...\n...\n...\n.w.\n..w\nw..\n...\n",
+      "output": "...\n...\n...\n...\n...\n...\n+w+\n+.w\nw++\n...\n"
+    },
+    {
+      "input": "1 2\n.w\n",
+      "output": ".w\n"
+    },
+    {
+      "input": "2 2\n.w\n..\n",
+      "output": ".w\n..\n"
+    },
+    {
+      "input": "5 2\n..\n.w\nww\n..\n..\n",
+      "output": "..\n+w\nww\n..\n..\n"
+    },
+    {
+      "input": "1 6\n..w...\n",
+      "output": "..w...\n"
+    },
+    {
+      "input": "4 4\n..w.\n....\n....\n....\n",
+      "output": "..w.\n....\n....\n....\n"
+    },
+    {
+      "input": "6 2\nw.\n..\n..\n..\n..\n..\n",
+      "output": "w.\n..\n..\n..\n..\n..\n"
+    },
+    {
+      "input": "3 2\n..\n.w\n..\n",
+      "output": "..\n.w\n..\n"
+    },
+    {
+      "input": "5 6\n......\n......\n.ww...\n......\n......\n",
+      "output": "......\n......\n.ww...\n.++...\n......\n"
+    },
+    {
+      "input": "1 4\nw...\n",
+      "output": "w...\n"
+    },
+    {
+      "input": "4 2\nw.\n..\n..\n..\n",
+      "output": "w.\n..\n..\n..\n"
+    },
+    {
+      "input": "6 3\n...\n...\nw.w\n...\nwww\n...\n",
+      "output": "...\n...\nw+w\n+.+\nwww\n...\n"
+    },
+    {
+      "input": "2 1\n.\nw\n",
+      "output": ".\nw\n"
+    },
+    {
+      "input": "5 5\n.....\n.....\n.....\n.w...\n.....\n",
+      "output": ".....\n.....\n.....\n.w...\n.....\n"
+    },
+    {
+      "input": "1 5\nw....\n",
+      "output": "w....\n"
+    },
+    {
+      "input": "4 3\nw..\n...\n...\n...\n",
+      "output": "w..\n...\n...\n...\n"
+    },
+    {
+      "input": "6 1\n.\n.\nw\n.\n.\n.\n",
+      "output": ".\n.\nw\n.\n.\n.\n"
+    },
+    {
+      "input": "2 5\n.....\nww...\n",
+      "output": "++...\nww...\n"
+    },
+    {
+      "input": "5 5\n.....\n.....\n..ww.\n.....\n.....\n",
+      "output": ".....\n.....\n..ww.\n..++.\n.....\n"
+    },
+    {
+      "input": "1 3\n..w\n",
+      "output": "..w\n"
+    },
+    {
+      "input": "4 1\n.\nw\n.\n.\n",
+      "output": ".\nw\n.\n.\n"
+    },
+    {
+      "input": "6 2\n..\n.w\n..\n..\n..\n..\n",
+      "output": "..\n.w\n..\n..\n..\n..\n"
+    },
+    {
+      "input": "2 1\nw\n.\n",
+      "output": "w\n.\n"
+    },
+    {
+      "input": "5 1\n.\n.\n.\nw\n.\n",
+      "output": ".\n.\n.\nw\n.\n"
+    },
+    {
+      "input": "1 5\n....w\n",
+      "output": "....w\n"
+    },
+    {
+      "input": "4 3\n..w\nw.w\n...\n...\n",
+      "output": "++w\nw.w\n+++\n...\n"
+    },
+    {
+      "input": "6 1\nw\n.\n.\n.\n.\n.\n",
+      "output": "w\n.\n.\n.\n.\n.\n"
+    },
+    {
+      "input": "2 1\nw\n.\n",
+      "output": "w\n.\n"
+    },
+    {
+      "input": "5 5\n.....\n...w.\n.....\n.....\n.w...\n",
+      "output": ".....\n+++w.\n+..+.\n+..+.\n+w++.\n"
+    },
+    {
+      "input": "1 3\n.w.\n",
+      "output": ".w.\n"
+    },
+    {
+      "input": "4 1\n.\n.\n.\nw\n",
+      "output": ".\n.\n.\nw\n"
+    },
+    {
+      "input": "4 2\n..\nw.\n.w\n..\n",
+      "output": "..\nw+\n+w\n..\n"
+    },
+    {
+      "input": "6 6\n......\nw.....\n...w..\n.w....\n......\n......\n",
+      "output": "++++..\nw..+..\n+..w..\n+w++..\n......\n......\n"
+    },
+    {
+      "input": "3 6\n......\n....w.\n......\n",
+      "output": "......\n....w.\n......\n"
+    },
+    {
+      "input": "5 4\nw.w.\nw...\nwww.\n....\n....\n",
+      "output": "w+w.\nw.+.\nwww.\n....\n....\n"
+    },
+    {
+      "input": "2 2\n..\nw.\n",
+      "output": "..\nw.\n"
+    },
+    {
+      "input": "4 2\n..\n..\nw.\n..\n",
+      "output": "..\n..\nw.\n..\n"
+    },
+    {
+      "input": "1 6\n.....w\n",
+      "output": ".....w\n"
+    },
+    {
+      "input": "3 4\nw...\n..w.\n.ww.\n",
+      "output": "w++.\n+.w.\n+ww.\n"
+    },
+    {
+      "input": "5 2\n..\n..\n..\n..\nw.\n",
+      "output": "..\n..\n..\n..\nw.\n"
+    },
+    {
+      "input": "2 2\n..\nw.\n",
+      "output": "..\nw.\n"
+    },
+    {
+      "input": "2 1\nw\n.\n",
+      "output": "w\n.\n"
+    },
+    {
+      "input": "4 1\n.\n.\nw\n.\n",
+      "output": ".\n.\nw\n.\n"
+    },
+    {
+      "input": "1 5\nw....\n",
+      "output": "w....\n"
+    },
+    {
+      "input": "3 3\n...\n...\n.w.\n",
+      "output": "...\n...\n.w.\n"
+    },
+    {
+      "input": "6 1\n.\nw\n.\n.\n.\n.\n",
+      "output": ".\nw\n.\n.\n.\n.\n"
+    },
+    {
+      "input": "2 1\n.\nw\n",
+      "output": ".\nw\n"
+    },
+    {
+      "input": "5 5\n.w...\n.....\n.....\n.....\n.....\n",
+      "output": ".w...\n.....\n.....\n.....\n.....\n"
+    },
+    {
+      "input": "1 3\n..w\n",
+      "output": "..w\n"
+    },
+    {
+      "input": "3 1\n.\n.\nw\n",
+      "output": ".\n.\nw\n"
+    },
+    {
+      "input": "6 1\n.\n.\n.\n.\n.\nw\n",
+      "output": ".\n.\n.\n.\n.\nw\n"
+    },
+    {
+      "input": "6 3\n...\n...\n...\n...\n...\n.w.\n",
+      "output": "...\n...\n...\n...\n...\n.w.\n"
+    }
+  ]
+}

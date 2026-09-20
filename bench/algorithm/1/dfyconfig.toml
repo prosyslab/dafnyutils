@@ -1,0 +1,6 @@
+includes = ["Algorithm1.dfy"]
+
+[options]
+target = "cs"
+no-verify = true
+standard-libraries = false

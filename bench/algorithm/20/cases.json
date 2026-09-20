@@ -1,0 +1,657 @@
+{
+  "problem_id": "20",
+  "parser": "def parser(input: str, output: str) -> tuple[str, int]:\n    import re\n    time = ''\n    s_in = input or ''\n    for line in s_in.splitlines():\n        m = re.fullmatch('\\\\s*(\\\\d{2}):(\\\\d{2})\\\\s*', line)\n        if m:\n            time = f'{m.group(1)}:{m.group(2)}'\n            break\n    if not time:\n        m = re.search('(\\\\d{2}):(\\\\d{2})', s_in)\n        if m:\n            time = f'{m.group(1)}:{m.group(2)}'\n        else:\n            m = re.search('(\\\\d{1,2}):(\\\\d{1,2})', s_in)\n            if m:\n                hh = int(m.group(1))\n                mm = int(m.group(2))\n                time = f'{hh:02d}:{mm:02d}'\n            else:\n                time = ''\n                for line in s_in.splitlines():\n                    s = line.strip()\n                    if s:\n                        time = s\n                        break\n                time = time or s_in.strip()\n    s_out = output or ''\n    result: int | None = None\n    for line in s_out.splitlines():\n        t = line.strip()\n        if t.isdigit():\n            result = int(t)\n            break\n    if result is None:\n        m = re.search('\\\\d+', s_out)\n        if m:\n            result = int(m.group(0))\n        else:\n            result = 0\n    return (time, result)",
+  "input_count": 1,
+  "parameters": [
+    {
+      "name": "time",
+      "python_type": "str"
+    },
+    {
+      "name": "result",
+      "python_type": "int"
+    }
+  ],
+  "positive": [
+    {
+      "input": "05:39\n",
+      "output": "11\n"
+    },
+    {
+      "input": "13:31\n",
+      "output": "0\n"
+    },
+    {
+      "input": "23:59\n",
+      "output": "1\n"
+    },
+    {
+      "input": "13:32\n",
+      "output": "69\n"
+    },
+    {
+      "input": "14:40\n",
+      "output": "1\n"
+    },
+    {
+      "input": "14:00\n",
+      "output": "41\n"
+    },
+    {
+      "input": "05:50\n",
+      "output": "0\n"
+    },
+    {
+      "input": "12:22\n",
+      "output": "69\n"
+    },
+    {
+      "input": "12:34\n",
+      "output": "57\n"
+    },
+    {
+      "input": "05:30\n",
+      "output": "20\n"
+    },
+    {
+      "input": "14:14\n",
+      "output": "27\n"
+    },
+    {
+      "input": "01:10\n",
+      "output": "0\n"
+    },
+    {
+      "input": "02:20\n",
+      "output": "0\n"
+    },
+    {
+      "input": "03:30\n",
+      "output": "0\n"
+    },
+    {
+      "input": "04:40\n",
+      "output": "0\n"
+    },
+    {
+      "input": "10:01\n",
+      "output": "0\n"
+    },
+    {
+      "input": "11:11\n",
+      "output": "0\n"
+    },
+    {
+      "input": "12:21\n",
+      "output": "0\n"
+    },
+    {
+      "input": "14:41\n",
+      "output": "0\n"
+    },
+    {
+      "input": "15:51\n",
+      "output": "0\n"
+    },
+    {
+      "input": "20:02\n",
+      "output": "0\n"
+    },
+    {
+      "input": "21:12\n",
+      "output": "0\n"
+    },
+    {
+      "input": "22:22\n",
+      "output": "0\n"
+    },
+    {
+      "input": "23:32\n",
+      "output": "0\n"
+    },
+    {
+      "input": "01:11\n",
+      "output": "69\n"
+    },
+    {
+      "input": "02:21\n",
+      "output": "69\n"
+    },
+    {
+      "input": "03:31\n",
+      "output": "69\n"
+    },
+    {
+      "input": "04:41\n",
+      "output": "69\n"
+    },
+    {
+      "input": "05:51\n",
+      "output": "250\n"
+    },
+    {
+      "input": "10:02\n",
+      "output": "69\n"
+    },
+    {
+      "input": "11:12\n",
+      "output": "69\n"
+    },
+    {
+      "input": "14:42\n",
+      "output": "69\n"
+    },
+    {
+      "input": "15:52\n",
+      "output": "250\n"
+    },
+    {
+      "input": "20:03\n",
+      "output": "69\n"
+    },
+    {
+      "input": "21:13\n",
+      "output": "69\n"
+    },
+    {
+      "input": "22:23\n",
+      "output": "69\n"
+    },
+    {
+      "input": "23:33\n",
+      "output": "27\n"
+    },
+    {
+      "input": "00:00\n",
+      "output": "0\n"
+    },
+    {
+      "input": "00:01\n",
+      "output": "69\n"
+    },
+    {
+      "input": "22:21\n",
+      "output": "1\n"
+    },
+    {
+      "input": "20:01\n",
+      "output": "1\n"
+    },
+    {
+      "input": "11:10\n",
+      "output": "1\n"
+    },
+    {
+      "input": "06:59\n",
+      "output": "182\n"
+    },
+    {
+      "input": "02:00\n",
+      "output": "20\n"
+    },
+    {
+      "input": "02:19\n",
+      "output": "1\n"
+    },
+    {
+      "input": "17:31\n",
+      "output": "151\n"
+    },
+    {
+      "input": "19:00\n",
+      "output": "62\n"
+    },
+    {
+      "input": "13:37\n",
+      "output": "64\n"
+    },
+    {
+      "input": "07:59\n",
+      "output": "122\n"
+    },
+    {
+      "input": "04:20\n",
+      "output": "20\n"
+    },
+    {
+      "input": "07:10\n",
+      "output": "171\n"
+    },
+    {
+      "input": "06:00\n",
+      "output": "241\n"
+    },
+    {
+      "input": "06:01\n",
+      "output": "240\n"
+    },
+    {
+      "input": "08:15\n",
+      "output": "106\n"
+    },
+    {
+      "input": "06:59\n",
+      "output": "182\n"
+    },
+    {
+      "input": "01:00\n",
+      "output": "10\n"
+    },
+    {
+      "input": "07:00\n",
+      "output": "181\n"
+    },
+    {
+      "input": "06:10\n",
+      "output": "231\n"
+    },
+    {
+      "input": "18:52\n",
+      "output": "70\n"
+    },
+    {
+      "input": "09:59\n",
+      "output": "2\n"
+    },
+    {
+      "input": "19:00\n",
+      "output": "62\n"
+    },
+    {
+      "input": "15:52\n",
+      "output": "250\n"
+    },
+    {
+      "input": "06:50\n",
+      "output": "191\n"
+    },
+    {
+      "input": "00:00\n",
+      "output": "0\n"
+    },
+    {
+      "input": "19:20\n",
+      "output": "42\n"
+    },
+    {
+      "input": "05:51\n",
+      "output": "250\n"
+    },
+    {
+      "input": "06:16\n",
+      "output": "225\n"
+    },
+    {
+      "input": "10:10\n",
+      "output": "61\n"
+    },
+    {
+      "input": "17:11\n",
+      "output": "171\n"
+    },
+    {
+      "input": "18:00\n",
+      "output": "122\n"
+    },
+    {
+      "input": "00:01\n",
+      "output": "69\n"
+    },
+    {
+      "input": "05:04\n",
+      "output": "46\n"
+    },
+    {
+      "input": "16:00\n",
+      "output": "242\n"
+    },
+    {
+      "input": "23:31\n",
+      "output": "1\n"
+    },
+    {
+      "input": "17:25\n",
+      "output": "157\n"
+    },
+    {
+      "input": "23:32\n",
+      "output": "0\n"
+    },
+    {
+      "input": "23:58\n",
+      "output": "2\n"
+    },
+    {
+      "input": "02:21\n",
+      "output": "69\n"
+    },
+    {
+      "input": "01:11\n",
+      "output": "69\n"
+    },
+    {
+      "input": "23:46\n",
+      "output": "14\n"
+    },
+    {
+      "input": "00:09\n",
+      "output": "61\n"
+    },
+    {
+      "input": "09:20\n",
+      "output": "41\n"
+    },
+    {
+      "input": "05:59\n",
+      "output": "242\n"
+    },
+    {
+      "input": "18:59\n",
+      "output": "63\n"
+    },
+    {
+      "input": "02:02\n",
+      "output": "18\n"
+    },
+    {
+      "input": "00:30\n",
+      "output": "40\n"
+    },
+    {
+      "input": "05:54\n",
+      "output": "247\n"
+    },
+    {
+      "input": "19:59\n",
+      "output": "3\n"
+    },
+    {
+      "input": "16:59\n",
+      "output": "183\n"
+    },
+    {
+      "input": "17:51\n",
+      "output": "131\n"
+    },
+    {
+      "input": "09:30\n",
+      "output": "31\n"
+    },
+    {
+      "input": "10:01\n",
+      "output": "0\n"
+    },
+    {
+      "input": "16:55\n",
+      "output": "187\n"
+    },
+    {
+      "input": "20:02\n",
+      "output": "0\n"
+    },
+    {
+      "input": "16:12\n",
+      "output": "230\n"
+    },
+    {
+      "input": "20:00\n",
+      "output": "2\n"
+    },
+    {
+      "input": "01:01\n",
+      "output": "9\n"
+    },
+    {
+      "input": "23:01\n",
+      "output": "31\n"
+    },
+    {
+      "input": "06:05\n",
+      "output": "236\n"
+    },
+    {
+      "input": "19:19\n",
+      "output": "43\n"
+    },
+    {
+      "input": "17:00\n",
+      "output": "182\n"
+    },
+    {
+      "input": "07:50\n",
+      "output": "131\n"
+    },
+    {
+      "input": "21:20\n",
+      "output": "62\n"
+    },
+    {
+      "input": "23:23\n",
+      "output": "9\n"
+    },
+    {
+      "input": "19:30\n",
+      "output": "32\n"
+    },
+    {
+      "input": "00:59\n",
+      "output": "11\n"
+    },
+    {
+      "input": "22:59\n",
+      "output": "33\n"
+    },
+    {
+      "input": "18:18\n",
+      "output": "104\n"
+    },
+    {
+      "input": "17:46\n",
+      "output": "136\n"
+    },
+    {
+      "input": "07:30\n",
+      "output": "151\n"
+    },
+    {
+      "input": "17:16\n",
+      "output": "166\n"
+    },
+    {
+      "input": "06:06\n",
+      "output": "235\n"
+    },
+    {
+      "input": "23:30\n",
+      "output": "2\n"
+    },
+    {
+      "input": "05:57\n",
+      "output": "244\n"
+    },
+    {
+      "input": "19:46\n",
+      "output": "16\n"
+    },
+    {
+      "input": "11:10\n",
+      "output": "1\n"
+    },
+    {
+      "input": "17:07\n",
+      "output": "175\n"
+    },
+    {
+      "input": "18:53\n",
+      "output": "69\n"
+    },
+    {
+      "input": "07:06\n",
+      "output": "175\n"
+    },
+    {
+      "input": "17:50\n",
+      "output": "132\n"
+    },
+    {
+      "input": "09:15\n",
+      "output": "46\n"
+    },
+    {
+      "input": "09:55\n",
+      "output": "6\n"
+    },
+    {
+      "input": "20:05\n",
+      "output": "67\n"
+    },
+    {
+      "input": "22:55\n",
+      "output": "37\n"
+    },
+    {
+      "input": "10:00\n",
+      "output": "1\n"
+    },
+    {
+      "input": "07:55\n",
+      "output": "126\n"
+    },
+    {
+      "input": "07:40\n",
+      "output": "141\n"
+    },
+    {
+      "input": "19:08\n",
+      "output": "54\n"
+    },
+    {
+      "input": "23:24\n",
+      "output": "8\n"
+    },
+    {
+      "input": "16:15\n",
+      "output": "227\n"
+    },
+    {
+      "input": "07:20\n",
+      "output": "161\n"
+    },
+    {
+      "input": "23:10\n",
+      "output": "22\n"
+    },
+    {
+      "input": "06:51\n",
+      "output": "190\n"
+    },
+    {
+      "input": "16:30\n",
+      "output": "212\n"
+    },
+    {
+      "input": "17:54\n",
+      "output": "128\n"
+    },
+    {
+      "input": "07:07\n",
+      "output": "174\n"
+    },
+    {
+      "input": "08:01\n",
+      "output": "120\n"
+    },
+    {
+      "input": "09:58\n",
+      "output": "3\n"
+    },
+    {
+      "input": "18:03\n",
+      "output": "119\n"
+    },
+    {
+      "input": "07:59\n",
+      "output": "122\n"
+    },
+    {
+      "input": "05:55\n",
+      "output": "246\n"
+    },
+    {
+      "input": "07:39\n",
+      "output": "142\n"
+    },
+    {
+      "input": "05:52\n",
+      "output": "249\n"
+    },
+    {
+      "input": "12:02\n",
+      "output": "19\n"
+    },
+    {
+      "input": "08:59\n",
+      "output": "62\n"
+    },
+    {
+      "input": "09:21\n",
+      "output": "40\n"
+    },
+    {
+      "input": "16:04\n",
+      "output": "238\n"
+    },
+    {
+      "input": "04:00\n",
+      "output": "40\n"
+    },
+    {
+      "input": "18:21\n",
+      "output": "101\n"
+    },
+    {
+      "input": "09:13\n",
+      "output": "48\n"
+    },
+    {
+      "input": "17:20\n",
+      "output": "162\n"
+    },
+    {
+      "input": "06:15\n",
+      "output": "226\n"
+    },
+    {
+      "input": "19:21\n",
+      "output": "41\n"
+    },
+    {
+      "input": "16:02\n",
+      "output": "240\n"
+    },
+    {
+      "input": "15:59\n",
+      "output": "243\n"
+    },
+    {
+      "input": "06:07\n",
+      "output": "234\n"
+    },
+    {
+      "input": "08:08\n",
+      "output": "113\n"
+    },
+    {
+      "input": "09:09\n",
+      "output": "52\n"
+    },
+    {
+      "input": "02:19\n",
+      "output": "1\n"
+    },
+    {
+      "input": "21:59\n",
+      "output": "23\n"
+    }
+  ]
+}

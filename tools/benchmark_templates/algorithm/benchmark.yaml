@@ -1,0 +1,6 @@
+schema_version: benchmark.definition.v2
+task_id: "{{TASK_ID}}"
+kind: algorithm
+source:
+  status: incomplete
+  name: TODO

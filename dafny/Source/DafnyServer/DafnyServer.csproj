@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+      <OutputType>Exe</OutputType>
+      <AssemblyName>DafnyServer</AssemblyName>
+      <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+      <DefineConstants>TRACE</DefineConstants>
+      <RollForward>Major</RollForward>
+      <OutputPath>..\..\Binaries\</OutputPath>
+      <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DafnyLanguageServer\DafnyLanguageServer.csproj" />
+    <ProjectReference Include="..\DafnyPipeline\DafnyPipeline.csproj" />
+  </ItemGroup>
+</Project>

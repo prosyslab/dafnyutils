@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Build the evaluator with the invoking user's filesystem identity.
+set -euo pipefail
+
+cd -- "$(dirname -- "$0")/.."
+exec docker compose -p dafnyutils-eval -f docker-compose.evaluation.yml build \
+    --build-arg "EVALUATOR_UID=$(id -u)" --build-arg "EVALUATOR_GID=$(id -g)"

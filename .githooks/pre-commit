@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+ruff_bin="${RUFF_BIN:-}"
+if [[ -z "$ruff_bin" ]]; then
+  if [[ -x "$repo_root/.venv/bin/ruff" ]]; then
+    ruff_bin="$repo_root/.venv/bin/ruff"
+  else
+    ruff_bin="ruff"
+  fi
+fi
+
+mapfile -d '' py_files < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.py')
+if (( ${#py_files[@]} > 0 )); then
+  "$ruff_bin" format "${py_files[@]}"
+  "$ruff_bin" check --fix --exit-zero "${py_files[@]}"
+  git add -- "${py_files[@]}"
+fi
+
+python3 -m pytest -q tests/core/test_import_fallback_guards.py

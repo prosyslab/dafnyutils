@@ -1,0 +1,6 @@
+schema_version: benchmark.definition.v2
+task_id: algorithm-20
+kind: algorithm
+source:
+  status: legacy-unverified
+  name: Existing algorithm benchmark material

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <AssemblyName>DafnyTestGeneration</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <OutputPath>..\..\Binaries\</OutputPath>
+    <IsPackable>true</IsPackable>
+    <DefineConstants>TRACE</DefineConstants>
+      <RollForward>Major</RollForward>
+    <Nullable>enable</Nullable>
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\DafnyPipeline\DafnyPipeline.csproj" />
+  </ItemGroup>
+
+</Project>

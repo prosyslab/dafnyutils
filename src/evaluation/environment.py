@@ -1,0 +1,10 @@
+"""Shared environment names for evaluator processes and benchmark test helpers."""
+
+from __future__ import annotations
+
+EVAL_BENCH_BUILD_SCRIPT_ENV = "EVAL_BENCH_BUILD_SCRIPT"
+EVAL_BENCH_DLL_ENV = "EVAL_BENCH_DLL"
+EVAL_COREUTILS_BIN_ENV = "EVAL_COREUTILS_BIN"
+EVAL_REPO_ROOT_ENV = "EVAL_REPO_ROOT"
+EVAL_TARGET_ROOT_ENV = "EVAL_TARGET_ROOT"
+EVAL_WORKSPACE_DIR_ENV = "EVAL_WORKSPACE_DIR"

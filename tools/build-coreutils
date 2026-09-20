@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Prepare and build the pinned GNU sources under one build-directory lock.
+set -euo pipefail
+
+root=$(cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+build_dir=${BUILD_DIR:-_build}
+mkdir -p "$build_dir"
+exec 9>"$build_dir/.coreutils.lock"
+flock 9
+
+for input in bootstrap bootstrap.conf configure.ac Makefile.am; do
+    if [[ ! -f coreutils/configure || coreutils/$input -nt coreutils/configure ]]; then
+        (cd coreutils && ./bootstrap)
+        break
+    fi
+done
+
+mkdir -p "$build_dir/coreutils"
+if [[ ! -f "$build_dir/coreutils/Makefile" || coreutils/configure -nt "$build_dir/coreutils/Makefile" ]]; then
+    (cd "$build_dir/coreutils" && FORCE_UNSAFE_CONFIGURE=1 "$root/coreutils/configure" --disable-nls)
+fi
+
+"${MAKE:-make}" -C "$build_dir/coreutils"

@@ -1,0 +1,6 @@
+schema_version: benchmark.definition.v2
+task_id: tail
+kind: coreutils
+source:
+  status: legacy-unverified
+  name: Existing GNU coreutils benchmark material

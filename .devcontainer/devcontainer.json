@@ -1,0 +1,52 @@
+{
+  "name": "Dafnyutils contributors (Ubuntu 24.04)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "remoteUser": "vscode",
+  "containerUser": "vscode",
+  "updateRemoteUserUID": true,
+  "init": true,
+  "workspaceFolder": "/workspace/dafnyutils",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/dafnyutils,type=bind",
+  "containerEnv": {
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "TZ": "Etc/UTC"
+  },
+  "privileged": true,
+  "runArgs": ["--name=${localEnv:USER}-dafnyutils"],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "python.defaultInterpreterPath": "/workspace/dafnyutils/.venv/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
+        "files.watcherExclude": {
+          "**/_build/**": true,
+          "**/coreutils/**": true,
+          "**/dafny/**": true,
+          "**/tools/coreutils_fuzzer/target/**": true
+        }
+      },
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ms-dotnettools.csharp",
+        "ms-vscode.makefile-tools",
+        "dafny-lang.ide-vscode",
+        "rust-lang.rust-analyzer"
+      ]
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "remoteEnv": {
+    "PATH": "/workspace/dafnyutils/.venv/bin:${containerEnv:PATH}"
+  }
+}

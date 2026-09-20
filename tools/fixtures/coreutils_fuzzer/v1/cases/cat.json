@@ -1,0 +1,20 @@
+{
+  "schema_version": "coreutils-fuzzer.case-set.v1",
+  "util": "cat",
+  "cases": [
+    {
+      "id": "stdin-only",
+      "case": {
+        "argv": ["-"],
+        "fixture": {
+          "directories": [],
+          "files": [],
+          "symlinks": [],
+          "hardlinks": []
+        },
+        "stdin": [104, 101, 108, 108, 111, 10],
+        "cwd": "."
+      }
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+services:
+  evaluator:
+    build:
+      context: .
+      dockerfile: docker/evaluation/Dockerfile
+    image: dafnyutils-evaluation:latest
+    network_mode: none
+    init: true
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p "$$HOME" "$$TMPDIR"
+        exec "$$@"
+      - --
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      LANG: "C"
+      LC_ALL: "C"
+      EVAL_REPO_ROOT: "/repo"
+      DAFNYUTILS_REPO_ROOT: "/repo"
+      EVAL_TARGET_ROOT: "/target"
+      EVAL_WORKSPACE_DIR: "/target"
+      REF_BIN_TEMPLATE: "/repo/_build/coreutils/src/{util}"
+      DUT_BIN_TEMPLATE: "_build/bench/{util}_bench.dll"
+      HOME: "/run/evaluator_home"
+      TMPDIR: "/run/tmp"
+      NUGET_PACKAGES: "/opt/eval-cache/nuget/packages"
+      RestoreSources: "/opt/eval-cache/nuget/packages"
+      RUSTUP_HOME: "/opt/eval-cache/rustup"
+      CARGO_HOME: "/opt/eval-cache/cargo"
+      CARGO_TARGET_DIR: "/run/cargo-target"
+      CARGO_NET_OFFLINE: "true"

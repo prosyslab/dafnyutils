@@ -1,0 +1,23 @@
+schema_version: model_cost.v1
+models:
+  gpt-6-astra:
+    input_per_1m: 10.00
+    output_per_1m: 50.00
+  gpt-5.6-sol:
+    input_per_1m: 5.00
+    output_per_1m: 30.00
+  gpt-5.6-terra:
+    input_per_1m: 2.00
+    output_per_1m: 12.00
+  gpt-5.6-luna:
+    input_per_1m: 0.2
+    output_per_1m: 1.2
+  gpt-5.5:
+    input_per_1m: 5.00
+    output_per_1m: 30.00
+  gpt-5.4:
+    input_per_1m: 2.50
+    output_per_1m: 15.00
+  gpt-5.4-mini:
+    input_per_1m: 0.75
+    output_per_1m: 4.50

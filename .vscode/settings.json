@@ -1,0 +1,14 @@
+{
+  "files.watcherExclude": {
+    "**/evaluation/runs/**": true
+  },
+  "python.analysis.exclude": [
+    "evaluation/runs"
+  ],
+  "rust-analyzer.linkedProjects": [
+    "tools/coreutils_fuzzer/Cargo.toml"
+  ],
+  "search.exclude": {
+    "evaluation/runs": true
+  }
+}

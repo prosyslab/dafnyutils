@@ -1,0 +1,110 @@
+record_type,id,category,scope,status,description,remaining_preparation
+candidate,[,shell_and_control,Shell-oriented status timing and process-control behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"String/integer predicates are expressible as for test, but canonical task IDs reject [. Prepare an explicit executable-name/task-ID mapping; do not silently rename the GNU target."
+candidate,arch,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No public uname/machine architecture observation; host constants cannot be hardcoded as benchmark answers.
+candidate,b2sum,encoding_and_checksums,"Digest generation; -b, -t, -z and -l digest length; ordered file/stdin operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#b2sum,
+candidate,base32,encoding_and_checksums,"Default encoding; -d, -i, -w (including zero); zero or one file operand.",open_for_contribution,Open initial scope: docs/adding-utilities.md#base32,
+benchmark,base64,encoding_and_checksums,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,basename,filesystem_and_paths,GNU-compatible supported subset,released,Existing benchmark,
+candidate,basenc,encoding_and_checksums,"--base16, --base32, --base64; -d, -i, -w; zero or one file operand.",open_for_contribution,Open initial scope: docs/adding-utilities.md#basenc,
+benchmark,cat,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+candidate,chcon,identity_and_permissions,Identity ownership permission and security-context behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No security-label query/set operation or isolated SELinux/SMACK outcome model.
+candidate,chgrp,identity_and_permissions,Group ownership modification,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No ownership-changing IO method; group names additionally need name-service lookup.
+benchmark,chmod,identity_and_permissions,GNU-compatible supported subset,released,Existing benchmark,
+candidate,chown,identity_and_permissions,Ownership modification,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No ownership-changing IO method, privilege-transition contract or owner/group lookup."
+candidate,chroot,filesystem_and_paths,Filesystem and path behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No root/cwd namespace transition, credential switching or subprocess execution contract."
+candidate,cksum,encoding_and_checksums,Default POSIX CRC with length and filename; ordered file/stdin operands.,open_for_contribution,Open initial scope: docs/adding-utilities.md#cksum,
+benchmark,comm,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+candidate,coreutils,multi_call,Multi-call command dispatch,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,Multi-call dispatch requires approved callable utility entries and executable-name mapping; all constituent commands are not prepared.
+candidate,cp,filesystem_and_paths,Follow-up filesystem utility,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"WriteFile fixes creation mode and does not model ordinary permission/partial-write outcomes faithfully; no copy contract for mode preservation, overwrite/alias/error policy. Read-plus-write existence is insufficient."
+benchmark,csplit,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,cut,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+candidate,date,system_information,"Explicit --reference=FILE, -u, and an explicit +%s, +%Y-%m-%d or +%H:%M:%S format.",open_for_contribution,Open initial scope: docs/adding-utilities.md#date,
+candidate,dd,text_and_streams,"Finite stdin to stdout; status=none; iflag=fullblock; bs=N and conv=lcase,ucase,swab (valid combinations), including plain copying.",open_for_contribution,Open initial scope: docs/adding-utilities.md#dd,
+candidate,df,system_information,Filesystem statistics,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"Per-inode storage is not mount/volume capacity, free blocks or inode availability; observations absent."
+candidate,dir,filesystem_and_paths,"Explicit -1; -a, -A, -d, -r; stable local paths, stdout capture and C locale.",open_for_contribution,Open initial scope: docs/adding-utilities.md#dir,
+candidate,dircolors,filesystem_and_paths,Explicit -b or -c and one configuration file; normal TERM/COLORTERM matching and color/extension records in C locale.,open_for_contribution,Open initial scope: docs/adding-utilities.md#dircolors,
+benchmark,dirname,filesystem_and_paths,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,du,filesystem_and_paths,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,echo,output_generation,GNU-compatible supported subset,released,Existing benchmark,
+candidate,env,process_and_environment,Process execution and environment behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No subprocess/environment mutation API; no-command enumeration also loses insertion order in the map contract (verified countermodel).
+benchmark,expand,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,expr,numeric_and_sequences,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,factor,numeric_and_sequences,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,false,shell_and_control,GNU-compatible supported subset,released,Existing benchmark,
+candidate,fmt,text_and_streams,"Default; -w, -g, -s, -u; ordered file/stdin operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#fmt,
+benchmark,fold,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+candidate,groups,identity_and_permissions,Group reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No supplementary-group enumeration or user/group name-service results.
+benchmark,head,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+candidate,hostid,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No gethostid observation; cannot substitute hostname or a fixed fixture answer.
+candidate,hostname,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No host-name query or mutation observation.
+candidate,id,identity_and_permissions,Identity reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"Credentials expose only ghost effective IDs, with no executable UID/GID getter; real/supplementary IDs and name lookup also absent."
+candidate,install,filesystem_and_paths,Filesystem and path behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No ownership-setting contract, copy error relation or prepared install-directory ownership/mode policy; cp and mkdir availability does not supply these."
+candidate,join,text_and_streams,"Two operands, at most one stdin; -1, -2, -j, -t, -a, -v, -e; --check-order / --nocheck-order.",open_for_contribution,Open initial scope: docs/adding-utilities.md#join,
+candidate,kill,shell_and_control,Shell-oriented status timing and process-control behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No process table, signal delivery, permission or observable target-process outcome contract; listing signal names alone does not prepare signal delivery."
+candidate,link,filesystem_and_paths,Exactly two operands; normal option delimiter/help/version handling.,open_for_contribution,Open initial scope: docs/adding-utilities.md#link,
+benchmark,ln,filesystem_and_paths,Symbolic-link subset,released,Existing benchmark,
+benchmark,logname,identity_and_permissions,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,ls,filesystem_and_paths,GNU-compatible supported subset,released,Existing benchmark,
+candidate,md5sum,encoding_and_checksums,"Digest generation; -b, -t, -z; ordered file/stdin operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#md5sum,
+candidate,mkdir,filesystem_and_paths,Default one-directory creation; -v; ordered operands.,open_for_contribution,Open initial scope: docs/adding-utilities.md#mkdir,
+candidate,mkfifo,filesystem_and_paths,Default FIFO creation with mode 0666 and process umask; ordered operands.,open_for_contribution,Open initial scope: docs/adding-utilities.md#mkfifo,
+candidate,mknod,filesystem_and_paths,FIFO form NAME p (including GNU first-character type matching); default mode 0666 and umask.,open_for_contribution,Open initial scope: docs/adding-utilities.md#mknod,
+candidate,mktemp,filesystem_and_paths,Filesystem and path behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No randomness/unique-name allocation observation and exclusive atomic creation contract; do not use a deterministic guessed name.
+benchmark,mv,filesystem_and_paths,GNU-compatible supported subset,released,Existing benchmark,
+candidate,nice,process_and_environment,Process execution and environment behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No priority query/change or command execution contract, including the no-command priority query."
+benchmark,nl,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+candidate,nohup,process_and_environment,Process execution and environment behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No signal-disposition change, terminal-dependent descriptor replacement or subprocess contract."
+candidate,nproc,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No CPU availability/affinity/quota observation; environment variables alone are insufficient.
+candidate,numfmt,numeric_and_sequences,C-locale unit conversion and rounding,scope_investigation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"Exact long-double parsing, intermediate rounding, printf conversion and precision diagnostics need a reviewed numerical relation or prepared trusted formatter. Ideal decimal arithmetic is not a justified GNU specification; no wrapper currently provides those results."
+candidate,od,text_and_streams,"Explicit -t x1, o1 or u1; -A, -j, -N, -v, -w; regular file operands (no stdin for bounded reads).",open_for_contribution,Open initial scope: docs/adding-utilities.md#od,
+benchmark,paste,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+candidate,pathchk,filesystem_and_paths,-p or --portability (equivalent to -p -P); one or more names.,open_for_contribution,Open initial scope: docs/adding-utilities.md#pathchk,
+candidate,pinky,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No login-session/utmp and passwd/GECOS/home information model; reading arbitrary ABI bytes is not a prepared interface.
+candidate,pr,text_and_streams,"Explicit -t; single-column output; -l page length, -d double spacing, -n numbering, -o indentation; file/stdin operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#pr,
+benchmark,printenv,process_and_environment,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,printf,output_generation,GNU-compatible supported subset,released,Existing benchmark,
+candidate,ptx,text_and_streams,"Default GNU keyword output; -w width and -g gap; file/stdin input, stdout only; no user regex.",open_for_contribution,Open initial scope: docs/adding-utilities.md#ptx,
+benchmark,pwd,system_information,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,readlink,filesystem_and_paths,GNU-compatible supported subset,released,Existing benchmark,
+candidate,realpath,filesystem_and_paths,Explicit -m -s; -z and -q; one or more nonempty/empty operands in the fixed Linux filesystem namespace.,open_for_contribution,Open initial scope: docs/adding-utilities.md#realpath,
+candidate,rm,filesystem_and_paths,Explicit -f; optional -v; nonrecursive ordinary files/symlinks and directory-rejection cases; ordered operands.,open_for_contribution,Open initial scope: docs/adding-utilities.md#rm,
+candidate,rmdir,filesystem_and_paths,Default empty-directory removal; -v; ordered operands.,open_for_contribution,Open initial scope: docs/adding-utilities.md#rmdir,
+candidate,runcon,identity_and_permissions,Identity ownership permission and security-context behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No security context transition, policy lookup or execution contract."
+benchmark,seq,numeric_and_sequences,GNU-compatible supported subset,released,Existing benchmark,
+candidate,sha1sum,encoding_and_checksums,"Digest generation; -b, -t, -z; ordered file/stdin operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#sha1sum,
+candidate,sha224sum,encoding_and_checksums,"Digest generation; -b, -t, -z; ordered file/stdin operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#sha224sum,
+candidate,sha256sum,encoding_and_checksums,"Digest generation; -b, -t, -z; ordered file/stdin operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#sha256sum,
+candidate,sha384sum,encoding_and_checksums,"Digest generation; -b, -t, -z; ordered file/stdin operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#sha384sum,
+candidate,sha512sum,encoding_and_checksums,"Digest generation; -b, -t, -z; ordered file/stdin operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#sha512sum,
+candidate,shred,filesystem_and_paths,Filesystem and path behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No random overwrite sequence, durability/truncation outcome model or observable secure-deletion guarantee."
+candidate,shuf,text_and_streams,Text and byte-stream processing,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No random-source observation. A permutation relation would accept arbitrary wrong GNU output; --random-source needs a separately reviewed entropy-consumption/sampling relation.
+candidate,sleep,shell_and_control,Shell-oriented status timing and process-control behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No delay, elapsed-time or interruption contract. Returning immediately cannot be distinguished by the present observation model."
+candidate,sort,text_and_streams,"Whole-line C byte order; -r, -u, -s, -c, -C, -z; file/stdin operands, stdout output (check mode uses regular files).",open_for_contribution,Open initial scope: docs/adding-utilities.md#sort,
+candidate,split,text_and_streams,Explicit -n r/K/N to stdout; optional one file operand or stdin; default newline records.,open_for_contribution,Open initial scope: docs/adding-utilities.md#split,
+benchmark,stat,filesystem_and_paths,GNU-compatible supported subset,released,Existing benchmark,
+candidate,stdbuf,process_and_environment,Process execution and environment behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No environment mutation, child execution or child stream-buffering contract."
+candidate,stty,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No public terminal-attribute query/set API; historical raw terminal support is not exported.
+candidate,sum,encoding_and_checksums,Default BSD checksum; -r and -s; ordered file/stdin operands.,open_for_contribution,Open initial scope: docs/adding-utilities.md#sum,
+candidate,sync,filesystem_and_paths,Global no-operand sync; --help/--version and invalid option combinations including -d without operands.,open_for_contribution,Open initial scope: docs/adding-utilities.md#sync,
+benchmark,tac,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,tail,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,tee,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+candidate,test,shell_and_control,"String -n/-z and =/!=; integer -eq/-ne/-lt/-le/-gt/-ge; !, parentheses, -a/-o and GNU argument-count precedence.",open_for_contribution,Open initial scope: docs/adding-utilities.md#test,
+candidate,timeout,process_and_environment,Process execution and environment behavior,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No child lifecycle, timer, process-group signal or timeout outcome contract."
+benchmark,touch,filesystem_and_paths,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,tr,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+benchmark,true,shell_and_control,GNU-compatible supported subset,released,Existing benchmark,
+candidate,truncate,filesystem_and_paths,"Explicit -c -s N with absolute nonnegative decimal size through signed 64-bit maximum; stable regular files/symlinks, directories and missing paths.",open_for_contribution,Open initial scope: docs/adding-utilities.md#truncate,
+candidate,tsort,text_and_streams,"Zero or one file/stdin operand; space/tab/newline-separated pairs; self pairs, duplicate edges and cycles; legacy -w no-op.",open_for_contribution,Open initial scope: docs/adding-utilities.md#tsort,
+candidate,tty,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No executable ttyname/isatty result and terminal error model.
+candidate,uname,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No kernel/node/release/version/machine/platform observations.
+candidate,unexpand,text_and_streams,"Default leading blanks; -a, --first-only, -t tab lists including continuation; ordered file/stdin operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#unexpand,
+benchmark,uniq,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+candidate,unlink,filesystem_and_paths,"Exactly one operand, including symlink operands.",open_for_contribution,Open initial scope: docs/adding-utilities.md#unlink,
+candidate,uptime,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No boot/uptime, load-average or session-count observations; Now is current wall-clock seconds only."
+candidate,users,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No prepared utmp session contract/ABI parser and fixture model.
+candidate,vdir,filesystem_and_paths,"Explicit -n --time-style=long-iso; -a, -A, -d, -r; C locale and UTC0.",open_for_contribution,Open initial scope: docs/adding-utilities.md#vdir,
+benchmark,wc,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
+candidate,who,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,"No login-session/utmp, boot/session metadata and tty activity model."
+candidate,whoami,identity_and_permissions,Identity reporting,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,No effective-user name-service result; GetLoginName answers a different question.
+candidate,yes,output_generation,Direct output generation,model_preparation,Reviewed blocker: docs/adding-utilities.md#candidates-awaiting-model-work,Successful behavior is unbounded output terminated externally; finite output plus normal exit is wrong. A progress/signal-aware specification and evaluator lifecycle are unprepared.
