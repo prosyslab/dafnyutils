@@ -99,7 +99,15 @@ Fill the generated `bench/utils/base32/base32.md` before implementation:
 | What is trusted? | Named `bench/core` IO and diagnostic contracts, with their recorded revision |
 | What remains to prove? | Bit-block relation, padding, wrapping, decoding prefix, diagnostics and exit policy |
 
-A missing API or observation is a maintainer model issue. Record it before extending the scope. Do not narrow an existing task, assume successful IO, or add an unchecked native call to make a proof pass.
+Check the current API in `bench/core/IO.dfy` before choosing the options to implement.
+If an option cannot be implemented with this API, leave it out of the contribution.
+List each such option in the utility's scope document and in the PR's
+**Options left out due to IO.dfy** section. Explain what API support is missing.
+Write `None` in that PR section if no options were left out for this reason.
+
+If the option is already required by an agreed task, ask a maintainer to review
+the scope or API change before implementation. Do not silently narrow the task,
+assume successful IO, or add an unchecked native call to make a proof pass.
 
 Open a draft PR with this scope table and ask a repository maintainer to review it
 before implementation. Link a related issue if one exists; an issue is not required.
@@ -315,9 +323,10 @@ Follow [the contribution guidelines below](#prepare-the-change) and use the
 [pull request template](.github/pull_request_template.md).
 
 - Paste actual stdout in **tests → fuzzing → verification** order, with commands,
-  exit codes and accessible logs. Explain failed, unrun and inapplicable checks.
-- For each affected coreutils utility, show three different seeds with at least
-  1,000 completed matches each, no errors and full comparison settings. The
+  exit codes. Explain failed, unrun and inapplicable checks.
+- For each affected coreutils utility, run the command in the PR template with
+  seeds `1,7,19` and 1,000 iterations per seed. Paste its actual output. Each seed
+  must complete 1,000 matches with no errors and full comparison settings. The
   20-case automatic gate does not replace these runs.
 - Include the source revision/license, accepted scope, trusted APIs, main
   specification, and any proof or termination limits.
@@ -449,20 +458,20 @@ Replace the template fields with facts. Include an accurate `Co-authored-by: Ful
 
 Report evidence in **tests → fuzzing → verification** order. Copy and paste actual stdout into the template's fenced `text` blocks, with the exact command and exit code alongside it. Include final summaries and explain failed, skipped, unrun or inapplicable work. A missing tool, timeout or skipped required check is not a pass.
 
-- **Tests:** Show the affected runtime/source test results with passed, failed and skipped counts, plus a log or JUnit link.
-- **Fuzzing:** For each affected coreutils utility, use three distinct seeds with at least **1,000 completed iterations per seed**. Every requested iteration must match, with zero mismatches, timeouts, incomplete coverage or other errors. Paste each seed's Configuration, Coverage and Results stdout and retain metrics. Use generated campaigns, full comparison including stderr, and the same code revision. Repeated seeds and fixed JSON cases do not meet this requirement. Record failures and fixes rather than selecting only favorable runs.
+- **Tests:** Show the affected runtime/source test results with passed, failed and skipped counts.
+- **Fuzzing:** For each affected coreutils utility, run the command in the PR template. Replace `<utility_name>` with your utility name. Keep seeds `1,7,19` and **1,000 iterations per seed**. Every requested iteration must match, with zero mismatches, timeouts, incomplete coverage or other errors. Paste the full stdout from the command into one block without changes. No file attachments are needed. Include stderr in the comparison and use the same code revision. Fixed JSON cases do not meet this requirement. Record failed runs and fixes too.
 - **Verification:** Show Dafny stdout with verified/error/timeout counts and the verified files, their included files, and whether termination was proved. Also report definition/layout checks and the final contribution gate. A build is not proof verification.
 
 The short automatic gate currently runs 20 fuzz cases with seed 1; it does not satisfy the separate PR requirement of three campaigns with at least 1,000 iterations each. See [Collect PR evidence](docs/fuzzing.md#collect-pr-evidence) for the command.
 For example, a one-case differential run should identify its case ID and completed outcome; a proof result should identify the verified files, their included files, and the verifier summary. Copy actual results from the run. Do not treat example output in a guide as evidence for your PR.
 
-See [validation commands](#validate-and-submit) and the [metrics example](docs/fuzzing.md#run-and-inspect-the-comparison). Link uploaded PR or CI artifacts that reviewers can access; a local `/tmp` path alone is not a shared log. Never include credentials or restricted evaluator payloads.
+See [validation commands](#validate-and-submit) and [Collect PR evidence](docs/fuzzing.md#collect-pr-evidence). Paste the output directly into the PR; no file attachments are needed. Never include credentials or restricted evaluator payloads.
 
 Algorithm tasks do not require the coreutils fuzzer; report their case tests instead and explain `not applicable` in the fuzzing section. For documentation-only changes, record link/content checks and explain why runtime verification and fuzzing were not run.
 
 ## Open the pull request
 
-Use a short title and explain the resulting behavior first. Complete the template's scope and evidence fields, attach relevant reports, and list remaining failures or limitations. Rerun affected checks after code changes and identify the revision each result covers.
+Use a short title and explain the resulting behavior first. Complete the template's scope and evidence fields, paste the command output, and list remaining failures or limitations. Rerun affected checks after code changes and identify the revision each result covers.
 
 Maintainers check whether the specification describes the required behavior and
 uses only approved library contracts, separately from automated checks. Leave

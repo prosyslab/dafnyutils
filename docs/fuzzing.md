@@ -151,9 +151,8 @@ Run **three distinct seeds with at least 1,000 iterations per seed** for each af
 ```sh
 # Expected duration: Unknown; at least 3,000 paired target executions, plus any shrinking.
 # Success criteria: Exit 0; all three seeds complete 1,000 matches each, with no failures.
-python3 tools/coreutils_fuzzer/run.py fuzz comm \
-  --seeds 1,7,19 --iterations 1000 \
-  --metrics-out '/tmp/comm-pr-{seed}.json'
+python3 tools/coreutils_fuzzer/run.py fuzz '<utility_name>' \
+  --seeds 1,7,19 --iterations 1000
 ```
 
 Expected Results section **for each of seeds 1, 7 and 19**, exit 0:
@@ -170,8 +169,8 @@ Results
 Keep each seed's Configuration and Coverage sections too; they are omitted here
 only to make the expected completion counts easier to find.
 
-Replace `comm` with the affected utility and choose fresh metrics paths. This
-selects seeds 1, 7 and 19 and writes one JSON file per seed. The automatic
+Replace `<utility_name>` with the affected utility. This command runs seeds
+1, 7 and 19. Paste its full stdout into the PR. No file attachments are needed. The automatic
 `make check` gate uses only 20 cases and seed 1, so it cannot replace this evidence.
 A fixed JSON case set is a separate regression check and does not satisfy the
 generated-campaign requirement.
@@ -182,7 +181,7 @@ Stdout now groups each campaign into **Configuration**, **Coverage** and **Resul
 - Coverage shows observed option singles/pairs and semantic buckets, including gaps. These are generated-input coverage measures, not source-code coverage or proof of all behavior.
 - Results shows requested/submitted/completed iterations, unstarted/unfinished work, matches, mismatches, timeouts, incomplete observations, other errors, elapsed time and PASS/FAIL. Completed errors are not matches. PASS is printed only after any requested metrics file is successfully saved.
 
-Copy each seed's complete report into its `text` block in the [PR template](../.github/pull_request_template.md), after the test stdout and before the verifier stdout. Record command and process exit status separately. Keep stderr if it reports failure details. A setup failure may stop before a result report; missing output is never proof of success. The wrapper stops when a seed fails, so unstarted later seeds still need execution after the cause is fixed.
+Copy the full stdout from the command into the single fuzzing `text` block in the [PR template](../.github/pull_request_template.md). The output includes all three seeds in order. Do not split or edit it. Record command and process exit status separately. Keep stderr if it reports failure details. A setup failure may stop before a result report; missing output is never proof of success. The wrapper stops when a seed fails, so unstarted later seeds still need execution after the cause is fixed.
 
 For a passing run, `requested`, `submitted`, `completed` and `match` must all
 equal the requested budget, with every error count zero. `not_started` counts
