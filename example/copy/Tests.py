@@ -28,8 +28,12 @@ def test_binary_input() -> None:
 def test_full_output_device() -> None:
     with open("/dev/full", "wb") as output:
         result = subprocess.run(
-            ["dotnet", str(PROGRAM)], input=b"hello\n", stdout=output,
-            stderr=subprocess.PIPE, timeout=10, check=False,
+            ["dotnet", str(PROGRAM)],
+            input=b"hello\n",
+            stdout=output,
+            stderr=subprocess.PIPE,
+            timeout=10,
+            check=False,
         )
     assert (result.stderr, result.returncode) == (b"", 1)
 
@@ -39,8 +43,11 @@ def test_directory_input(tmp_path: Path) -> None:
     descriptor = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
     try:
         result = subprocess.run(
-            ["dotnet", str(PROGRAM)], stdin=descriptor, capture_output=True,
-            timeout=10, check=False,
+            ["dotnet", str(PROGRAM)],
+            stdin=descriptor,
+            capture_output=True,
+            timeout=10,
+            check=False,
         )
     finally:
         os.close(descriptor)

@@ -326,21 +326,23 @@ def test_create_directory_symlink_parent(stream_filesystem_probe: Path, tmp_path
     (tmp_path / "untouched").write_bytes(b"preserve me")
     before = (tmp_path / "untouched").stat()
 
-    completed = _run_probe(
-        stream_filesystem_probe, "mkdir", tmp_path, directory_path="alias/made/"
-    )
+    completed = _run_probe(stream_filesystem_probe, "mkdir", tmp_path, directory_path="alias/made/")
 
     assert completed.returncode == 0, completed.stderr
     assert (tmp_path / "real" / "made").is_dir()
     link_after = (tmp_path / "alias").lstat()
     assert (link_after.st_ino, link_after.st_mode, link_after.st_mtime_ns) == (
-        link_before.st_ino, link_before.st_mode, link_before.st_mtime_ns
+        link_before.st_ino,
+        link_before.st_mode,
+        link_before.st_mtime_ns,
     )
     assert (tmp_path / "alias").readlink() == Path("real")
     assert (tmp_path / "untouched").read_bytes() == b"preserve me"
     after = (tmp_path / "untouched").stat()
     assert (after.st_ino, after.st_mode, after.st_mtime_ns) == (
-        before.st_ino, before.st_mode, before.st_mtime_ns
+        before.st_ino,
+        before.st_mode,
+        before.st_mtime_ns,
     )
 
 
@@ -399,9 +401,7 @@ def test_create_directory_file_parent(stream_filesystem_probe: Path, tmp_path: P
     # upstream: none - repository-local directory contract regression
     (tmp_path / "parent").write_bytes(b"keep")
 
-    completed = _run_probe(
-        stream_filesystem_probe, "mkdir", tmp_path, directory_path="parent/made"
-    )
+    completed = _run_probe(stream_filesystem_probe, "mkdir", tmp_path, directory_path="parent/made")
 
     assert completed.returncode == 10
     assert (tmp_path / "parent").read_bytes() == b"keep"

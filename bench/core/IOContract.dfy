@@ -2162,8 +2162,8 @@ module IOContract {
   )
   {
     var observed := observations(
-      FilesystemSetTimes(fs, path, followSymlink, now, atime, mtime)
-    );
+                      FilesystemSetTimes(fs, path, followSymlink, now, atime, mtime)
+                    );
     ok == observed.ok && err == observed.err && fs2 == observed.postFs
   }
 
@@ -2954,23 +2954,23 @@ module IOContract {
         before.namespace, PathSegments(target), InodeTreeNode(id, map[])) &&
       after.inodes.Keys == before.inodes.Keys + {id} &&
       (forall oldId | oldId in before.inodes ::
-        if oldId != parentId then
-          // Path traversal can refresh symlink atime. No traversal trace is modeled.
-          if before.inodes[oldId].node.Symlink? then
-            var times := NodeTimes(before.inodes[oldId].node);
-            var observedTimes := NodeTimes(after.inodes[oldId].node);
-            after.inodes[oldId] == before.inodes[oldId].(
-              node := WithNodeTimes(before.inodes[oldId].node,
-                times.(atimeSec := observedTimes.atimeSec, atimeNsec := observedTimes.atimeNsec)))
-          else
-            after.inodes[oldId] == before.inodes[oldId]
-        else
-          after.inodes[oldId].hostKey == before.inodes[oldId].hostKey &&
-          after.inodes[oldId].ownership == before.inodes[oldId].ownership &&
-          after.inodes[oldId].kind == before.inodes[oldId].kind &&
-          after.inodes[oldId].node.Directory? &&
-          after.inodes[oldId].node.mode == before.inodes[oldId].node.mode &&
-          after.inodes[oldId].node.ext == before.inodes[oldId].node.ext)
+         if oldId != parentId then
+           // Path traversal can refresh symlink atime. No traversal trace is modeled.
+           if before.inodes[oldId].node.Symlink? then
+             var times := NodeTimes(before.inodes[oldId].node);
+             var observedTimes := NodeTimes(after.inodes[oldId].node);
+             after.inodes[oldId] == before.inodes[oldId].(
+             node := WithNodeTimes(before.inodes[oldId].node,
+                                   times.(atimeSec := observedTimes.atimeSec, atimeNsec := observedTimes.atimeNsec)))
+           else
+             after.inodes[oldId] == before.inodes[oldId]
+         else
+           after.inodes[oldId].hostKey == before.inodes[oldId].hostKey &&
+           after.inodes[oldId].ownership == before.inodes[oldId].ownership &&
+           after.inodes[oldId].kind == before.inodes[oldId].kind &&
+           after.inodes[oldId].node.Directory? &&
+           after.inodes[oldId].node.mode == before.inodes[oldId].node.mode &&
+           after.inodes[oldId].node.ext == before.inodes[oldId].node.ext)
   }
 
   ghost predicate ValidDirectoryObservation(
@@ -2988,7 +2988,7 @@ module IOContract {
     observations: ((TrustedFilesystemRequest) -> TrustedFilesystemResult) |
       (forall request :: ValidDirectoryObservation(request, observations(request)))
     ghost witness (request: TrustedFilesystemRequest) =>
-      TrustedFilesystemResult(false, 5, request.preFs, 0, 0, 0, 0, false, false, 0, 0, 0)
+        TrustedFilesystemResult(false, 5, request.preFs, 0, 0, 0, 0, false, false, 0, 0, 0)
 
   ghost predicate CreateDirectorySpec(
     beforeFs: FileSystem,

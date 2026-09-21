@@ -358,7 +358,25 @@ Follow the surrounding code and reuse existing helpers before adding new ones. K
 
 ### Python
 
-Use Python 3.12 or newer, four-space indentation, and the 100-character line length configured in [pyproject.toml](pyproject.toml). Add type annotations to new interfaces. Ruff checks include import order and complexity; the configured complexity limit is 10. Follow the existing [CI checks](.github/workflows/benchmark.yml), which also run Pyright.
+Use Python 3.12 or newer, four-space indentation, and the 100-character line length configured in [pyproject.toml](pyproject.toml). Add type annotations to new interfaces. Ruff checks include import order and complexity; the configured complexity limit is 10.
+
+The [CI checks](.github/workflows/checks.yml) run only Python formatting, Python
+lint, and Rust formatting on pull requests and pushes to `main`. Run the same
+checks from the repository root:
+
+```sh
+ruff format --check .
+ruff check .
+cargo fmt --manifest-path tools/coreutils_fuzzer/Cargo.toml --all -- --check
+```
+
+Install `.[dev]` to use Ruff 0.15.12. CI reads Ruff's `required-version` from
+`pyproject.toml`; keep the development dependency pin in sync when updating it.
+Rustup uses Rust 1.94.0 and its bundled rustfmt from `rust-toolchain.toml` in both
+the development container and CI. Python checks use the exclusions in
+`pyproject.toml`; Rust formatting covers the repository's fuzzer crate.
+CI does not run tests, Pyright, Dafny verification, or benchmark checks. Run the
+applicable validation described in this guide and include its evidence in PRs.
 
 - Import a name from the module that defines it. For example, use `from benchmarks.definition import BenchmarkKind`, not a package-root re-export.
 - Keep `__init__.py` empty. Do not use wildcard imports, `__all__`, `importlib` or import tricks to avoid redesigning a cyclic dependency.

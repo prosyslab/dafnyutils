@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pyright", "pytest", "pytest-xdist", "ruff"]
+dev = ["pyright", "pytest", "pytest-xdist", "ruff==0.15.12"]
 contributor = ["click"]
 
 [project.scripts]
@@ -38,6 +38,7 @@ markers = [
 ]
 
 [tool.ruff]
+required-version = "0.15.12"
 target-version = "py312"
 line-length = 100
 exclude = [

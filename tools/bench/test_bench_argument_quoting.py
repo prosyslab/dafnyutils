@@ -45,11 +45,14 @@ int main(void) {
     subprocess.run(
         [
             "cc",
-            "-I", str(ROOT / "_build/coreutils/lib"),
-            "-I", str(ROOT / "coreutils/lib"),
+            "-I",
+            str(ROOT / "_build/coreutils/lib"),
+            "-I",
+            str(ROOT / "coreutils/lib"),
             str(reference_source),
             str(ROOT / "_build/coreutils/lib/libcoreutils.a"),
-            "-o", str(reference),
+            "-o",
+            str(reference),
         ],
         check=True,
         capture_output=True,
@@ -57,7 +60,7 @@ int main(void) {
     )
     source = build / "QuoteProbe.dfy"
     source.write_text(
-        f"""include "{ROOT / 'bench/core/IO.dfy'}"
+        f"""include "{ROOT / "bench/core/IO.dfy"}"
 
 module QuoteProbe {{
   import BenchIO
@@ -85,8 +88,14 @@ module QuoteProbe {{
     candidate = build / "QuoteProbe.dll"
     completed = subprocess.run(
         [
-            dafny_command(), "build", "--standard-libraries:false", "--target:cs",
-            "--output", str(candidate), str(source), str(ROOT / "bench/core/IOExtern.cs"),
+            dafny_command(),
+            "build",
+            "--standard-libraries:false",
+            "--target:cs",
+            "--output",
+            str(candidate),
+            str(source),
+            str(ROOT / "bench/core/IOExtern.cs"),
         ],
         cwd=build,
         env={**os.environ, "TMPDIR": "/tmp"},
@@ -113,7 +122,9 @@ module QuoteProbe {{
     ],
 )
 def test_argument_quote_matches_gnulib(
-    quote_programs: QuotePrograms, tmp_path: Path, payload: bytes,
+    quote_programs: QuotePrograms,
+    tmp_path: Path,
+    payload: bytes,
 ) -> None:
     # upstream: none - repository-owned diagnostic primitive conformance
     reference = subprocess.run(
@@ -125,7 +136,11 @@ def test_argument_quote_matches_gnulib(
         timeout=10,
     )
     candidate = run_candidate(
-        quote_programs.candidate, [], cwd=tmp_path, input=payload, timeout=30,
+        quote_programs.candidate,
+        [],
+        cwd=tmp_path,
+        input=payload,
+        timeout=30,
     )
     assert candidate.returncode == 0, candidate.stderr
     assert candidate.stderr == b""

@@ -1,0 +1,51 @@
+name: code-checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Ruff ${{ matrix.check }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [format, lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned Ruff
+        run: |
+          python - <<'PY'
+          import pathlib
+          import subprocess
+          import sys
+          import tomllib
+
+          config = tomllib.loads(pathlib.Path("pyproject.toml").read_text())
+          version = config["tool"]["ruff"]["required-version"]
+          subprocess.check_call([sys.executable, "-m", "pip", "install", f"ruff=={version}"])
+          PY
+      - name: Check formatting
+        if: matrix.check == 'format'
+        run: ruff format --check .
+      - name: Check lint
+        if: matrix.check == 'lint'
+        run: ruff check .
+
+  rust-format:
+    name: Rust format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pinned Rust toolchain
+        run: rustup show
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/coreutils_fuzzer/Cargo.toml --all -- --check

@@ -52,8 +52,8 @@ module SecurityModel {
     !record.node.Directory? && requested <= (7 as bv32) &&
     ((security.dacReadSearch && requested == (4 as bv32)) ||
      (security.dacOverride &&
-       ((requested & (1 as bv32)) == (0 as bv32) ||
-        (NodeMode(record.node) & (73 as bv32)) != (0 as bv32))) ||
+      ((requested & (1 as bv32)) == (0 as bv32) ||
+       (NodeMode(record.node) & (73 as bv32)) != (0 as bv32))) ||
      (var mode := NodeMode(record.node);
       var permission :=
         if security.fsuid == record.ownership.uid then mode >> 6
@@ -67,9 +67,9 @@ module SecurityModel {
     requires !record.node.Directory?
     requires NodeMode(record.node) == (0 as bv32)
     ensures FileAccessAllowed(record,
-      FilesystemSecurityContext(0, 0, {}, false, true, false, false), 4 as bv32)
+                              FilesystemSecurityContext(0, 0, {}, false, true, false, false), 4 as bv32)
     ensures !FileAccessAllowed(record,
-      FilesystemSecurityContext(0, 0, {}, false, true, false, false), 2 as bv32)
+                               FilesystemSecurityContext(0, 0, {}, false, true, false, false), 2 as bv32)
   {
   }
 
@@ -77,7 +77,7 @@ module SecurityModel {
     requires !record.node.Directory?
     requires (NodeMode(record.node) & (73 as bv32)) == (0 as bv32)
     ensures !FileAccessAllowed(record,
-      FilesystemSecurityContext(0, 0, {}, true, false, false, false), 1 as bv32)
+                               FilesystemSecurityContext(0, 0, {}, true, false, false, false), 1 as bv32)
   {
   }
 
@@ -88,11 +88,11 @@ module SecurityModel {
   ): InodeRecord
   {
     if !record.node.Directory? then record else
-      var mode := NodeMode(record.node);
-      var viewedMode := if DirectoryAccessAllowed(record, security, 1 as bv32)
-                        then mode | OWNER_EXECUTE_MODE_BIT
-                        else mode & (ALL_MODE_BITS ^ OWNER_EXECUTE_MODE_BIT);
-      InodeRecordWithNode(record, WithNodeMode(record.node, viewedMode))
+    var mode := NodeMode(record.node);
+    var viewedMode := if DirectoryAccessAllowed(record, security, 1 as bv32)
+                      then mode | OWNER_EXECUTE_MODE_BIT
+                      else mode & (ALL_MODE_BITS ^ OWNER_EXECUTE_MODE_BIT);
+    InodeRecordWithNode(record, WithNodeMode(record.node, viewedMode))
   }
 
   ghost function DirectorySearchInodes(
@@ -107,7 +107,7 @@ module SecurityModel {
   )
     requires record.node.Directory?
     ensures FixtureOwnerCanSearch(DirectorySearchRecord(record, security).node) ==
-      DirectoryAccessAllowed(record, security, 1 as bv32)
+            DirectoryAccessAllowed(record, security, 1 as bv32)
   {
   }
 
@@ -121,7 +121,7 @@ module SecurityModel {
   {
     forall name | name in tree.children
       ensures InodeTreeWellFormed(tree.children[name],
-        DirectorySearchInodes(inodes, security))
+                                  DirectorySearchInodes(inodes, security))
     {
       SearchTreeWellFormed(tree.children[name], inodes, security);
     }
@@ -141,9 +141,9 @@ module SecurityModel {
     SearchTreeWellFormed(fs.namespace, fs.inodes, security);
     assert viewed.inodes.Keys == fs.inodes.Keys;
     assert forall id | id in fs.inodes ::
-      viewed.inodes[id].hostKey == fs.inodes[id].hostKey &&
-      viewed.inodes[id].links == fs.inodes[id].links &&
-      InodeSameNodeKind(viewed.inodes[id].node, fs.inodes[id].node);
+        viewed.inodes[id].hostKey == fs.inodes[id].hostKey &&
+        viewed.inodes[id].links == fs.inodes[id].links &&
+        InodeSameNodeKind(viewed.inodes[id].node, fs.inodes[id].node);
   }
 
   ghost function DirectorySearchView(
@@ -162,8 +162,8 @@ module SecurityModel {
   lemma OwnerPermissionsTakePrecedence()
   {
     var record := InodeRecord(HostInodeKey(0, 1),
-      Directory(7 as bv32, DEFAULT_FILE_TIMES, map[]), LinkCountKnown(2),
-      Ownership(1000, 100), StorageInfo(4096, 8, 4096), DirectoryKind);
+                              Directory(7 as bv32, DEFAULT_FILE_TIMES, map[]), LinkCountKnown(2),
+                              Ownership(1000, 100), StorageInfo(4096, 8, 4096), DirectoryKind);
     var owner := FilesystemSecurityContext(1000, 100, {}, false, false, false, false);
     var other := FilesystemSecurityContext(2000, 200, {}, false, false, false, false);
     assert !DirectoryAccessAllowed(record, owner, 3 as bv32);
@@ -173,8 +173,8 @@ module SecurityModel {
   lemma SupplementaryGroupGrantsDirectoryAccess()
   {
     var record := InodeRecord(HostInodeKey(0, 1),
-      Directory(56 as bv32, DEFAULT_FILE_TIMES, map[]), LinkCountKnown(2),
-      Ownership(1000, 100), StorageInfo(4096, 8, 4096), DirectoryKind);
+                              Directory(56 as bv32, DEFAULT_FILE_TIMES, map[]), LinkCountKnown(2),
+                              Ownership(1000, 100), StorageInfo(4096, 8, 4096), DirectoryKind);
     var member := FilesystemSecurityContext(2000, 200, {100}, false, false, false, false);
     var nonmember := FilesystemSecurityContext(2000, 200, {}, false, false, false, false);
     assert DirectoryAccessAllowed(record, member, 3 as bv32);
@@ -184,8 +184,8 @@ module SecurityModel {
   lemma ReadSearchCapabilityDoesNotGrantWrite()
   {
     var record := InodeRecord(HostInodeKey(0, 1),
-      Directory(0 as bv32, DEFAULT_FILE_TIMES, map[]), LinkCountKnown(2),
-      Ownership(1000, 100), StorageInfo(4096, 8, 4096), DirectoryKind);
+                              Directory(0 as bv32, DEFAULT_FILE_TIMES, map[]), LinkCountKnown(2),
+                              Ownership(1000, 100), StorageInfo(4096, 8, 4096), DirectoryKind);
     var security := FilesystemSecurityContext(2000, 200, {}, false, true, false, false);
     assert DirectoryAccessAllowed(record, security, 1 as bv32);
     assert !DirectoryAccessAllowed(record, security, 3 as bv32);
@@ -194,11 +194,11 @@ module SecurityModel {
   lemma StickyDirectoryProtectsOtherOwners()
   {
     var parent := InodeRecord(HostInodeKey(0, 1),
-      Directory(1023 as bv32, DEFAULT_FILE_TIMES, map[]), LinkCountKnown(3),
-      Ownership(1000, 100), StorageInfo(4096, 8, 4096), DirectoryKind);
+                              Directory(1023 as bv32, DEFAULT_FILE_TIMES, map[]), LinkCountKnown(3),
+                              Ownership(1000, 100), StorageInfo(4096, 8, 4096), DirectoryKind);
     var target := InodeRecord(HostInodeKey(0, 2),
-      Directory(511 as bv32, DEFAULT_FILE_TIMES, map[]), LinkCountKnown(2),
-      Ownership(2000, 200), StorageInfo(4096, 8, 4096), DirectoryKind);
+                              Directory(511 as bv32, DEFAULT_FILE_TIMES, map[]), LinkCountKnown(2),
+                              Ownership(2000, 200), StorageInfo(4096, 8, 4096), DirectoryKind);
     var other := FilesystemSecurityContext(3000, 300, {}, false, false, false, false);
     var owner := FilesystemSecurityContext(2000, 300, {}, false, false, false, false);
     var capable := FilesystemSecurityContext(3000, 300, {}, false, false, true, false);

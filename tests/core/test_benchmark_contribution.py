@@ -301,12 +301,21 @@ def test_check_plan_keeps_required_family_checks(task_id: str) -> None:
     assert tuple(command.name for command in commands) == expected
     proof = next(command for command in commands if command.name == "dafny-verify")
     assert proof.argv == (
-        "make", "-C", repository.load_definition(task_id).item_directory, "verify"
+        "make",
+        "-C",
+        repository.load_definition(task_id).item_directory,
+        "verify",
     )
     if task_id == "cat":
         assert commands[-1].argv[1:] == (
-            "-m", "pytest", "-q", "-n0", "--import-mode=importlib",
-            "-m", "dafny_verify", "bench/utils/cat/Tests.py",
+            "-m",
+            "pytest",
+            "-q",
+            "-n0",
+            "--import-mode=importlib",
+            "-m",
+            "dafny_verify",
+            "bench/utils/cat/Tests.py",
         )
 
 
