@@ -15,11 +15,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution process and require
 | Run generated cases and reproduce mismatches | [Use the fuzzer](docs/fuzzing.md) |
 | Port upstream GNU scenarios into utility Python tests | [Add test cases](docs/adding-test-cases.md) |
 
-Follow the setup steps below before using any guide. [TODOLIST.csv](TODOLIST.csv) records utility status and initial scope.
-
-`bench/utils/` contains utility tasks, `bench/algorithm/` contains algorithm tasks, `bench/core/` supplies shared contracts, and `src/` contains authoring and evaluation tooling. `coreutils/` is a pinned upstream submodule. `dafny/` contains the Dafny source used by this project. Builds create `_build/`.
-
-Runtime parity, Dafny verification and human specification review provide different evidence; none replaces the others. Follow [repository instructions](AGENTS.md), [bench rules](bench/AGENTS.md) and [Dafny style](DAFNYSTYLE.md).
+Follow [repository instructions](AGENTS.md), [bench rules](bench/AGENTS.md) and [Dafny style](DAFNYSTYLE.md).
 
 ## Setup
 
@@ -72,15 +68,11 @@ The container name is `<USER>-dafnyutils`, where `<USER>` is the value of `USER`
 on your host. For example, if `USER` is `duncan`, the name is `duncan-dafnyutils`.
 Inside the container, the repository is `/workspace/dafnyutils`.
 
-Setup installs Python 3.12, .NET 8, Rust, Z3, tmux and native build tools. It creates
-`.venv`, installs the Python development and contributor dependencies, initializes
-the pinned GNU submodules, and builds the bundled Dafny. Budget 10–30 minutes for
-initial downloads and compilation; this is an estimate, not a time limit.
-GNU binaries and the fuzzer execution image are built later by the task guides.
+Setup installs Python 3.12, .NET 8, Rust, Z3, tmux and native build tools.
+Budget 10–30 minutes for initial downloads and compilation.
 A clean Linux x86-64 setup used up to about 10 GiB of memory, excluding the image build.
 
-Run repository commands inside the container. Its terminal already puts `.venv/bin`
-on `PATH`; in a manually opened shell, activate it explicitly:
+Run repository commands inside the container to check environment setup:
 
 ```sh
 cd /workspace/dafnyutils
@@ -88,7 +80,7 @@ source .venv/bin/activate
 make check-environment
 ```
 
-Expected output (versions and the package list vary):
+Expected output:
 
 ```text
 Checking: python3 --version
@@ -331,7 +323,7 @@ proof constrains those partial results under the shared IO contracts.
 
 ### 8. See a bug fail both checks
 
-For a local exercise, change the exit assignment in `Copy.dfy` to:
+For a exercise, change the exit assignment in `Copy.dfy` to:
 
 ```dafny
 exit := 0;
@@ -386,23 +378,3 @@ Dafny program verifier finished with 10 verified, 0 errors
 4 passed in <seconds>s
 ...
 ```
-
-### 9. Use the same steps after creating a utility scaffold
-
-The [utility guide](docs/adding-utilities.md#create-the-files) creates intentionally
-unfinished files. Fill them in using this order:
-
-| Example | New utility |
-| --- | --- |
-| Behavior list in step 1 | Fill `<utility>.md` and get maintainer scope review |
-| `CopySpec.CopyResult` and `Spec` | Replace false predicates in `<Utility>Spec.dfy` with the required IO and output relations |
-| `CopyCore.CopyInput` | Replace the failing Core body; prove what its result satisfies |
-| `CopyProof.CopyResultImpliesSpec` | Prove that the implementation's result satisfies the main specification |
-| `Copy.RunCore` | Keep the direct `ensures Spec(...)` on the utility entry |
-| `CopyCli.Main` | Keep the generated shared runner; complete Schema, parsing and early exits |
-| `Tests.py` | Replace placeholder tests with real GNU comparisons and retain the generated proof tests |
-
-Then register the utility's fuzzer generator and follow the full
-[validation and submission steps](docs/adding-utilities.md#validate-and-submit).
-This example has no benchmark definition or fuzzer registration and does not
-count as a completed utility contribution.
