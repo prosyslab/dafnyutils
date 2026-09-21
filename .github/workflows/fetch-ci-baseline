@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Full-history checkout can omit the previous tip after a force push.
+set -euo pipefail
+
+if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
+  exit 0
+fi
+
+if git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+  exit 0
+fi
+
+echo "Fetching comparison baseline $BASE_SHA"
+if ! git fetch --no-tags --no-recurse-submodules origin "$BASE_SHA"; then
+  echo "Failed to fetch comparison baseline $BASE_SHA; cannot compare task contracts." >&2
+  exit 1
+fi
+git cat-file -e "$BASE_SHA^{commit}"
