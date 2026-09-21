@@ -31,8 +31,9 @@ Use the [development container](.devcontainer/devcontainer.json) included in thi
 repository. The container has been tested on Linux x86-64 (Ubuntu 24.04).
 Other architectures have not been tested.
 
-We use a version of Dafny changed for dafnyutils. Its source is included in
-`dafny/`. You must use the Dafny built inside the development container, available
+We use a version of Dafny changed for dafnyutils. Its source is pinned in the
+`dafny/` submodule from `git@github.com:prosyslab/dafny.git` (`expecto` branch).
+You must use the Dafny built inside the development container, available
 at `/usr/bin/dafny-benchmark` in the container.
 
 ### Start the container
@@ -114,7 +115,7 @@ dafnyutils/
 │   ├── core/              # Shared system models, IO contracts and native adapters
 │   └── utils/             # GNU coreutils task specifications, implementations and proofs
 ├── coreutils/             # Pinned upstream GNU coreutils submodule
-├── dafny/                 # Bundled Dafny source customized for this project
+├── dafny/                 # Pinned Dafny submodule customized for this project
 ├── docker/                # Task and evaluation container build definitions
 ├── docs/                  # Contributor guides and API documentation
 ├── example/               # Worked examples

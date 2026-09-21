@@ -1,2 +1,0 @@
-Contains various scripts for developing Dafny. New scripts can be added by adding System.CommandLine commands.
-You can invoke these scripts using `dotnet run --project Source/Scripts <command-name> <command-arguments>`

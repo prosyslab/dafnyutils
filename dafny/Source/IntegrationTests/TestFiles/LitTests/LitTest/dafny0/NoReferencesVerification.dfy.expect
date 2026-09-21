@@ -1,6 +1,0 @@
-NoReferencesVerification.dfy(16,2): Error: assertion could not be proved
-NoReferencesVerification.dfy(26,4): Error: assertion could not be proved
-NoReferencesVerification.dfy(33,4): Error: assertion could not be proved
-NoReferencesVerification.dfy(49,2): Error: assertion could not be proved
-
-Dafny program verifier finished with 2 verified, 4 errors

@@ -1,3 +1,7 @@
 [submodule "coreutils"]
 	path = coreutils
 	url = https://github.com/coreutils/coreutils.git
+[submodule "dafny"]
+	path = dafny
+	url = git@github.com:prosyslab/dafny.git
+	branch = expecto

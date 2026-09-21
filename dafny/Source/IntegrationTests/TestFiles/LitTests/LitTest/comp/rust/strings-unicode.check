@@ -1,2 +1,0 @@
-// CHECK: .*DafnyChar\(.*
-// CHECK-NOT: .*DafnyCharUTF16\(.*

@@ -1,3 +1,0 @@
-TypeInferenceSubsetTypes.dfy(60,15): Error: target object could not be proved to be non-null
-
-Dafny program verifier finished with 6 verified, 1 error

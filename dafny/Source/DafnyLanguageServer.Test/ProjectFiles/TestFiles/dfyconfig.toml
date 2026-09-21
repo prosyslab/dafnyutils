@@ -1,5 +1,0 @@
-includes = ["**/*.dfy"]
-
-[options]
-warn-shadowing = false
-function-syntax = 4
