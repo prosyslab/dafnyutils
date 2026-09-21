@@ -301,7 +301,7 @@ Treat the exact `IO.dfy` declarations and `IOContract.dfy` predicates as authori
 - `TrustedFilesystemEffectContractFields` binds the typed request, pre-filesystem and complete supplied result. By itself it does not impose POSIX insertion/removal laws. Do not replace this binding with just `ok <==> err == 0` or choose a different resulting state to make the proof pass.
 - Environment enumeration permits more than one order for the same map. Ghost credentials are not executable UID/GID or name-service queries.
 - `TruncateFile` does not create a missing file. Path-targeted `Sync` lacks GNU's write-only-open retry and separate failure phases.
-- There is no public arbitrary process execution, user/group lookup, terminal control, random-source or volume-capacity API. The [starting scopes](initial-scopes.md#initial-scopes) state supported modes.
+- There is no public arbitrary process execution, user/group lookup, terminal control, random-source or volume-capacity API. The [utility requirements](implementation-notes.md#requirements-by-utility) state supported modes.
 
 Directory creation has an additional contract. For example, a successful request
 to create `parent/new` must leave a fresh empty directory at the resolved path.

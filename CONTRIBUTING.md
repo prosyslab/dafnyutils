@@ -64,7 +64,8 @@ in the draft PR, as described in [Prepare the change](#prepare-the-change).
 #### Create the files
 
 Choose an `open_for_contribution` row in [TODOLIST.csv](TODOLIST.csv), then
-read its [initial scope](docs/initial-scopes.md#initial-scopes). This walkthrough uses `base32`.
+read the [implementation notes](docs/implementation-notes.md) and its
+[utility requirements](docs/implementation-notes.md#requirements-by-utility). This walkthrough uses `base32`.
 Create the scaffold **before** creating its directory or scope document:
 
 ```sh
@@ -91,9 +92,9 @@ Fill the generated `bench/utils/base32/base32.md` before implementation:
 | Question | Example answer for base32 |
 | --- | --- |
 | What is the source? | Pinned `coreutils/src/basenc.c`, built with `BASE_TYPE=32`; record the submodule commit |
-| What is accepted? | Finite raw bytes from stdin or one regular file; the options in the agreed initial scope |
+| What is accepted? | Finite raw bytes from stdin or one regular file; the options in the agreed task scope |
 | What is observed? | Exact output and error bytes, exit behavior, and modeled input consumption |
-| Which environment? | Linux, C locale and UTC0; the filename and IO limits in the [shared stream scope](docs/initial-scopes.md#shared-stream-scope) |
+| Which environment? | Linux, C locale and UTC0; the filename and IO limits in the [stream handling rules](docs/implementation-notes.md#handle-stream-errors-and-partial-output) |
 | Which errors matter? | Invalid alphabet/padding/options; missing or inaccessible file; partial progress followed by failure |
 | What is trusted? | Named `bench/core` IO and diagnostic contracts, with their recorded revision |
 | What remains to prove? | Bit-block relation, padding, wrapping, decoding prefix, diagnostics and exit policy |
