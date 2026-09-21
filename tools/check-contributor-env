@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Check the supported contributor tools without building or running a benchmark.
+set -Eeuo pipefail
+
+root=$(cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+trap 'printf "Environment check failed at line %s.\n" "$LINENO" >&2' ERR
+
+check() {
+    printf '\nChecking:'
+    printf ' %q' "$@"
+    printf '\n'
+    "$@"
+}
+
+check python3 --version
+check python3 -c 'import sys; assert sys.version_info >= (3, 12), "Python 3.12 or newer is required"; import benchmarks, click, pydantic, pytest, xdist, yaml'
+check python3 -m pip check
+check python3 -m pip list --format=columns
+check python3 -m benchmarks --help
+check dotnet --version
+check cargo --version
+check rustc --version
+check z3 --version
+check tmux -V
+check docker version
+check docker compose version
+check git submodule status --recursive
+
+check test -f coreutils/src/basenc.c
+check test -f coreutils/gnulib/gnulib-tool
+dafny_bin=${DAFNY_BENCHMARK:-dafny-benchmark}
+check test "$(readlink -f "$(command -v "$dafny_bin")")" = "$root/dafny/Binaries/Dafny"
+check "$dafny_bin" --version
+check "$dafny_bin" verify --standard-libraries:false tools/fixtures/contributor/StreamCopy.dfy
+
+printf '\nEnvironment ready. The StreamCopy result checks the verifier, not a utility proof.\n'

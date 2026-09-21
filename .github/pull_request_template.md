@@ -60,13 +60,13 @@ If a mismatch was fixed, also link the unchanged original bundle, replay command
 
 ## 3. Verification results
 
-Run Dafny verification over the affected source closure (for example, `make -C bench/utils/comm verify`). Paste its stdout with the verified/error/timeout summary. A build or runtime test is not proof verification. Also report definition/layout validation and the final `make check TASK=<task-id>` gate; keep these results clearly labeled.
+Run Dafny verification for the affected files and all files they include (for example, `make -C bench/utils/comm verify`). Paste its stdout with the verified/error/timeout summary. A build or runtime test is not proof verification. Also report definition/layout validation and the final `make check TASK=<task-id>` gate; keep these results clearly labeled.
 
 - Exact verification command and exit code:
-- Verified source files / closure and termination limits:
+- Verified files, included files, and termination limits:
 - Verified / errors / timeouts:
 - Definition/layout validation and final gate commands, outcomes and log links:
-- Remaining obligations, or reason not run / not applicable:
+- Conditions still to prove, or reason not run / not applicable:
 
 ```text
 Paste actual verification stdout here, including the final verifier summary.

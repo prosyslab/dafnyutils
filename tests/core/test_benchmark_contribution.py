@@ -77,7 +77,7 @@ def test_scaffold_is_incomplete_for_both_families(
         assert (result.directory / "Tests.py").is_file()
         assert (result.directory / "Tests.dfy").is_file()
     assert any(
-        "source provenance is incomplete" in issue.message
+        "source details are incomplete" in issue.message
         for issue in validate_benchmark(repository, task_id)
     )
 

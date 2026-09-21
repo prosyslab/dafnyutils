@@ -20,15 +20,26 @@ Submit a focused change with reproducible code verification and fuzzing results.
 | Your task | Guide |
 | --- | --- |
 | Set up the environment and add a utility through review | [Add a utility](docs/adding-utilities.md) |
-| Use shared APIs and understand what the proof trusts | [Core API and trust boundary](docs/core-api.md) |
+| Use shared APIs and understand what the proof trusts | [Core API and library assumptions](docs/core-api.md) |
 | Run campaigns, inspect metrics and replay failures | [Use the fuzzer](docs/fuzzing.md) |
 | Port a GNU scenario into a utility’s Python tests | [Add differential test cases](docs/adding-test-cases.md) |
 
-Start with the [contributor environment](docs/adding-utilities.md#set-up-your-checkout). For a new utility, check [TODOLIST.csv](TODOLIST.csv) and agree on the initial scope before implementation. Follow [repository instructions](AGENTS.md), [bench rules](bench/AGENTS.md) and [Dafny style](DAFNYSTYLE.md).
+Start with the [setup guide](README.md#setup). For a new utility, check [TODOLIST.csv](TODOLIST.csv) and follow the [scope review step](docs/adding-utilities.md#agree-on-the-observable-behavior) before implementation. Follow [repository instructions](AGENTS.md), [bench rules](bench/AGENTS.md) and [Dafny style](DAFNYSTYLE.md).
 
 ## Prepare the change
 
-Explain the problem, the intended behavior and the files affected. Keep specification, implementation, proof and evaluator changes distinct. Reuse shared helpers and preserve the approved input and trust boundaries.
+Explain the problem, the intended behavior and the files affected. Keep specification, implementation, proof and evaluator changes distinct. Reuse shared helpers and keep the approved inputs and library assumptions unchanged.
+
+Use a draft PR for the work plan and maintainer discussion. Put the accepted
+utility scope in `bench/utils/<utility>/<utility>.md`. Keep progress notes in the
+draft PR using these fields: **completed work, remaining work, blockers, commands
+and results, artifact links, next action**. Before a PR exists, local notes may
+live under `_build/contribution-notes/`; copy relevant evidence into the PR so
+reviewers can access it. No separate wiki or plan directory is required.
+
+These are contributor-maintenance records. Evaluated benchmark runs must follow
+their own permitted-input and artifact rules; do not feed these notes into a run
+unless its protocol permits them.
 
 For an upstream scenario, record the GNU source revision and test path. Keep evaluator cases and oracle material out of candidate-visible resources. Preserve original mismatch bundles and store post-fix expectations separately.
 
@@ -51,9 +62,16 @@ Use Python 3.12 or newer, four-space indentation, and the 100-character line len
 
 Read [DAFNYSTYLE.md](DAFNYSTYLE.md) and [bench/AGENTS.md](bench/AGENTS.md). Use the existing two-space indentation and write the contract before the implementation.
 
-Keep declarative behavior and fixed user-facing text in `*Spec.dfy`, algorithms in `*Core.dfy`, and connecting lemmas in `*Proof.dfy`. Spec must not import Core, Proof or CLI. The entry `RunCore` must directly ensure its principal `Spec(...)`; a helper lemma alone is insufficient.
+Keep declarative behavior and fixed user-facing text in `*Spec.dfy`, algorithms in `*Core.dfy`, and connecting lemmas in `*Proof.dfy`. Spec must not import Core, Proof or CLI. The entry `RunCore` must directly ensure its main specification, `Spec(...)`; a helper lemma alone is insufficient.
 
-Use the narrowest correct `reads` and `modifies` frames. Do not restate frame-derived invariance with old/new equalities. Supply termination metrics where required and state when a result proves correctness on return rather than termination. Reuse lemmas and add local proof guidance only where it discharges a real obligation. Diagnose a timeout before increasing its limit. Never add an assumption, unchecked extern or verification skip to manufacture proof success.
+- List only the objects or fields needed in `reads` and `modifies`. Fields outside
+  `modifies` already stay unchanged; do not repeat that fact as old/new equalities.
+- Add `decreases` where required. Say whether a proof also shows termination or
+  only shows that a returned result is correct.
+- Reuse lemmas. Add local proof steps when they help Dafny prove a required condition.
+  Find the slow condition before increasing a verification time limit.
+- Never use assumptions, unchecked external calls or verification skips to obtain
+  a successful result.
 
 ### Tests and documentation
 
@@ -62,6 +80,12 @@ Test one observable scenario per test, including a realistic input that could ex
 Do not test LLM prompt substrings instead of behavior. When removing a feature, update or remove its old tests rather than adding a test solely to prove absence. Select checks for the affected behavior; do not run unrelated benchmark suites for a documentation change.
 
 Write documentation in simple English. State the result or action first, then show a small complete example. Separate measured results from expected behavior and report failures or missing checks explicitly.
+
+For every runnable command example, put its expected output in a fenced `text`
+block directly below the command. Include the expected exit code in the nearby
+text. Mark variable values with `<...>` and omitted lines with `...`; say when a
+command is silent or an unfinished example is expected to fail. Keep internal
+walkthrough and experiment logs out of public documentation.
 
 ## Naming conventions
 
@@ -87,7 +111,9 @@ Existing shared API names such as `io.stdout()` are intentional exceptions to a 
 
 ## Commit messages
 
-Keep each commit focused on one logical change, including its relevant plan and wiki updates. If an agent is helping, it must create commits only when you explicitly request them.
+Keep each commit focused on one logical change, including related scope and
+documentation updates. Keep the work record in the draft PR as described above.
+If an agent is helping, it must create commits only when you explicitly request them.
 
 Write the entire message in English. Use this subject format:
 
@@ -125,10 +151,10 @@ Report evidence in **tests → fuzzing → verification** order. Copy and paste 
 
 - **Tests:** Show the affected runtime/source test results with passed, failed and skipped counts, plus a log or JUnit link.
 - **Fuzzing:** For each affected coreutils utility, use three distinct seeds with at least **1,000 completed iterations per seed**. Every requested iteration must match, with zero mismatches, timeouts, incomplete coverage or other errors. Paste each seed's Configuration, Coverage and Results stdout and retain metrics. Use generated campaigns, full comparison including stderr, and the same code revision. Repeated seeds and fixed JSON cases do not meet this requirement. Record failures and fixes rather than selecting only favorable runs.
-- **Verification:** Show Dafny stdout with verified/error/timeout counts and the verified source closure and termination scope. Also report definition/layout checks and the final contribution gate. A build is not proof verification.
+- **Verification:** Show Dafny stdout with verified/error/timeout counts and the verified files, their included files, and whether termination was proved. Also report definition/layout checks and the final contribution gate. A build is not proof verification.
 
 The short automatic gate currently runs 20 fuzz cases with seed 1; it does not satisfy the separate PR requirement of three campaigns with at least 1,000 iterations each. See [Collect PR evidence](docs/fuzzing.md#collect-pr-evidence) for the command.
-For example, a one-case differential run should identify its case ID and completed outcome; a proof result should identify the verified source closure and verifier summary. Copy actual results from the run. Do not treat example output in a guide as evidence for your PR.
+For example, a one-case differential run should identify its case ID and completed outcome; a proof result should identify the verified files, their included files, and the verifier summary. Copy actual results from the run. Do not treat example output in a guide as evidence for your PR.
 
 See [validation commands](docs/adding-utilities.md#validate-and-submit) and the [metrics example](docs/fuzzing.md#run-and-inspect-the-comparison). Link uploaded PR or CI artifacts that reviewers can access; a local `/tmp` path alone is not a shared log. Never include credentials or restricted evaluator payloads.
 
@@ -138,4 +164,7 @@ Algorithm tasks do not require the coreutils fuzzer; report their case tests ins
 
 Use a short title and explain the resulting behavior first. Complete the template's scope and evidence fields, attach relevant reports, and list remaining failures or limitations. Rerun affected checks after code changes and identify the revision each result covers.
 
-Maintainers review specification adequacy and the trusted boundary separately from automated checks. Leave their review decision pending until a human reviewer records it. Passing tests, fuzzing and Dafny verification does not automatically approve the specification.
+Maintainers check whether the specification describes the required behavior and
+uses only approved library contracts, separately from automated checks. Leave
+their review decision pending until a human reviewer records it. Passing tests,
+fuzzing and Dafny verification does not automatically approve the specification.

@@ -50,6 +50,7 @@ RUN apt-get update \
         rsync \
         tar \
         texinfo \
+        tmux \
         tzdata \
         util-linux \
         unzip \

@@ -23,6 +23,8 @@
     "vscode": {
       "settings": {
         "terminal.integrated.defaultProfile.linux": "zsh",
+        "dafny.version": "custom",
+        "dafny.cliPath": "/workspace/dafnyutils/dafny/Binaries/Dafny",
         "python.defaultInterpreterPath": "/workspace/dafnyutils/.venv/bin/python",
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": [

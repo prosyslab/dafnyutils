@@ -4,15 +4,18 @@ Contribute a utility by writing its behavior contract, implementing it, proving 
 
 This guide follows `base32`, an open utility with byte-stream input. The scaffold is a starting point, not a working implementation. Use the existing `base64` and `cat` projects to learn the structure; do not copy their specifications as the meaning of `base32`.
 
+First try the [small IO example](../README.md#a-small-io-program-from-start-to-finish) if you have not connected
+Spec, Core, Proof and a process entry before. It includes working files and
+commands for checking both the proof and the executable.
+
 ## Contents
 
 - [Set up your checkout](#set-up-your-checkout)
-  - [Install the tools](#install-the-tools)
-  - [Check the installation](#check-the-installation)
 - [Find the right files](#find-the-right-files)
 - [Build one contribution](#build-one-contribution)
-  - [Agree on the observable behavior](#agree-on-the-observable-behavior)
   - [Create the files](#create-the-files)
+  - [Agree on the observable behavior](#agree-on-the-observable-behavior)
+  - [Complete the generated files](#complete-the-generated-files)
   - [Specify first, then implement and prove](#specify-first-then-implement-and-prove)
   - [Add differential cases and a generator](#add-differential-cases-and-a-generator)
 - [Validate and submit](#validate-and-submit)
@@ -64,27 +67,9 @@ This guide follows `base32`, an open utility with byte-stream input. The scaffol
 
 ## Set up your checkout
 
-### Install the tools
-
-Use the checked-in [development container](../.devcontainer/devcontainer.json). On a host with Docker and VS Code's Dev Containers extension, open this repository and select **Dev Containers: Reopen in Container**. Setup installs Python 3.12, .NET 8, Rust and native build tools, creates `.venv`, installs the development/contributor extras, initializes the pinned coreutils submodule and its dependencies, and builds the bundled Dafny source. Allow an estimated 10–30 minutes with downloads; a cold or slow network can take longer. This is based on the setup script, not a new clean-machine timing.
-
-The container uses the host Docker daemon for execution tests. Docker access must work from its terminal. The full editor setup was not rerun for this documentation update.
-
-Run all commands below in a Bash or zsh terminal at `/workspace/dafnyutils`, with `.venv/bin` on `PATH`. Use the repository's `dafny-benchmark`, not an unrelated Dafny installation. If you use another checkout path, adjust absolute paths in examples.
-
-### Check the installation
-
-```sh
-# Expected duration: < 1 sec in the documentation checkout.
-# Success criteria: Exit 0 and list, init, validate and check appear.
-python3 -m benchmarks --help
-```
-
-This checks the installed contributor CLI. It does not build or verify a utility. The check completed within 10 seconds. Output excerpt:
-
-```text
-usage: python -m benchmarks [-h] [--root ROOT] {list,init,validate,check} ...
-```
+Follow [Setup](../README.md#setup), including
+`make check-environment`. Run the commands below from `/workspace/dafnyutils`
+inside that container, with `.venv/bin` on `PATH`.
 
 ## Find the right files
 
@@ -98,37 +83,58 @@ usage: python -m benchmarks [-h] [--root ROOT] {list,init,validate,check} ...
 | `src/benchmarks/` | Discovery, validation, builds and contribution checks |
 | `_build/` | Generated binaries and reports, created by build/check commands |
 
-Read [bench rules](../bench/AGENTS.md) and [Dafny style](../DAFNYSTYLE.md) before editing Dafny. Agent-assisted changes also follow the repository's plan and knowledge workflow.
+Read [bench rules](../bench/AGENTS.md) and [Dafny style](../DAFNYSTYLE.md) before editing Dafny.
+Keep the scope in the utility's Markdown file and implementation/validation notes
+in the draft PR, as described in [Prepare the change](../CONTRIBUTING.md#prepare-the-change).
 
 ## Build one contribution
 
+### Create the files
+
+Choose an `open_for_contribution` row in [TODOLIST.csv](../TODOLIST.csv), then
+read its [initial scope](#initial-scopes). This walkthrough uses `base32`.
+Create the scaffold **before** creating its directory or scope document:
+
+```sh
+python3 -m benchmarks init --kind coreutils --id base32
+```
+
+Expected output, exit 0:
+
+```text
+bench/utils/base32
+scaffold is incomplete; replace TODO content and source status before validation
+```
+
+If the directory already exists, inspect it and continue that contribution; init will
+not overwrite it. Do not delete someone else's work to rerun this command.
+
 ### Agree on the observable behavior
 
-Choose an `open_for_contribution` row in [TODOLIST.csv](../TODOLIST.csv), then read its [initial scope](#initial-scopes). For `base32`, the opening covers encoding, `-d`, `-i`, `-w`, and zero or one file operand. It does not cover other encodings.
+The `base32` opening covers encoding, `-d`, `-i`, `-w`, and zero or one file
+operand. It does not cover other encodings.
 
-Write a scope table in `bench/utils/base32/base32.md` before implementation:
+Fill the generated `bench/utils/base32/base32.md` before implementation:
 
 | Question | Example answer for base32 |
 | --- | --- |
 | What is the source? | Pinned `coreutils/src/basenc.c`, built with `BASE_TYPE=32`; record the submodule commit |
 | What is accepted? | Finite raw bytes from stdin or one regular file; the options in the agreed initial scope |
 | What is observed? | Exact output and error bytes, exit behavior, and modeled input consumption |
-| Which environment? | Linux, C locale and UTC0; prepared filename and IO domains |
+| Which environment? | Linux, C locale and UTC0; the filename and IO limits in the shared stream scope below |
 | Which errors matter? | Invalid alphabet/padding/options; missing or inaccessible file; partial progress followed by failure |
 | What is trusted? | Named `bench/core` IO and diagnostic contracts, with their recorded revision |
 | What remains to prove? | Bit-block relation, padding, wrapping, decoding prefix, diagnostics and exit policy |
 
 A missing API or observation is a maintainer model issue. Record it before extending the scope. Do not narrow an existing task, assume successful IO, or add an unchecked native call to make a proof pass.
 
-### Create the files
+Open a draft PR with this scope table and ask a repository maintainer to review it
+before implementation. Link a related issue if one exists; an issue is not required.
+An open row identifies an available starting scope, not approval of your completed
+specification. State explicitly when you use that scope without changes. Record
+the maintainer's decision in the draft PR, including any requested model work.
 
-```sh
-# Expected duration: Estimated < 1 sec; copies a small local template.
-# Success criteria: Exit 0 and a new bench/utils/base32 directory.
-python3 -m benchmarks init --kind coreutils --id base32
-```
-
-Run this only when `base32` is absent. The command refuses to overwrite an existing item and reports that the scaffold is incomplete. It was not run in this checkout because this documentation change must not add a benchmark.
+### Complete the generated files
 
 Replace `benchmark.yaml` with this complete metadata after checking the source and license:
 
@@ -143,39 +149,58 @@ source:
   license: GPL-3.0-or-later
 ```
 
-Here `verified` means the source attribution has been checked. It does not mean the utility or its proof has passed. New contributions cannot use `legacy-unverified`. Do not add invented fields for evaluator paths: the loader derives them from the task ID and family.
+Here `verified` means the source name, URL and license have been checked. It does not mean the utility or its proof has passed. New contributions cannot use `legacy-unverified`. Do not add invented fields for evaluator paths: the loader derives them from the task ID and family.
 
 Complete these generated files:
 
 | File | What to put there |
 | --- | --- |
-| `base32.md` | Agreed input, option, environment, output and error scope, with examples and source provenance |
+| `base32.md` | Agreed input, option, environment, output and error scope, with examples, source revision, and license |
 | `Base32Schema.dfy` | CLI schema/configuration, raw command types and decode behavior |
 | `Base32Spec.dfy` | Declarative observable relation and fixed help/version/error text |
-| `Base32Core.dfy` | Executable parsing/processing algorithms and implementation witnesses |
+| `Base32Core.dfy` | Executable algorithms and the values they construct to satisfy the specification |
 | `Base32Proof.dfy` | Lemmas connecting the implementation summary to the specification |
-| `Base32.dfy` | Entry assembly; `RunCore` directly ensures the principal `Spec(...)` |
+| `Base32.dfy` | Shared runner hooks; `RunCore` directly ensures the main `Spec(...)` |
 | `Base32Cli.dfy` | Process entry using `BenchIO.Process()`, the shared runner and `BenchIO.Exit` |
 | `Tests.py`, `Tests.dfy` | Evaluator-owned differential cases and executable Dafny cases |
 | `dfyconfig.toml`, `Makefile` | Existing project/build conventions from the scaffold |
+
+The scaffold already connects the CLI to a class extending
+`BenchItem.BenchmarkItemTwostate<Base32CmdRaw>`. It passes the parsed command and
+IO handle through Core, the connecting lemma, and the entry postcondition.
+Replace the raw-command wrapper and parser TODOs with the utility's actual rules.
+Use only the IO regions it reads or changes; the supplied stream regions are a
+starting point, not permission to widen an existing task's frame.
+
+The false Spec/CoreSummary relations and failing assertions deliberately block
+verification. Replace them with reviewed behavior and proofs, not `true`, `assume`,
+or verification skips. `Main` uses `decreases *` because the shared runner permits
+nontermination; this does not prove CLI termination. The generated Core method
+still has to terminate. Review help/version/parse-error plans separately.
 
 ### Specify first, then implement and prove
 
 State the result as a mathematical relation. For example, a valid base32 block relates five input bytes to eight alphabet symbols through bit equations. Padding and line breaks have separate position rules. Decoding must constrain the bytes emitted before an invalid suffix. A second copy of the encoder loop is not an independent specification.
 
-Use the [core API guide](core-api.md) for IO, byte conversion and reusable lemmas. Keep algorithms in Core, proof connections in Proof, and fixed user-facing text in Spec. Spec must not import Core, Proof or CLI. Keep the direct entry obligation:
+Use the [core API guide](core-api.md) for IO, byte conversion and reusable lemmas. Keep algorithms in Core, proof connections in Proof, and fixed user-facing text in Spec. Spec must not import Core, Proof or CLI. Keep this required condition on the entry method:
 
 ```dafny
 ensures Spec(raw, io, exit)
 ```
 
-This is a contract line, not a complete method. Use the actual argument types and frames of your utility. A separate `CoreSummary ==> Spec` lemma supports this obligation; it does not replace it. Use narrow `reads` and `modifies` clauses. Do not add `assume`, trust annotations, or verification skips.
+This is a contract line, not a complete method. Use the actual argument types and frames of your utility. A separate `CoreSummary ==> Spec` lemma helps prove this condition; it does not replace it. Use narrow `reads` and `modifies` clauses. Do not add `assume`, trust annotations, or verification skips.
 
 The shared runner calls `RunCore` only for a run plan. Help, version and parse errors may use an early-exit plan. Review and test that CLI path separately; a `RunCore` proof alone does not prove every early-exit branch.
 
 ### Add differential cases and a generator
 
 Follow [Add test cases](adding-test-cases.md) to port upstream scenarios into `bench/utils/<utility>/Tests.py`, reusing its fixtures and runner helpers. Compare the pinned GNU binary with the built Dafny binary. Include normal, malformed-input and partial-effect cases; reject plausible wrong outputs as part of specification review.
+
+For a new utility, start with [the generated test adapter](adding-test-cases.md#start-a-new-utility-test-file).
+It includes the build fixture, strict comparison helper, and three
+`@pytest.mark.dafny_verify` cases for Entry/Core/Proof. Keep those proof cases:
+`make check` runs them after project verification. Without them pytest selects
+no proof tests and exits 5, even if `make verify` succeeded.
 
 For a new utility, add its generator under `tools/coreutils_fuzzer/src/fuzz/input/generators/`, declare the module in `generators/mod.rs`, and register `GENERATOR` in `src/utils/capabilities.rs`. Reuse `PatternInputGenerator` and the shared argument-pattern engine. See [generator extension](fuzzing.md#support-a-new-utility) for the concrete registration points. A case JSON file alone does not register a new utility.
 
@@ -191,7 +216,20 @@ Keep evaluator cases, oracle code and reference answers out of public task resou
 python3 -m benchmarks validate base32
 ```
 
-This checks the completed item and its contract structure. The untouched scaffold is intentionally invalid. This example was not executed because `base32` is not implemented here.
+Expected output for a completed utility, exit 0:
+
+```text
+base32: valid
+```
+
+Expected output for an untouched scaffold, exit 1:
+
+```text
+base32: source details are incomplete
+```
+
+This checks the completed item and its contract structure. The untouched scaffold
+must fail with `source details are incomplete`; that is an expected unfinished state.
 
 ```sh
 # Expected duration: Unknown; requires the completed item and Dafny analysis.
@@ -199,7 +237,15 @@ This checks the completed item and its contract structure. The untouched scaffol
 python3 -m tools.generate_task_profiles --utility base32 --output-dir _build/profile-review
 ```
 
-Review the generated specification closure, read-only support and editable/output boundaries. Confirm that tests and oracle material are absent. This generation command was checked against its source but not run for an unimplemented item. Generation is not a proof.
+Expected result, exit 0:
+
+```text
+(no stdout; _build/profile-review/base32/task.json is created)
+```
+
+Review the specification and all files it includes, the read-only support files,
+and the editable/output paths. Confirm that tests and reference answers are absent.
+Generating a profile does not verify its proof.
 
 ### Build, test and verify
 
@@ -209,23 +255,64 @@ Review the generated specification closure, read-only support and editable/outpu
 make build-coreutils
 ```
 
-This builds the pinned original utilities. It may need network access for build inputs. An existing GNU build was available during this documentation update; this full build was not repeated.
+Expected output, exit 0 (paths and build steps vary):
+
+```text
+...
+make[1]: Leaving directory '/workspace/dafnyutils/_build/coreutils'
+```
+
+This builds the pinned original utilities. It may need network access for build inputs.
 
 ```sh
 # Expected duration: Unknown; requires a complete Base32 implementation and .NET.
 # Success criteria: Exit 0 and _build/bench/base32_bench.dll exists.
 make -C bench/utils/base32 build
+```
 
+Expected output, exit 0:
+
+```text
+Dafny program verifier did not attempt verification
+make: Leaving directory '/workspace/dafnyutils/bench/utils/base32'
+```
+
+```sh
 # Expected duration: Unknown; depends on the new case population and Docker setup.
 # Success criteria: Exit 0 with real, non-skipped runtime cases passing.
 make -C bench/utils/base32 test
+```
 
-# Expected duration: Unknown; depends on proof obligations and solver cost.
-# Success criteria: Exit 0 and zero Dafny verification errors for the project closure.
+Expected output shape, exit 0 (names and counts depend on your cases):
+
+```text
+Base32Tests.<case>: PASSED
+...
+<count> passed, <count> deselected in <seconds>s
+make: Leaving directory '/workspace/dafnyutils/bench/utils/base32'
+```
+
+```sh
+# Expected duration: Unknown; depends on the conditions to prove and solver time.
+# Success criteria: Exit 0 and zero Dafny verification errors for the project and all files it includes.
 make -C bench/utils/base32 verify
 ```
 
-These separate compilation, executable behavior and proof. They were not run for the unimplemented example. A build is not verification, and matching a finite test set is not proof of the specification. On a timeout, locate the expensive obligation and add local proof guidance before considering a larger time limit.
+Expected output, exit 0:
+
+```text
+Verification targets (<count> files):
+...
+Dafny program verifier finished with <count> verified, 0 errors
+...
+DAFNY_VERIFICATION_OUTCOME=verified phase=verify
+DAFNY_VERIFICATION_RESULT total=<count> failed=0
+```
+
+These commands check compilation, executable behavior and proof separately.
+A build is not verification, and matching a finite test set is not proof of the
+specification. On a timeout, locate the expensive condition and add local proof
+guidance before considering a larger time limit.
 
 ```sh
 # Expected duration: Unknown; includes builds, runtime tests, 20 fuzz cases and proofs.
@@ -233,17 +320,44 @@ These separate compilation, executable behavior and proof. They were not run for
 make check TASK=base32
 ```
 
-This is the final contribution gate. Current mandatory checks are `impl_layout`, `implementation_tests`, `fuzzer`, `proof_layout` and `dafny_verify`, defined in [checks.py](../src/benchmarks/checks.py). The implementation test report is `_build/contribution_checks/base32/implementation-tests.xml`; it must include at least one non-skipped case. Missing tools, unsupported fuzzing, skipped mandatory work and timeouts are not passes. This full new-utility example remains unverified until the utility is implemented and the gate runs.
+Expected final output after all required stages, exit 0:
+
+```text
+...
+base32: checks passed
+```
+
+This is the final contribution gate. Required checks are `impl_layout`,
+`implementation_tests`, `fuzzer`, `proof_layout` and `dafny_verify`, defined in
+[checks.py](../src/benchmarks/checks.py). The implementation report is
+`_build/contribution_checks/base32/implementation-tests.xml`; it must contain an
+executed, non-skipped case. The verification stage also runs the marked proof
+tests in `Tests.py`. Missing tools, unsupported fuzzing, skipped required work
+and timeouts are failures. Run this gate only after completing the utility;
+the untouched scaffold is not a passing example.
 
 ### Open a pull request
 
-Follow [CONTRIBUTING.md](../CONTRIBUTING.md) and use the [pull request template](../.github/pull_request_template.md). Paste actual stdout in **tests → fuzzing → verification** order, with commands, exit codes and accessible artifacts. For each affected coreutils utility, show three distinct seeds with at least 1,000 completed matching iterations each, no failures, and full comparison settings. The 20-case automatic gate is additional evidence, not a substitute. Explain failed, unrun and inapplicable checks. Include source revision/license, accepted scope, trusted APIs, the principal specification, proof/termination limits, and exact commands with outcomes. Record campaign seeds, budgets, artifact identities, original mismatch bundles and separate fixed-case regression results.
+Follow [CONTRIBUTING.md](../CONTRIBUTING.md) and use the
+[pull request template](../.github/pull_request_template.md).
 
-The maintainer reviews whether the specification describes GNU behavior, rejects wrong behavior, and uses only the approved trust boundary. Automated checks do not replace this review. Keep failed and unrun checks visible and rerun affected checks after corrections.
+- Paste actual stdout in **tests → fuzzing → verification** order, with commands,
+  exit codes and accessible logs. Explain failed, unrun and inapplicable checks.
+- For each affected coreutils utility, show three different seeds with at least
+  1,000 completed matches each, no errors and full comparison settings. The
+  20-case automatic gate does not replace these runs.
+- Include the source revision/license, accepted scope, trusted APIs, main
+  specification, and any proof or termination limits.
+- Identify the seeds, case counts and built artifacts. Preserve original mismatch
+  bundles and report fixed-case regression results separately.
+
+The maintainer reviews whether the specification describes GNU behavior, rejects wrong behavior, and relies only on the approved library contracts. Automated checks do not replace this review. Keep failed and unrun checks visible and rerun affected checks after corrections.
 
 ## Initial scopes
 
-These handoffs preserve the existing openings; they are not completed utility implementations or claims of full GNU support. [TODOLIST.csv](../TODOLIST.csv) records open, released and blocked items. The source paths below are relative to `coreutils/src/`.
+These are the starting scopes for open contributions, not completed implementations
+or claims of full GNU support. [TODOLIST.csv](../TODOLIST.csv) records open,
+released and blocked items. Source paths below are relative to `coreutils/src/`.
 
 ### Shared stream scope
 
@@ -263,12 +377,12 @@ which phase failed. A utility needing phase-specific diagnostics for injected
 faults must first request a maintainer model extension. Output-error regression
 fixtures must cover failed writes (including `/dev/full`) and treat a signal as
 a signal, never as a successful exit. Exact timing or buffering of output under
-asynchronous faults is not supplied by the whole-request model.
+asynchronous faults is not described by a model that records only a complete IO request.
 
 Host access-time bookkeeping on reads is not a modeled filesystem mutation.
 Do not claim an exact physical filesystem frame beyond the existing evaluator's
 declared observation policy. Any newly required observation returns the item to
-`model_preparation` until maintainers qualify it.
+`model_preparation` until maintainers review and approve it.
 
 Options listed as outside the initial scope are valid GNU functionality outside
 this new task's domain; implementations must not pretend GNU rejects them.
@@ -283,7 +397,7 @@ regular files, directories, symlinks and hard-link aliases. Use the evaluator's
 fixed non-root identity, controlled umask and ordinary mode-bit permissions.
 Cross-mount fixtures, access/default ACLs, SELinux/SMACK policy, capabilities,
 setgid-directory inheritance, block/character device nodes, resource exhaustion and concurrent
-mutation require separate scope/model qualification. Operands stay inside the
+mutation need separate maintainer review of the supported behavior and model. Operands stay inside the
 fixture tree; do not target the host root or mounts to test a failure.
 
 Each mutating call has `modifies io.fsRegion`. It selects a typed request
@@ -303,10 +417,10 @@ inode numbers. The current comparator strips host keys and has a separate identi
 transition comparison; exact timestamp comparisons depend on its existing policy.
 These new entries do not claim exact cross-run wall-clock timestamp equality.
 Their native operations still have real parent/child timestamp effects, retained
-in the trusted post-state. A stronger timestamp requirement needs maintainer
+in the resulting state supplied by the library. A stronger timestamp requirement needs maintainer
 observation work before opening that extension; do not silently discard it.
 
-Required GNU differential scenarios below are contributor deliverables. The
+Contributors must include the GNU comparison cases listed below. The
 focused common-model tests establish only the recorded native success/error
 cases, not complete filesystem utility conformance.
 
@@ -317,9 +431,9 @@ for the **declared initial scope**, and a completed utility specification/proof.
 source review and representative contract/native checks. It does not establish
 the third. Every contribution must reject the counterexamples in its handoff.
 
-For filesystem effects, the principal relation must bind the operation, arguments,
-prestate and supplied result. It cannot be just `ok <==> err == 0`, nor may a
-contributor choose arbitrary post-states as witnesses. The IO handle owns the
+For filesystem effects, the main specification must relate the operation, arguments,
+state before the call and supplied result. It cannot be just `ok <==> err == 0`, nor may a
+contributor choose arbitrary resulting states to satisfy the specification. The IO handle owns the
 immutable observation function. POSIX operation correctness remains trusted.
 The public mkdir contract additionally constrains successful namespace effects
 through `DirectoryValidFilesystemObservations` and `DirectoryCreationEffectFields`.
@@ -393,7 +507,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | GNU source | dd.c: scanargs / dd_copy / apply_translations |
 | Supported behavior | Finite stdin to stdout; status=none; iflag=fullblock; bs=N and conv=lcase,ucase,swab (valid combinations), including plain copying. |
 | Declarative specification | Byte-index case mapping and adjacent-pair swapping, preserving a final odd byte; ordered composition of requested conversions and exact output prefix. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Available API | Finite stream outcomes, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | Odd byte count, conflicting case conversions, repeated operands, invalid block size and failed stdout. |
 | Outside initial scope | if/of, seek/skip/count, record padding, encodings, devices, timed progress/statistics and injected short-read faults. |
 
@@ -415,7 +529,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | GNU source | dircolors.c: dc_parse_stream / append_quoted / main |
 | Supported behavior | Explicit -b or -c and one configuration file; normal TERM/COLORTERM matching and color/extension records in C locale. |
 | Declarative specification | Line grammar, shell selection, ordered active assignments, shell escaping and TERM glob language; no regular-expression engine required. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Available API | Finite stream outcomes, GetEnv, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | Duplicate records, inactive TERM blocks, invalid keyword, missing value, shell metacharacters and read failure. |
 | Outside initial scope | Implicit SHELL inference, embedded database output and print-ls-colors display mode. |
 
@@ -426,7 +540,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | GNU source | fmt.c: get_paragraph / fmt_paragraph / base_cost / line_cost |
 | Supported behavior | Default; -w, -g, -s, -u; ordered file/stdin operands. |
 | Declarative specification | Paragraph/word partition, indentation, exact line-break cost equations and strict tie rule; include the source buffer flush boundaries in the relation. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Available API | Finite stream outcomes, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | A legal width-respecting wrap that differs from GNU; equal-cost breaks; very long paragraphs; tabs, sentence spacing and invalid goal and width zero. |
 | Outside initial scope | Crown/tagged margins, prefix selection and legacy -WIDTH spelling. |
 
@@ -437,7 +551,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | GNU source | join.c: join / check_order / prjoin |
 | Supported behavior | Two operands, at most one stdin; -1, -2, -j, -t, -a, -v, -e; --check-order / --nocheck-order. |
 | Declarative specification | Ordered field records, equal-key group Cartesian products and unmatched rows; exact order-check detection point and retained output prefix. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Available API | Finite stream outcomes, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | Duplicate keys, missing fields, unsorted input after prior output, two stdin operands and empty files. |
 | Outside initial scope | Output lists, headers, case folding, NUL records and historical syntax. |
 
@@ -447,7 +561,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | --- | --- |
 | GNU source | link.c: main |
 | Supported behavior | Exactly two operands; normal option delimiter/help/version handling. |
-| Declarative specification | One FilesystemCreateHardLink request binding source/target and prestate, exact diagnostic on failure and normal exit. |
+| Declarative specification | One FilesystemCreateHardLink request relating source/target and the state before the call, exact diagnostic on failure and normal exit. |
 | Available API | Typed filesystem request/result calls selected by this entry; path/kind queries where needed, output outcomes and diagnostics. |
 | Required counterexamples and errors | Existing target, directory source, dangling source symlink, remaining alias content/link count and wrong operand count. |
 | Outside initial scope | Cross-mount links, devices and privileged directory links. |
@@ -494,7 +608,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | Declarative specification | Same FifoNode request as mkfifo with mknod-specific operand/type grammar and diagnostics. |
 | Available API | Typed filesystem request/result calls selected by this entry; path/kind queries where needed, output outcomes and diagnostics. |
 | Required counterexamples and errors | Extra major/minor operands for p, unknown type, existing target and absent parent. |
-| Outside initial scope | Block/character devices, device numbers, -m and security contexts; these still lack qualified privilege fixtures. |
+| Outside initial scope | Block/character devices, device numbers, -m and security contexts; these still need approved test setups for privileged operations. |
 
 ### od
 
@@ -503,7 +617,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | GNU source | od.c: decode_format_string / dump / write_block |
 | Supported behavior | Explicit -t x1, o1 or u1; -A, -j, -N, -v, -w; regular file operands (no stdin for bounded reads). |
 | Declarative specification | Byte-block partition, offsets, radix rendering, padding and duplicate-row compression over the selected byte interval. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Available API | Finite stream outcomes, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | Address radix, partial row, duplicate runs, skip across operands, zero limits and invalid counts. |
 | Outside initial scope | Stdin with skip/limits (whole-read API cannot retain an unread suffix), implicit word format, multibyte/float/character formats and legacy offsets. |
 
@@ -525,7 +639,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | GNU source | pr.c: init_parameters / print_files / print_page |
 | Supported behavior | Explicit -t; single-column output; -l page length, -d double spacing, -n numbering, -o indentation; file/stdin operands. |
 | Declarative specification | Line/page partitions, form-feed boundaries, numbering, spacing and indentation; omit headers/trailers as requested. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Available API | Finite stream outcomes, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | Form feed, partial page, unterminated input, tabs, invalid length and multiple files. |
 | Outside initial scope | Timestamped headers, multicolumn/merge layouts, custom date formats and terminal behavior. |
 
@@ -536,7 +650,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | GNU source | ptx.c: initialize_regex / compare_occurs / define_all_fields |
 | Supported behavior | Default GNU keyword output; -w width and -g gap; file/stdin input, stdout only; no user regex. |
 | Declarative specification | Maximal C-locale alphabetic word intervals; the fixed default sentence-boundary language; keyword ordering with source-position ties, clipping and reference fields. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Available API | Finite stream outcomes, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | Repeated identical keywords with different context, punctuation, line breaks, narrow width and invalid gap. |
 | Outside initial scope | User regex, break/ignore/only files, traditional mode, roff/TeX, input/automatic references and output files. |
 
@@ -635,7 +749,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | GNU source | sort.c: compare / check / sort |
 | Supported behavior | Whole-line C byte order; -r, -u, -s, -c, -C, -z; file/stdin operands, stdout output (check mode uses regular files). |
 | Declarative specification | Ordered multiset of records (set multiplicities for -u), delimiter normalization and exact first-disorder location; stable ties where relevant. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Available API | Finite stream outcomes, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | Dropped duplicates, wrong final delimiter, embedded NUL, first disorder and unique/check interaction. |
 | Outside initial scope | Stdin check mode (early-stop consumption needs incremental IO), keys, numeric/month/version/random order, output files, merging and spilling. |
 
@@ -646,7 +760,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | GNU source | split.c: lines_rr / main |
 | Supported behavior | Explicit -n r/K/N to stdout; optional one file operand or stdin; default newline records. |
 | Declarative specification | Select records at indices congruent to K-1 modulo N, preserving exact bytes and the last unterminated record. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Available API | Finite stream outcomes, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | K>N, zero N, fewer records than chunks, empty input and binary record contents. |
 | Outside initial scope | File-creating modes, filters/subprocesses, byte/line-size partitions, suffix policies and custom separators. |
 
@@ -678,8 +792,8 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | --- | --- |
 | GNU source | test.c: posixtest / unary_operator / binary_operator |
 | Supported behavior | String -n/-z and =/!=; integer -eq/-ne/-lt/-le/-gt/-ge; !, parentheses, -a/-o and GNU argument-count precedence. |
-| Declarative specification | A declarative expression grammar and argument-count judgments, decimal integer values and Boolean truth; syntax errors distinct from false. |
-| Available API | CliPlan/PlanArgv override, output outcomes and diagnostics; pure expression judgments. |
+| Declarative specification | A declarative expression grammar and rules based on the number of arguments, decimal integer values and Boolean truth; syntax errors distinct from false. |
+| Available API | CliPlan/PlanArgv override, output outcomes and diagnostics; expression rules without IO. |
 | Required counterexamples and errors | Empty arguments, negative/oversized integers, ambiguous operator strings, wrong arity and malformed parentheses. |
 | Outside initial scope | Filesystem, identity/access, terminal predicates and the separate [ command. |
 
@@ -700,8 +814,8 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | --- | --- |
 | GNU source | tsort.c: record_relation / scan_zeros / detect_loop / tsort |
 | Supported behavior | Zero or one file/stdin operand; space/tab/newline-separated pairs; self pairs, duplicate edges and cycles; legacy -w no-op. |
-| Declarative specification | Ordered graph judgments: initial zero nodes by strcmp order; FIFO eligibility, successors in reverse insertion order; exact deterministic cycle selection/removal and diagnostics. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Declarative specification | Graph ordering rules: initial zero nodes by strcmp order; FIFO eligibility, successors in reverse insertion order; exact deterministic cycle selection/removal and diagnostics. |
+| Available API | Finite stream outcomes, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | Any different valid topological order; repeated edge counts; NUL within a token (C-string key); odd token count and cycle output. |
 | Outside initial scope | No additional transformation modes; late read/close faults follow the common exclusion. |
 
@@ -712,7 +826,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | GNU source | unexpand.c: next_file / unexpand |
 | Supported behavior | Default leading blanks; -a, --first-only, -t tab lists including continuation; ordered file/stdin operands. |
 | Declarative specification | Column-position and tab-stop relation preserving nonblank bytes; backspace/newline effects and GNU option precedence. |
-| Available API | Finite stream outcomes, output outcomes and diagnostics; GetEnv for dircolors. Transformations remain pure Dafny. |
+| Available API | Finite stream outcomes, output outcomes and diagnostics. Transformations remain pure Dafny. |
 | Required counterexamples and errors | Existing tabs, backspace, irregular stops, last unterminated line, invalid stop order and option interaction. |
 | Outside initial scope | Non-C locale display widths. |
 
@@ -722,7 +836,7 @@ current stdout/stderr/filesystem comparator. Do not claim it from these openings
 | --- | --- |
 | GNU source | unlink.c: main |
 | Supported behavior | Exactly one operand, including symlink operands. |
-| Declarative specification | One FilesystemUnlink request without terminal dereference; preserve returned post-state and select GNU failure diagnostic. |
+| Declarative specification | One FilesystemUnlink request without terminal dereference; preserve the returned state and select GNU failure diagnostic. |
 | Available API | Typed filesystem request/result calls selected by this entry; path/kind queries where needed, output outcomes and diagnostics. |
 | Required counterexamples and errors | Directory rejection, missing target, symlink target preservation and remaining hard-link alias. |
 | Outside initial scope | Recursive removal and open detached handles. |

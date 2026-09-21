@@ -19,7 +19,7 @@ Use `bench/core` to describe and perform a utility's IO under explicit library c
 
 ## Setup and module map
 
-Use the [contributor environment](adding-utilities.md#set-up-your-checkout). There is no separate core package. Run examples from `/workspace/dafnyutils` with `dafny-benchmark` on `PATH`.
+Use the [setup guide](../README.md#setup). There is no separate core package. Run examples from `/workspace/dafnyutils` with `dafny-benchmark` on `PATH`.
 
 | Source | Responsibility |
 | --- | --- |
@@ -34,11 +34,17 @@ Use the [contributor environment](adding-utilities.md#set-up-your-checkout). The
 
 The five `World*Proof.dfy` modules own lookup, insertion, removal, rename and filesystem update lemmas. Include the required proof file and import its module explicitly; for example, use `WorldFileSystemProof.FsSetPathIsInodeFsUpdateNode`. `BenchWorld` does not import those proofs.
 
-`Std.*` is disabled in benchmark projects. Reuse `BenchFunctional` for maps, filters, scans and folds, or write a verified task-local helper. A file in this checkout is not automatically available to evaluated candidates: the generated task's approved support closure controls access.
+`Std.*` is disabled in benchmark projects. Reuse `BenchFunctional` for maps,
+filters, scans and folds, or write a verified task-local helper. Evaluated
+candidates may use only the support files included by their generated task;
+having a file in this checkout does not grant access to it.
 
 ## Copy stdin with explicit error results
 
-Save this complete client as `/tmp/StreamCopy.dfy`. It copies the consumed input prefix and returns both errors so a caller can choose the right exit policy.
+The checked-in [StreamCopy client](../tools/fixtures/contributor/StreamCopy.dfy)
+copies the consumed input prefix and returns both errors so a caller can choose
+the right exit policy. Its implementation is shown below; the checked-in file
+uses a relative include path so it also works in other checkout locations.
 
 ```dafny
 include "/workspace/dafnyutils/bench/core/IO.dfy"
@@ -71,14 +77,19 @@ module StreamCopy {
 ```sh
 # Expected duration: Estimated 1–10 sec for this small client after tool installation.
 # Success criteria: Exit 0 and zero verification errors.
-dafny-benchmark verify --standard-libraries:false /tmp/StreamCopy.dfy
+dafny-benchmark verify --standard-libraries:false tools/fixtures/contributor/StreamCopy.dfy
 ```
 
-This verifies only the client contract. It does not compile/link the native adapter, establish GNU `cat` parity, or implement GNU error messages. On the documentation checkout, the command exited 0:
+This verifies only the client contract. It does not compile/link the native adapter,
+establish GNU `cat` parity, or implement GNU error messages. Expected summary:
 
 ```text
 Dafny program verifier finished with 4 verified, 0 errors
 ```
+
+For a complete program using these calls, follow the
+[small IO example](../README.md#a-small-io-program-from-start-to-finish). It adds a specification for partial
+results, the exit policy, a separate proof, an executable build and error tests.
 
 ## Entry and CLI contract
 
@@ -169,8 +180,8 @@ selection, fixed text, operand order and exit policy.
 
 `ParseTimestamp` / `ParseDate` return `(ok, sec, nsec)` under
 `TrustedTimeParseResultFields`. The runtime calls pinned gnulib through
-`TouchTimeParser.c` in the C locale and UTC0 environment. This is an explicit
-trust boundary, not a proved parser implementation.
+`TouchTimeParser.c` in the C locale and UTC0 environment. The utility proof relies
+on this library contract; it does not verify the parser implementation.
 
 | Method | Contract / relation | Modified region |
 | --- | --- | --- |
@@ -218,8 +229,8 @@ result while preserving the abstract filesystem.
 `DeletePath` retains the older derived contract; `UnlinkPath` uses the typed
 trusted unlink result. The methods are not interchangeable error models.
 Recursive traversal, parent creation, overwrite policy and utility diagnostics
-remain utility work. Availability does not qualify device privileges or every
-filesystem configuration.
+remain utility work. An available API does not mean that maintainers have approved
+device privileges or every filesystem configuration.
 
 | Method | Contract / relation | Modified region |
 | --- | --- | --- |
@@ -287,12 +298,33 @@ supply recursive traversal or a utility's ordering and filtering policy.
 Treat the exact `IO.dfy` declarations and `IOContract.dfy` predicates as authoritative. The summaries above cannot strengthen a precondition, frame or result relation.
 
 - Stream contracts constrain the consumed/committed prefix and errno. They do not provide incremental stdin reads or distinguish open/read/close failure phases.
-- `TrustedFilesystemEffectContractFields` binds the typed request, pre-filesystem and complete supplied result. By itself it does not impose POSIX insertion/removal laws. Do not replace this binding with just `ok <==> err == 0` or choose a convenient post-state.
-- `CreateDirectorySpec` additionally guarantees `DirectoryCreationEffectFields` on success: a fresh empty directory at the resolved destination, exactly one namespace insertion, and preservation of existing inode records except parent metadata and symlink access times. The parent retains its identity, ownership, kind, mode and extension fields; its timestamps, link count and storage may change. Existing symlinks may change only their access times; the model does not track which links were traversed. `FileSystem` continues to require valid inode structure. Parent symlinks and dot components use the existing resolver; trailing slashes are accepted without following a terminal symlink.
-- `IO.trustedFilesystem()` has type `DirectoryValidFilesystemObservations`. This ghost subset excludes mkdir observations inconsistent with that effect; it is not a runtime validator. The subset has a failure witness for nonemptiness; the native `mkdir` implementation remains inside the existing trusted library boundary. Other operation contracts are unchanged. Failed mkdir calls still bind the supplied post-state and do not promise rollback or exact errno selection. Requested mode/umask/time stay bound to the request, but exact permission, ownership, timestamp and link-count laws are not established by this namespace contract. Concurrent external mutation remains outside the isolated filesystem model.
+- `TrustedFilesystemEffectContractFields` binds the typed request, pre-filesystem and complete supplied result. By itself it does not impose POSIX insertion/removal laws. Do not replace this binding with just `ok <==> err == 0` or choose a different resulting state to make the proof pass.
 - Environment enumeration permits more than one order for the same map. Ghost credentials are not executable UID/GID or name-service queries.
 - `TruncateFile` does not create a missing file. Path-targeted `Sync` lacks GNU's write-only-open retry and separate failure phases.
-- There is no public arbitrary process execution, user/group lookup, terminal control, random-source or volume-capacity API. The [utility handoffs](adding-utilities.md#initial-scopes) state supported modes.
+- There is no public arbitrary process execution, user/group lookup, terminal control, random-source or volume-capacity API. The [starting scopes](adding-utilities.md#initial-scopes) state supported modes.
+
+Directory creation has an additional contract. For example, a successful request
+to create `parent/new` must leave a fresh empty directory at the resolved path.
+A failed request must retain the supplied filesystem result; it does not promise
+to restore the old filesystem.
+
+| `CreateDirectorySpec` result | What the contract says |
+| --- | --- |
+| Success | `DirectoryCreationEffectFields` requires one new directory entry and a fresh empty directory. Existing inode records are preserved except parent metadata and symlink access times. |
+| Parent after success | Identity, ownership, kind, mode and extension fields stay the same. Timestamps, link count and storage may change. |
+| Existing symlinks after success | Only access times may change; the model does not record which links were traversed. |
+| Failure | The request and returned filesystem remain linked. Rollback and exact errno selection are not guaranteed. |
+| Both results | The request retains its mode, umask and time values. This contract does not establish exact permission, ownership, timestamp or link-count laws. |
+
+`FileSystem` still requires valid inode structure. Parent symlinks and dot
+components use the existing resolver; trailing slashes are accepted without
+following a terminal symlink. Concurrent external changes are outside this model.
+
+The ghost type `DirectoryValidFilesystemObservations` restricts
+`IO.trustedFilesystem()` to observations consistent with the successful-directory
+rule. It has at least one valid value because failure observations are allowed.
+This is a proof model, not a runtime checker. Native `mkdir` remains trusted;
+the contracts of other operations are unchanged.
 
 Maintainers own shared contracts and runtime adapters. Report a missing operation with its GNU scenario, inputs, errors, effects and proposed observation. Contributors must not modify immutable support, add unchecked externs, reset IO observations, or weaken a contract to pass verification.
 

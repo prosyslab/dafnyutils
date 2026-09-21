@@ -1,4 +1,4 @@
-.PHONY: build build-dafny build-image test check build-coreutils clean
+.PHONY: build build-dafny build-image test check check-environment build-coreutils clean
 
 build:
 	@python3 -m benchmarks.make_tasks build --task "$(TASK)"
@@ -21,6 +21,9 @@ check:
 
 build-coreutils:
 	@tools/build-coreutils
+
+check-environment:
+	@bash tools/check-contributor-env
 
 clean:
 	@test "$(abspath $(or $(BUILD_DIR),_build))" = "$(CURDIR)/_build" || \

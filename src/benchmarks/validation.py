@@ -37,7 +37,7 @@ def load_validated_benchmark(repository: BenchmarkRepository, task_id: str) -> V
         raise BenchmarkValidationError((ValidationIssue(task_id, str(exc)),)) from exc
     issues = list(_validate_declared_files(repository, definition))
     if definition.source.status is SourceStatus.INCOMPLETE:
-        issues.append(ValidationIssue(task_id, "source provenance is incomplete"))
+        issues.append(ValidationIssue(task_id, "source details are incomplete"))
     if issues:
         raise BenchmarkValidationError(tuple(issues))
     configuration = ResolvedBenchmark.for_task(task_id)

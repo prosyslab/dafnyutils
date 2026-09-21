@@ -7,12 +7,13 @@ This guide uses `bench/utils/comm/Tests.py`. Its upstream source is `coreutils/t
 ## Contents
 
 - [Prepare the environment and find the source](#prepare-the-environment-and-find-the-source)
+- [Start a new utility test file](#start-a-new-utility-test-file)
 - [Translate one upstream scenario](#translate-one-upstream-scenario)
   - [Read the upstream case](#read-the-upstream-case)
   - [Reuse the existing adapter helpers](#reuse-the-existing-adapter-helpers)
   - [Add the Python function](#add-the-python-function)
 - [Port an error case too](#port-an-error-case-too)
-- [Keep upstream provenance and scope visible](#keep-upstream-provenance-and-scope-visible)
+- [Record the upstream source and supported behavior](#record-the-upstream-source-and-supported-behavior)
 - [Run the port and inspect its result](#run-the-port-and-inspect-its-result)
   - [Run the new case](#run-the-new-case)
   - [Run the utility suite and record evidence](#run-the-utility-suite-and-record-evidence)
@@ -20,7 +21,7 @@ This guide uses `bench/utils/comm/Tests.py`. Its upstream source is `coreutils/t
 
 ## Prepare the environment and find the source
 
-Use the [contributor environment](adding-utilities.md#set-up-your-checkout). Run commands below in Bash or zsh from `/workspace/dafnyutils`, inside the prepared contributor container. Python tests launch the GNU executable and .NET program through the existing helpers in that environment; they do not start the Rust fuzzer or its Compose service.
+Use the [setup guide](../README.md#setup). Run commands below in Bash or zsh from `/workspace/dafnyutils`, inside the prepared contributor container. Python tests launch the GNU executable and .NET program through the existing helpers in that environment; they do not start the Rust fuzzer or its Compose service.
 
 ```sh
 # Expected duration: Estimated < 1 sec; searches the local upstream checkout.
@@ -37,6 +38,59 @@ coreutils/tests/misc/comm.pl
 Read [comm.pl](../coreutils/tests/misc/comm.pl), [Tests.py](../bench/utils/comm/Tests.py), and the [supported comm scope](../bench/utils/comm/comm.md) together. Check upstream case names against existing Python functions and parameter rows before adding anything. `comm.pl` covers more GNU behavior than this benchmark currently implements.
 
 The current adapter already covers basic columns, delimiters, totals, several NUL modes and operand errors. Its NUL-mode parameter table does not contain the `-z -2` combination used below. If a later revision already covers it, extend or improve the existing test instead of duplicating it.
+
+## Start a new utility test file
+
+`python3 -m benchmarks init --kind coreutils --id base32` creates a `Tests.py`
+with shared runner imports, an `executables` fixture, and `assert_parity`.
+The fixture builds the pinned GNU binary and the utility DLL. Proof-only tests
+do not request this fixture, so they need no executable build.
+
+Replace `test_gnu_parity`, which deliberately fails, with a concrete case. For
+the base32 encoding scope, a small stdin case can use the generated helpers:
+
+```python
+# Encode one byte from stdin with the default GNU wrapping behavior.
+def test_encodes_one_byte(executables: tuple[Path, Path], tmp_path: Path) -> None:
+    # upstream: coreutils/tests/basenc/base64.pl
+    # Port inout1; this upstream file tests both base32 and base64.
+    assert_parity(executables, [], tmp_path, input_data=b"a")
+```
+
+Check that upstream path and the accepted scope against your pinned checkout.
+`assert_parity` compares stdout, stderr and status exactly, including stderr on
+failure. The shared lower-level comparison helper ignores error stderr by default;
+pass `ignore_stderr_when_exit_nonzero=False` for a strict comparison.
+Add malformed-input and partial-effect cases separately. For filesystem-changing
+commands, replace the read-only helper with separate equivalent fixture trees and
+compare filesystem effects as well as the returned streams/status.
+
+Keep the generated `test_verify_module` and its `@pytest.mark.dafny_verify` marker.
+It verifies Entry, Core and Proof through `run_dafny_verify`. Add any new proof
+modules to its parameter list. The final gate runs this selection explicitly:
+
+```sh
+python3 -m pytest -q -n0 --import-mode=importlib -m dafny_verify \
+  bench/utils/base32/Tests.py
+```
+
+Expected summary after completing the three generated proof targets, exit 0:
+
+```text
+3 passed, <runtime-case-count> deselected in <seconds>s
+```
+
+On an untouched scaffold, expect proof failures and exit 1. If all marked cases
+are missing, pytest instead exits 5:
+
+```text
+<runtime-case-count> deselected in <seconds>s
+```
+
+An unchanged scaffold is expected to fail verification. A completed utility must
+pass both this selection and `make -C bench/utils/base32 verify`; selecting no
+marked tests exits 5 and is not a pass. Replace the separate placeholder in
+`Tests.dfy` with an executable Core behavior case too.
 
 ## Translate one upstream scenario
 
@@ -66,7 +120,7 @@ The complete test below belongs in `bench/utils/comm/Tests.py`, next to the exis
 | `write_comm_nul_inputs(cwd)` | Writes `za` and `zb` with the exact upstream bytes shown above |
 | `run_system_comm(args, cwd, input_data=...)` | Runs the pinned `_build/coreutils/src/comm` reference |
 | `run_bench_comm(args, cwd, input_data=...)` | Runs `_build/bench/comm_bench.dll` through the shared candidate runner |
-| `assert_result_matches_reference(reference, candidate)` | Compares the returned stdout/stderr/status tuples; default comparison is strict |
+| `assert_result_matches_reference(reference, candidate, ignore_stderr_when_exit_nonzero=False)` | Compares the returned stdout/stderr/status tuples, including error stderr |
 | `assert_comm_parity(args, cwd, input_data=...)` | Convenience wrapper that runs and compares both programs |
 
 The runners return `(stdout: bytes, stderr: bytes, exit_code: int)` and use the shared C-locale/UTC0 environment and timeout. Do not replace the pinned reference with whatever `comm` happens to be on `PATH`.
@@ -89,7 +143,7 @@ def test_zero_terminated_suppress_second_column_matches_coreutils(tmp_path: Path
     candidate = run_bench_comm(args, tmp_path)
 
     assert reference == (b"1\x00\t3\x00\t3\x00\t3\x00", b"", 0)
-    assert_result_matches_reference(reference, candidate)
+    assert_result_matches_reference(reference, candidate, ignore_stderr_when_exit_nonzero=False)
 ```
 
 `tmp_path` is pytest's temporary-directory fixture, so this test needs no new import or manual cleanup. Both programs can read the same fixture here because `comm` does not change file contents. For a mutating utility, prepare separate equivalent reference/candidate trees and compare the relevant filesystem effects using that utility's existing helpers.
@@ -115,12 +169,12 @@ def test_missing_operands_match_upstream_comm(tmp_path: Path) -> None:
         b"Try 'comm --help' for more information.\n"
     )
     assert reference == (b"", expected_stderr, 1)
-    assert_result_matches_reference(reference, candidate)
+    assert_result_matches_reference(reference, candidate, ignore_stderr_when_exit_nonzero=False)
 ```
 
 Keep success and failure scenarios in separate tests. Use parameterization only for related variants; put the intention comment above the decorators and give variants readable IDs when useful. For stdin scenarios, pass the same `input_data` bytes to both helpers so each process receives its own input.
 
-## Keep upstream provenance and scope visible
+## Record the upstream source and supported behavior
 
 Place a one-line intention comment above the test. Put the exact `# upstream: coreutils/tests/misc/comm.pl` marker **inside** its body, and put the case name on a separate comment line. The [marker reader](../tools/bench/upstream_markers.py) requires that location and accepts a path, not a path plus a free-text case label.
 
@@ -151,6 +205,14 @@ make -C bench/utils/comm test \
   PYTEST_ARGS='-k test_zero_terminated_suppress_second_column_matches_coreutils --junitxml=/tmp/comm-zopt2.xml'
 ```
 
+Expected Python-stage summary after adding the case, exit 0:
+
+```text
+...
+1 passed, <count> deselected in <seconds>s
+make: Leaving directory '/workspace/dafnyutils/bench/utils/comm'
+```
+
 The target runs executable `Tests.dfy` cases first, then `Tests.py`. `PYTEST_ARGS` filters the Python stage only. Build and helper errors must be resolved before interpreting parity. The XML path is supplied explicitly; choose a fresh path for each run to avoid confusing old and new evidence.
 
 For a direct Python-only diagnostic after setup, select the exact pytest node:
@@ -162,15 +224,15 @@ python3 -m pytest -q -n0 --import-mode=importlib \
   bench/utils/comm/Tests.py::test_zero_terminated_suppress_second_column_matches_coreutils
 ```
 
-This reuses the module's build fixture and runners. It does not execute `Tests.dfy`. The lowercase `test_` function name makes it discoverable once the explicit `Tests.py` path is selected. Root `make test` targets source tests; use the utility target or explicit adapter path for utility cases.
-
-The two documented functions were appended to a temporary copy of the real adapter and run with its existing helpers and build fixture, alongside `test_default_three_columns_match_coreutils`. `EVAL_TARGET_ROOT` pointed at this checkout, so both programs were the real GNU/Dafny artifacts. The temporary pytest run completed with:
+Expected summary after adding the case, exit 0:
 
 ```text
-3 passed, 44 deselected in 14.70s
+1 passed in <seconds>s
 ```
 
-This validates both example functions and one existing scenario. The live `Tests.py` was left unchanged; the new node exists there only after a contributor adds the function. The Make routing was inspected, but the filtered Make command above was not executed against the live file. These results do not claim a full utility suite or Dafny proof run.
+This reuses the module's build fixture and runners. It does not execute `Tests.dfy`. The lowercase `test_` function name makes it discoverable once the explicit `Tests.py` path is selected. Root `make test` targets source tests; use the utility target or explicit adapter path for utility cases.
+
+The example node exists only after you add the function. Record your own result.
 
 ### Run the utility suite and record evidence
 
@@ -180,7 +242,22 @@ This validates both example functions and one existing scenario. The live `Tests
 make -C bench/utils/comm test
 ```
 
-Run the broader utility suite after the focused test. It was not rerun for this guide-only edit. This target excludes tests marked `dafny_verify`; it is not proof verification. Follow [utility validation](adding-utilities.md#validate-and-submit) for the separate proof and final contribution checks.
+Expected output shape, exit 0:
+
+```text
+CommTests.<case>: PASSED
+...
+<count> passed, <count> deselected in <seconds>s
+make: Leaving directory '/workspace/dafnyutils/bench/utils/comm'
+```
+
+If existing cases are skipped, the summary includes a skipped count. Report their
+reasons; a skipped case is not passing coverage.
+
+Run the broader utility suite after the focused test. This target excludes tests
+marked `dafny_verify`; it is not proof verification. Follow
+[utility validation](adding-utilities.md#validate-and-submit) for the separate
+proof and final contribution checks.
 
 For a PR, report the upstream path/case/revision, Python test name, exact command, tested revision, GNU/Dafny artifact identities, pass/fail/skip counts and an accessible log or JUnit artifact. In `/tmp/comm-zopt2.xml`, look for the named `testcase` and confirm it has no `failure`, `error` or `skipped` child. A collected, deselected or skipped test is not an executed pass.
 
