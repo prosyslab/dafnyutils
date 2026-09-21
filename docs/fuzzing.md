@@ -405,4 +405,4 @@ and `input/support.rs` for scalar values. For a base32 contribution,
 example of a generic generator with fixed scenarios; adapt its inputs to base32.
 A custom value callback may generate one semantic value; do not add another
 argument assembler or utility-name dispatch to the common interpreter. Complete
-the [utility contribution gate](adding-utilities.md#build-test-and-verify) after registration.
+the [utility contribution gate](../CONTRIBUTING.md#build-test-and-verify) after registration.

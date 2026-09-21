@@ -88,7 +88,7 @@ Dafny program verifier finished with 4 verified, 0 errors
 ```
 
 For a complete program using these calls, follow the
-[small IO example](../README.md#a-small-io-program-from-start-to-finish). It adds a specification for partial
+[small IO example](../README.md#example-test-and-verify-a-small-program). It adds a specification for partial
 results, the exit policy, a separate proof, an executable build and error tests.
 
 ## Entry and CLI contract
@@ -301,7 +301,7 @@ Treat the exact `IO.dfy` declarations and `IOContract.dfy` predicates as authori
 - `TrustedFilesystemEffectContractFields` binds the typed request, pre-filesystem and complete supplied result. By itself it does not impose POSIX insertion/removal laws. Do not replace this binding with just `ok <==> err == 0` or choose a different resulting state to make the proof pass.
 - Environment enumeration permits more than one order for the same map. Ghost credentials are not executable UID/GID or name-service queries.
 - `TruncateFile` does not create a missing file. Path-targeted `Sync` lacks GNU's write-only-open retry and separate failure phases.
-- There is no public arbitrary process execution, user/group lookup, terminal control, random-source or volume-capacity API. The [starting scopes](adding-utilities.md#initial-scopes) state supported modes.
+- There is no public arbitrary process execution, user/group lookup, terminal control, random-source or volume-capacity API. The [starting scopes](initial-scopes.md#initial-scopes) state supported modes.
 
 Directory creation has an additional contract. For example, a successful request
 to create `parent/new` must leave a fresh empty directory at the resolved path.
@@ -328,4 +328,4 @@ the contracts of other operations are unchanged.
 
 Maintainers own shared contracts and runtime adapters. Report a missing operation with its GNU scenario, inputs, errors, effects and proposed observation. Contributors must not modify immutable support, add unchecked externs, reset IO observations, or weaken a contract to pass verification.
 
-Evaluation owns GNU execution, runtime adapters, comparison and trusted tests. Differential replay reproduces observed evidence; it does not prove an observation satisfies a Dafny specification. Exact-specification replay adapters are not a current contribution gate. See [the full workflow](adding-utilities.md#validate-and-submit) for current checks and human review.
+Evaluation owns GNU execution, runtime adapters, comparison and trusted tests. Differential replay reproduces observed evidence; it does not prove an observation satisfies a Dafny specification. Exact-specification replay adapters are not a current contribution gate. See [the full workflow](../CONTRIBUTING.md#validate-and-submit) for current checks and human review.

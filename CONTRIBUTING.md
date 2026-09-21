@@ -1,10 +1,22 @@
 # Contributing to Dafnyutils
 
-Submit a focused change with reproducible code verification and fuzzing results. Use the four guides below for implementation details, then report the results in the [pull request template](.github/pull_request_template.md).
+Submit a focused change with reproducible code verification and fuzzing results. Follow the utility contribution workflow below, then report the results in the [pull request template](.github/pull_request_template.md).
 
 ## Contents
 
-- [Choose a guide](#choose-a-guide)
+- [Extending benchmark](#extending-benchmark)
+  - [Set up your checkout](#set-up-your-checkout)
+  - [Find the right files](#find-the-right-files)
+  - [Build one contribution](#build-one-contribution)
+    - [Create the files](#create-the-files)
+    - [Agree on the observable behavior](#agree-on-the-observable-behavior)
+    - [Complete the generated files](#complete-the-generated-files)
+    - [Specify first, then implement and prove](#specify-first-then-implement-and-prove)
+    - [Add differential cases and a generator](#add-differential-cases-and-a-generator)
+  - [Validate and submit](#validate-and-submit)
+    - [Check the definition and public profile](#check-the-definition-and-public-profile)
+    - [Build, test and verify](#build-test-and-verify)
+    - [Open a pull request](#open-a-pull-request)
 - [Prepare the change](#prepare-the-change)
 - [Coding style](#coding-style)
   - [Python](#python)
@@ -15,16 +27,303 @@ Submit a focused change with reproducible code verification and fuzzing results.
 - [Show verification and fuzzing results](#show-verification-and-fuzzing-results)
 - [Open the pull request](#open-the-pull-request)
 
-## Choose a guide
+## Extending benchmark
 
-| Your task | Guide |
+Contribute a utility by writing its behavior contract, implementing it, proving the entry point, and comparing the executable with the pinned GNU binary. Submit all four kinds of evidence for human review.
+
+This guide follows `base32`, an open utility with byte-stream input. The scaffold is a starting point, not a working implementation. Use the existing `base64` and `cat` projects to learn the structure; do not copy their specifications as the meaning of `base32`.
+
+First try the [small IO example](README.md#example-test-and-verify-a-small-program) if you have not connected
+Spec, Core, Proof and a process entry before. It includes working files and
+commands for checking both the proof and the executable.
+
+### Set up your checkout
+
+Follow [Setup](README.md#setup), including
+`make check-environment`. Run the commands below from `/workspace/dafnyutils`
+inside that container, with `.venv/bin` on `PATH`.
+
+### Find the right files
+
+| Path | Purpose |
 | --- | --- |
-| Set up the environment and add a utility through review | [Add a utility](docs/adding-utilities.md) |
-| Use shared APIs and understand what the proof trusts | [Core API and library assumptions](docs/core-api.md) |
-| Run campaigns, inspect metrics and replay failures | [Use the fuzzer](docs/fuzzing.md) |
-| Port a GNU scenario into a utility’s Python tests | [Add differential test cases](docs/adding-test-cases.md) |
+| `bench/utils/<utility>/` | Utility definition, description, Dafny modules and local Makefile |
+| `bench/core/` | Shared model, contracts, helpers and trusted runtime adapters |
+| `coreutils/` | Pinned upstream GNU source and tests; keep its revision fixed |
+| `tools/benchmark_templates/coreutils/` | Incomplete starting files used by the scaffold command |
+| `tools/coreutils_fuzzer/` | Differential runner, generators and comparison logic |
+| `src/benchmarks/` | Discovery, validation, builds and contribution checks |
+| `_build/` | Generated binaries and reports, created by build/check commands |
 
-Start with the [setup guide](README.md#setup). For a new utility, check [TODOLIST.csv](TODOLIST.csv) and follow the [scope review step](docs/adding-utilities.md#agree-on-the-observable-behavior) before implementation. Follow [repository instructions](AGENTS.md), [bench rules](bench/AGENTS.md) and [Dafny style](DAFNYSTYLE.md).
+Read [bench rules](bench/AGENTS.md) and [Dafny style](DAFNYSTYLE.md) before editing Dafny.
+Keep the scope in the utility's Markdown file and implementation/validation notes
+in the draft PR, as described in [Prepare the change](#prepare-the-change).
+
+### Build one contribution
+
+#### Create the files
+
+Choose an `open_for_contribution` row in [TODOLIST.csv](TODOLIST.csv), then
+read its [initial scope](docs/initial-scopes.md#initial-scopes). This walkthrough uses `base32`.
+Create the scaffold **before** creating its directory or scope document:
+
+```sh
+python3 -m benchmarks init --kind coreutils --id base32
+```
+
+Expected output, exit 0:
+
+```text
+bench/utils/base32
+scaffold is incomplete; replace TODO content and source status before validation
+```
+
+If the directory already exists, inspect it and continue that contribution; init will
+not overwrite it. Do not delete someone else's work to rerun this command.
+
+#### Agree on the observable behavior
+
+The `base32` opening covers encoding, `-d`, `-i`, `-w`, and zero or one file
+operand. It does not cover other encodings.
+
+Fill the generated `bench/utils/base32/base32.md` before implementation:
+
+| Question | Example answer for base32 |
+| --- | --- |
+| What is the source? | Pinned `coreutils/src/basenc.c`, built with `BASE_TYPE=32`; record the submodule commit |
+| What is accepted? | Finite raw bytes from stdin or one regular file; the options in the agreed initial scope |
+| What is observed? | Exact output and error bytes, exit behavior, and modeled input consumption |
+| Which environment? | Linux, C locale and UTC0; the filename and IO limits in the [shared stream scope](docs/initial-scopes.md#shared-stream-scope) |
+| Which errors matter? | Invalid alphabet/padding/options; missing or inaccessible file; partial progress followed by failure |
+| What is trusted? | Named `bench/core` IO and diagnostic contracts, with their recorded revision |
+| What remains to prove? | Bit-block relation, padding, wrapping, decoding prefix, diagnostics and exit policy |
+
+A missing API or observation is a maintainer model issue. Record it before extending the scope. Do not narrow an existing task, assume successful IO, or add an unchecked native call to make a proof pass.
+
+Open a draft PR with this scope table and ask a repository maintainer to review it
+before implementation. Link a related issue if one exists; an issue is not required.
+An open row identifies an available starting scope, not approval of your completed
+specification. State explicitly when you use that scope without changes. Record
+the maintainer's decision in the draft PR, including any requested model work.
+
+#### Complete the generated files
+
+Replace `benchmark.yaml` with this complete metadata after checking the source and license:
+
+```yaml
+schema_version: benchmark.definition.v2
+task_id: base32
+kind: coreutils
+source:
+  status: verified
+  name: GNU coreutils base32
+  url: https://www.gnu.org/software/coreutils/
+  license: GPL-3.0-or-later
+```
+
+Here `verified` means the source name, URL and license have been checked. It does not mean the utility or its proof has passed. New contributions cannot use `legacy-unverified`. Do not add invented fields for evaluator paths: the loader derives them from the task ID and family.
+
+Complete these generated files:
+
+| File | What to put there |
+| --- | --- |
+| `base32.md` | Agreed input, option, environment, output and error scope, with examples, source revision, and license |
+| `Base32Schema.dfy` | CLI schema/configuration, raw command types and decode behavior |
+| `Base32Spec.dfy` | Declarative observable relation and fixed help/version/error text |
+| `Base32Core.dfy` | Executable algorithms and the values they construct to satisfy the specification |
+| `Base32Proof.dfy` | Lemmas connecting the implementation summary to the specification |
+| `Base32.dfy` | Shared runner hooks; `RunCore` directly ensures the main `Spec(...)` |
+| `Base32Cli.dfy` | Process entry using `BenchIO.Process()`, the shared runner and `BenchIO.Exit` |
+| `Tests.py`, `Tests.dfy` | Evaluator-owned differential cases and executable Dafny cases |
+| `dfyconfig.toml`, `Makefile` | Existing project/build conventions from the scaffold |
+
+The scaffold already connects the CLI to a class extending
+`BenchItem.BenchmarkItemTwostate<Base32CmdRaw>`. It passes the parsed command and
+IO handle through Core, the connecting lemma, and the entry postcondition.
+Replace the raw-command wrapper and parser TODOs with the utility's actual rules.
+Use only the IO regions it reads or changes; the supplied stream regions are a
+starting point, not permission to widen an existing task's frame.
+
+The false Spec/CoreSummary relations and failing assertions deliberately block
+verification. Replace them with reviewed behavior and proofs, not `true`, `assume`,
+or verification skips. `Main` uses `decreases *` because the shared runner permits
+nontermination; this does not prove CLI termination. The generated Core method
+still has to terminate. Review help/version/parse-error plans separately.
+
+#### Specify first, then implement and prove
+
+State the result as a mathematical relation. For example, a valid base32 block relates five input bytes to eight alphabet symbols through bit equations. Padding and line breaks have separate position rules. Decoding must constrain the bytes emitted before an invalid suffix. A second copy of the encoder loop is not an independent specification.
+
+Use the [core API guide](docs/core-api.md) for IO, byte conversion and reusable lemmas. Keep algorithms in Core, proof connections in Proof, and fixed user-facing text in Spec. Spec must not import Core, Proof or CLI. Keep this required condition on the entry method:
+
+```dafny
+ensures Spec(raw, io, exit)
+```
+
+This is a contract line, not a complete method. Use the actual argument types and frames of your utility. A separate `CoreSummary ==> Spec` lemma helps prove this condition; it does not replace it. Use narrow `reads` and `modifies` clauses. Do not add `assume`, trust annotations, or verification skips.
+
+The shared runner calls `RunCore` only for a run plan. Help, version and parse errors may use an early-exit plan. Review and test that CLI path separately; a `RunCore` proof alone does not prove every early-exit branch.
+
+#### Add differential cases and a generator
+
+Follow [Add test cases](docs/adding-test-cases.md) to port upstream scenarios into `bench/utils/<utility>/Tests.py`, reusing its fixtures and runner helpers. Compare the pinned GNU binary with the built Dafny binary. Include normal, malformed-input and partial-effect cases; reject plausible wrong outputs as part of specification review.
+
+For a new utility, start with [the generated test adapter](docs/adding-test-cases.md#start-a-new-utility-test-file).
+It includes the build fixture, strict comparison helper, and three
+`@pytest.mark.dafny_verify` cases for Entry/Core/Proof. Keep those proof cases:
+`make check` runs them after project verification. Without them pytest selects
+no proof tests and exits 5, even if `make verify` succeeded.
+
+For a new utility, add its generator under `tools/coreutils_fuzzer/src/fuzz/input/generators/`, declare the module in `generators/mod.rs`, and register `GENERATOR` in `src/utils/capabilities.rs`. Reuse `PatternInputGenerator` and the shared argument-pattern engine. See [generator extension](docs/fuzzing.md#support-a-new-utility) for the concrete registration points. A case JSON file alone does not register a new utility.
+
+Keep evaluator cases, oracle code and reference answers out of public task resources. Authors can inspect public GNU tests during maintenance; an evaluated agent may only read material allowed by that run's protocol.
+
+### Validate and submit
+
+#### Check the definition and public profile
+
+```sh
+# Expected duration: Unknown; depends on source analysis and the completed utility.
+# Success criteria: Exit 0 and base32: valid.
+python3 -m benchmarks validate base32
+```
+
+Expected output for a completed utility, exit 0:
+
+```text
+base32: valid
+```
+
+Expected output for an untouched scaffold, exit 1:
+
+```text
+base32: source details are incomplete
+```
+
+This checks the completed item and its contract structure. The untouched scaffold
+must fail with `source details are incomplete`; that is an expected unfinished state.
+
+```sh
+# Expected duration: Unknown; requires the completed item and Dafny analysis.
+# Success criteria: Exit 0 and _build/profile-review/base32/task.json exists.
+python3 -m tools.generate_task_profiles --utility base32 --output-dir _build/profile-review
+```
+
+Expected result, exit 0:
+
+```text
+(no stdout; _build/profile-review/base32/task.json is created)
+```
+
+Review the specification and all files it includes, the read-only support files,
+and the editable/output paths. Confirm that tests and reference answers are absent.
+Generating a profile does not verify its proof.
+
+#### Build, test and verify
+
+```sh
+# Expected duration: Unknown; first GNU bootstrap/build depends on downloads and CPU.
+# Success criteria: Exit 0 and _build/coreutils/src/base32 is executable.
+make build-coreutils
+```
+
+Expected output, exit 0 (paths and build steps vary):
+
+```text
+...
+make[1]: Leaving directory '/workspace/dafnyutils/_build/coreutils'
+```
+
+This builds the pinned original utilities. It may need network access for build inputs.
+
+```sh
+# Expected duration: Unknown; requires a complete Base32 implementation and .NET.
+# Success criteria: Exit 0 and _build/bench/base32_bench.dll exists.
+make -C bench/utils/base32 build
+```
+
+Expected output, exit 0:
+
+```text
+Dafny program verifier did not attempt verification
+make: Leaving directory '/workspace/dafnyutils/bench/utils/base32'
+```
+
+```sh
+# Expected duration: Unknown; depends on the new case population and Docker setup.
+# Success criteria: Exit 0 with real, non-skipped runtime cases passing.
+make -C bench/utils/base32 test
+```
+
+Expected output shape, exit 0 (names and counts depend on your cases):
+
+```text
+Base32Tests.<case>: PASSED
+...
+<count> passed, <count> deselected in <seconds>s
+make: Leaving directory '/workspace/dafnyutils/bench/utils/base32'
+```
+
+```sh
+# Expected duration: Unknown; depends on the conditions to prove and solver time.
+# Success criteria: Exit 0 and zero Dafny verification errors for the project and all files it includes.
+make -C bench/utils/base32 verify
+```
+
+Expected output, exit 0:
+
+```text
+Verification targets (<count> files):
+...
+Dafny program verifier finished with <count> verified, 0 errors
+...
+DAFNY_VERIFICATION_OUTCOME=verified phase=verify
+DAFNY_VERIFICATION_RESULT total=<count> failed=0
+```
+
+These commands check compilation, executable behavior and proof separately.
+A build is not verification, and matching a finite test set is not proof of the
+specification. On a timeout, locate the expensive condition and add local proof
+guidance before considering a larger time limit.
+
+```sh
+# Expected duration: Unknown; includes builds, runtime tests, 20 fuzz cases and proofs.
+# Success criteria: Exit 0 and base32: checks passed; every required check completes.
+make check TASK=base32
+```
+
+Expected final output after all required stages, exit 0:
+
+```text
+...
+base32: checks passed
+```
+
+This is the final contribution gate. Required checks are `impl_layout`,
+`implementation_tests`, `fuzzer`, `proof_layout` and `dafny_verify`, defined in
+[checks.py](src/benchmarks/checks.py). The implementation report is
+`_build/contribution_checks/base32/implementation-tests.xml`; it must contain an
+executed, non-skipped case. The verification stage also runs the marked proof
+tests in `Tests.py`. Missing tools, unsupported fuzzing, skipped required work
+and timeouts are failures. Run this gate only after completing the utility;
+the untouched scaffold is not a passing example.
+
+#### Open a pull request
+
+Follow [the contribution guidelines below](#prepare-the-change) and use the
+[pull request template](.github/pull_request_template.md).
+
+- Paste actual stdout in **tests → fuzzing → verification** order, with commands,
+  exit codes and accessible logs. Explain failed, unrun and inapplicable checks.
+- For each affected coreutils utility, show three different seeds with at least
+  1,000 completed matches each, no errors and full comparison settings. The
+  20-case automatic gate does not replace these runs.
+- Include the source revision/license, accepted scope, trusted APIs, main
+  specification, and any proof or termination limits.
+- Identify the seeds, case counts and built artifacts. Preserve original mismatch
+  bundles and report fixed-case regression results separately.
+
+The maintainer reviews whether the specification describes GNU behavior, rejects wrong behavior, and relies only on the approved library contracts. Automated checks do not replace this review. Keep failed and unrun checks visible and rerun affected checks after corrections.
 
 ## Prepare the change
 
@@ -156,7 +455,7 @@ Report evidence in **tests → fuzzing → verification** order. Copy and paste 
 The short automatic gate currently runs 20 fuzz cases with seed 1; it does not satisfy the separate PR requirement of three campaigns with at least 1,000 iterations each. See [Collect PR evidence](docs/fuzzing.md#collect-pr-evidence) for the command.
 For example, a one-case differential run should identify its case ID and completed outcome; a proof result should identify the verified files, their included files, and the verifier summary. Copy actual results from the run. Do not treat example output in a guide as evidence for your PR.
 
-See [validation commands](docs/adding-utilities.md#validate-and-submit) and the [metrics example](docs/fuzzing.md#run-and-inspect-the-comparison). Link uploaded PR or CI artifacts that reviewers can access; a local `/tmp` path alone is not a shared log. Never include credentials or restricted evaluator payloads.
+See [validation commands](#validate-and-submit) and the [metrics example](docs/fuzzing.md#run-and-inspect-the-comparison). Link uploaded PR or CI artifacts that reviewers can access; a local `/tmp` path alone is not a shared log. Never include credentials or restricted evaluator payloads.
 
 Algorithm tasks do not require the coreutils fuzzer; report their case tests instead and explain `not applicable` in the fuzzing section. For documentation-only changes, record link/content checks and explain why runtime verification and fuzzing were not run.
 

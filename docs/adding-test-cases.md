@@ -256,7 +256,7 @@ reasons; a skipped case is not passing coverage.
 
 Run the broader utility suite after the focused test. This target excludes tests
 marked `dafny_verify`; it is not proof verification. Follow
-[utility validation](adding-utilities.md#validate-and-submit) for the separate
+[utility validation](../CONTRIBUTING.md#validate-and-submit) for the separate
 proof and final contribution checks.
 
 For a PR, report the upstream path/case/revision, Python test name, exact command, tested revision, GNU/Dafny artifact identities, pass/fail/skip counts and an accessible log or JUnit artifact. In `/tmp/comm-zopt2.xml`, look for the named `testcase` and confirm it has no `failure`, `error` or `skipped` child. A collected, deselected or skipped test is not an executed pass.

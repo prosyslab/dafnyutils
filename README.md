@@ -10,7 +10,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution process and require
 
 | Your task | Guide |
 | --- | --- |
-| Add a utility from setup through review | [Add a utility](docs/adding-utilities.md) |
+| Add a utility from setup through review | [Add a utility](CONTRIBUTING.md#extending-benchmark) |
 | Understand shared contracts and what the proof assumes | [Use the core API](docs/core-api.md) |
 | Run generated cases and reproduce mismatches | [Use the fuzzer](docs/fuzzing.md) |
 | Port upstream GNU scenarios into utility Python tests | [Add test cases](docs/adding-test-cases.md) |

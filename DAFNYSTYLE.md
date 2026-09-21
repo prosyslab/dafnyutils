@@ -3,7 +3,7 @@
 Generation policy for Dafny code and proofs.
 
 For utility benchmarks, also follow [the benchmark rules](bench/AGENTS.md) and
-[the specification authoring guide](docs/adding-utilities.md). The generic
+[the specification authoring guide](CONTRIBUTING.md#extending-benchmark). The generic
 examples below do not authorize algorithmic principal specifications, wider
 trusted APIs, or changes to an existing task's required behavior.
 
