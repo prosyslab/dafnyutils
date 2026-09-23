@@ -54,6 +54,65 @@ def test_public_release_contains_only_public_material(
     assert layout_check.returncode == 0, layout_check.stdout + layout_check.stderr
 
 
+# A released task provides every declared resource while keeping generated formal sources public.
+def test_public_release_materializes_declared_resources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    generated: dict[Path, str] = {}
+    original = release_module.task_workspace_spec
+
+    def record_generated(**kwargs):  # noqa: ANN003, ANN202
+        spec = original(**kwargs)
+        generated.update(spec.generated_files)
+        return spec
+
+    monkeypatch.setattr(release_module, "task_workspace_spec", record_generated)
+    directory = tmp_path / "release"
+    manifest = publish_release(("true",), directory)
+    restored = prepare_release(directory, tmp_path / "restored")
+    profile = TaskProfile.from_json_file(directory / "workspace/tasks/true/task.json")
+
+    for resource in profile.resources:
+        path = Path(resource.path)
+        assert resource.path in manifest.files
+        assert (directory / "workspace" / path).is_file()
+        assert restored.tasks["true"].input_layout.visible_artifacts[resource.resource_id].is_file()
+        if path in generated:
+            assert (directory / "workspace" / path).read_text(encoding="utf-8") == generated[path]
+
+    natural = next(
+        resource for resource in profile.resources if resource.resource_id == "natural-spec"
+    )
+    assert (directory / "workspace" / natural.path).read_bytes() == (
+        release_module.REPO_ROOT / natural.path
+    ).read_bytes()
+    assert "bench/utils/true/Tests.dfy" not in manifest.files
+    assert "bench/utils/true/Makefile" not in manifest.files
+
+
+# Publication rejects a formal resource if its filtered public source was not generated.
+def test_public_release_requires_generated_formal_resources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = release_module.task_workspace_spec
+
+    def omit_formal_source(**kwargs):  # noqa: ANN003, ANN202
+        spec = original(**kwargs)
+        return replace(
+            spec,
+            generated_files=tuple(
+                item for item in spec.generated_files
+                if item[0] != Path("bench/utils/true/TrueSpec.dfy")
+            ),
+        )
+
+    monkeypatch.setattr(release_module, "task_workspace_spec", omit_formal_source)
+    directory = tmp_path / "release"
+    with pytest.raises(ValueError, match="public formal resource has no generated source"):
+        publish_release(("true",), directory)
+    assert not directory.exists()
+
+
 # Mutating a canonical release file is rejected before preparation.
 def test_release_rejects_corrupted_canonical_material(tmp_path: Path) -> None:
     release = tmp_path / "release"

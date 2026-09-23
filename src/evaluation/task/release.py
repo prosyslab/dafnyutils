@@ -22,7 +22,7 @@ from benchmarks.generated_profile import GeneratedTaskProfile
 from benchmarks.paths import REPO_ROOT
 from benchmarks.profiles import ResolvedBenchmark
 from benchmarks.repository import BenchmarkRepository
-from benchmarks.task import TaskModel, TaskProfile, validate_relative_path
+from benchmarks.task import TaskModel, TaskProfile, TaskResourceKind, validate_relative_path
 from benchmarks.validation import load_validated_benchmark
 from entry_contract import DafnyEntry as AnalyzedDafnyEntry
 from entry_contract import analyze_entry_contract, entry_contract_source_snapshot
@@ -93,9 +93,15 @@ class TaskReleaseManifest(TaskModel):
                 raise ValueError("released task identity mismatch")
             if task.task_root != task.profile.dafny.utility_root:
                 raise ValueError("released task root mismatch")
+            _validate_released_resources(task, self.files)
         if self.release_id != release_digest(self):
             raise ValueError("release manifest identity mismatch")
         return self
+
+
+def _validate_released_resources(task: ReleasedTask, files: dict[str, str]) -> None:
+    if any(resource.path not in files for resource in task.profile.resources):
+        raise ValueError("released task resource is missing from public files")
 
 
 def release_digest(manifest: TaskReleaseManifest) -> str:
@@ -269,11 +275,9 @@ def _source_paths(path: Path) -> tuple[Path, ...]:
     return tuple(found)
 
 
-def _public_task_files(
-    spec: TaskWorkspaceSpec, prepared: PreparedTask, profile: TaskProfile
-) -> dict[Path, _PublicFile]:
-    task_id = profile.task_id
-    files: dict[Path, _PublicFile] = {}
+def _add_public_source_files(
+    files: dict[Path, _PublicFile], spec: TaskWorkspaceSpec, prepared: PreparedTask
+) -> set[Path]:
     for copied in spec.copied_paths:
         for path in _source_paths(copied):
             files[path] = _public_file(path, _source_file(path))
@@ -283,6 +287,30 @@ def _public_task_files(
         if task_path not in resources:
             raise FileNotFoundError(f"task seed file missing: {task_path}")
         files[workspace_path] = _public_file(workspace_path, _source_file(task_path))
+    return seeded
+
+
+def _add_declared_resources(
+    files: dict[Path, _PublicFile], spec: TaskWorkspaceSpec, profile: TaskProfile
+) -> None:
+    generated_paths = {path for path, _ in spec.generated_files}
+    for resource in profile.resources:
+        path = Path(resource.path)
+        if any(path.is_relative_to(hidden) for hidden in spec.hidden_paths):
+            raise ValueError(f"public task resource is evaluator-only: {path}")
+        if resource.kind is TaskResourceKind.FORMAL_SPECIFICATION:
+            if path not in generated_paths:
+                raise ValueError(f"public formal resource has no generated source: {path}")
+        elif path not in files:
+            files[path] = _public_file(path, _source_file(path))
+
+
+def _public_task_files(
+    spec: TaskWorkspaceSpec, prepared: PreparedTask, profile: TaskProfile
+) -> dict[Path, _PublicFile]:
+    task_id = profile.task_id
+    files: dict[Path, _PublicFile] = {}
+    seeded = _add_public_source_files(files, spec, prepared)
     for hidden in spec.hidden_paths:
         files = {path: item for path, item in files.items() if not path.is_relative_to(hidden)}
     for placeholder in spec.placeholder_paths:
@@ -290,6 +318,7 @@ def _public_task_files(
             files[placeholder] = _public_file(placeholder, PLACEHOLDER_FILE_CONTENT.encode("utf-8"))
     for path, content in spec.generated_files:
         files[path] = _public_file(path, content.encode("utf-8"))
+    _add_declared_resources(files, spec, profile)
     task_path = Path("tasks") / task_id / "task.json"
     if task_path in files:
         raise ValueError("task resource path collides with task.json")
