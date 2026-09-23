@@ -101,7 +101,8 @@ def test_public_release_requires_generated_formal_resources(
         return replace(
             spec,
             generated_files=tuple(
-                item for item in spec.generated_files
+                item
+                for item in spec.generated_files
                 if item[0] != Path("bench/utils/true/TrueSpec.dfy")
             ),
         )
