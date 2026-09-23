@@ -1,5 +1,16 @@
 schema_version: model_cost.v1
 models:
+  # Sources: https://developers.openai.com/api/docs/pricing and
+  # https://developers.openai.com/api/docs/models/gpt-6-sol,
+  # https://developers.openai.com/api/docs/models/gpt-6-luna (2026-09-23).
+  # USD per 1M tokens, Standard, input <=272K; this schema excludes cache and
+  # long-context pricing adjustments.
+  gpt-6-sol:
+    input_per_1m: 2.00
+    output_per_1m: 10.00
+  gpt-6-luna:
+    input_per_1m: 0.10
+    output_per_1m: 0.50
   gpt-6-astra:
     input_per_1m: 10.00
     output_per_1m: 50.00
