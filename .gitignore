@@ -38,3 +38,7 @@ experiments
 
 # Local self-reference from the former Dafny submodule
 /dafny/dafny
+
+# Local development records
+/plan/
+/wiki/
