@@ -133,6 +133,7 @@ pub(crate) static UTILITY_CAPABILITIES: &[UtilityCapability] = &[
         option_value_flags: &["-c", "--bytes", "-n", "--lines"],
         ..capability!("head", head)
     },
+    capability!("link", link),
     capability!("ln", ln),
     capability!("logname", logname),
     UtilityCapability {
@@ -387,8 +388,9 @@ mod tests {
         assert_eq!(
             patterned,
             BTreeSet::from([
-                "cat", "chmod", "comm", "csplit", "cut", "du", "expand", "head", "ln", "ls", "mv",
-                "nl", "paste", "readlink", "stat", "tac", "tail", "touch", "uniq", "unlink", "wc",
+                "cat", "chmod", "comm", "csplit", "cut", "du", "expand", "head", "link", "ln",
+                "ls", "mv", "nl", "paste", "readlink", "stat", "tac", "tail", "touch", "uniq",
+                "unlink", "wc",
             ])
         );
     }

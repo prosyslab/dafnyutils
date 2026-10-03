@@ -1,0 +1,8 @@
+schema_version: benchmark.definition.v2
+task_id: "link"
+kind: coreutils
+source:
+  status: verified
+  name: GNU coreutils link
+  url: https://www.gnu.org/software/coreutils/
+  license: GPL-3.0-or-later

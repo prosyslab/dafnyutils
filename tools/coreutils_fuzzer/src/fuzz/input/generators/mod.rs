@@ -14,6 +14,7 @@ pub(crate) mod factor;
 pub(crate) mod r#false;
 pub(crate) mod fold;
 pub(crate) mod head;
+pub(crate) mod link;
 pub(crate) mod ln;
 pub(crate) mod logname;
 pub(crate) mod ls;
