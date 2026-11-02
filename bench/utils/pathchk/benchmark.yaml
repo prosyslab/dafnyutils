@@ -1,0 +1,9 @@
+schema_version: benchmark.definition.v2
+task_id: "pathchk"
+kind: coreutils
+source:
+  status: incomplete
+  name: TODO
+capabilities:
+  gnu_reference: true
+  fuzzer: true
