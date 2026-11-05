@@ -16,6 +16,10 @@ mkdir -p "$(dirname "$exclude_file")"
 if [[ ! -f "$exclude_file" ]] || ! grep -Fxq '/m4/extern-inline.m4' "$exclude_file"; then
     printf '\n/m4/extern-inline.m4\n' >> "$exclude_file"
 fi
+# Build the pinned Dafny (a no-op when current) and expose it as `dafny` for task commands
+# and the Git hook.
+tools/build-dafny
+sudo ln -sfn "$PWD/_build/dafny/Binaries/Dafny" /usr/local/bin/dafny
 export PATH="/workspace/dafnyutils/.venv/bin:$PATH"
 python3 -m benchmarks --help
 python3 -m tools.contribution --help
@@ -32,6 +36,9 @@ versions_log="${setup_log%.log}-versions.txt"
     rustup show active-toolchain
     rustc --version
     cargo --version
+    printf '\n.NET SDK and Dafny\n'
+    dotnet --list-sdks
+    dafny --version
     printf '\nPython packages\n'
     python3 --version
     python3 -m pip freeze --all

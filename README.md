@@ -32,118 +32,13 @@ Utility Dafny sources live under `bench/utils/<utility>/Spec/`, `Impl/` and
 and project configuration. Algorithm sources retain their flat layout. See the
 [source responsibilities](docs/benchmark-layout.md) for details.
 
-### Standalone development
+### Development environment
 
-Use the [standalone development container](.devcontainer/devcontainer.json) to
-edit benchmark data, maintain Python tools and run development tests. It requires
-Git, Docker and VS Code with the
-Dev Containers extension. Open this checkout in VS Code and select **Dev
-Containers: Reopen in Container**. Setup installs the data package, contributor and development
-tools, initializes GNU reference sources and runs the serial data checks.
-The package, scaffolding tool and development tests need only this checkout and
-its development dependencies. This container does not install Dafny or .NET; install the native prerequisites
-below before running task builds or proofs.
-Fuzzing also needs a usable Docker daemon and Compose.
-
-For development on the host, use Python 3.12 or newer with virtual-environment
-support and Make. On Ubuntu, virtual-environment support is provided by
-`python3-venv`. Run these commands from this repository's root.
-Creating the environment uses the installed Python; its duration depends on the
-host. Expected result: exit 0 with a `.venv/` directory and no output.
-
-```sh
-python3 -m venv .venv
-```
-
-```text
-(no output)
-```
-
-Activate it in the current shell; expected duration is less than a second,
-with exit 0 and no output.
-
-```sh
-. .venv/bin/activate
-```
-
-```text
-(no output)
-```
-
-Install the data package and its declared development and contributor tools. Initial installation
-needs network access for dependencies; duration depends on downloads.
-
-```sh
-python -m pip install -e '.[dev,contributor]'
-```
-
-Expected result: pip installs `dafnyutils` and its development tools, then exits 0.
-
-```text
-...
-Successfully installed ...
-```
-
-Check the data CLI after installation; this takes less than a second in the
-current Python 3.12 environment.
-
-```sh
-python3 -m benchmarks --help
-```
-
-Expected output (excerpt), exit 0:
-
-```text
-usage: python -m benchmarks [-h] [--root ROOT] {list} ...
-```
-
-Continue with the [developer test tiers](#developer-test-tiers) below. Both tiers
-use this standalone environment.
+Use the [development container](.devcontainer/devcontainer.json) for all
+development: open this checkout in VS Code and select Dev Containers: Reopen in
+Container.
 
 ### Build, verify and evaluate tasks
-
-Task builds, proofs and executable comparison tests run from this checkout with
-the same Python environment. Install these public toolchain prerequisites:
-
-- The .NET 8 SDK as `dotnet` and a compatible native Dafny as `dafny`. Set
-  `DAFNY_BENCHMARK` to select another installed Dafny executable.
-- Git and GNU build tools for the pinned `coreutils` submodule, including a C
-  compiler, Make, Autoconf, Automake, Gettext, Perl and bootstrap dependencies.
-- Rust and Cargo using this repository's `rust-toolchain.toml` for the fuzzer.
-- Docker with Compose and access to its daemon for generated fuzz campaigns.
-
-The standalone container supplies Rust and GNU build tools. Install Dafny and
-.NET separately before executable checks. No integration checkout or analysis
-Python client is needed by these contributor commands.
-
-Initialize the pinned GNU sources from the repository root. Duration depends on
-network access; success is exit 0 with `coreutils/` and its submodules populated.
-
-```sh
-git submodule update --init --recursive
-```
-
-Expected output is Git's clone/checkout progress, or no output if already initialized.
-
-After installing `.[dev,contributor]`, run this lightweight help check from the
-repository root. It does not build a benchmark. On 2026-11-05, a fresh virtual
-environment installed this checkout with its contributor dependencies and ran
-the CLI without the evaluator, Cosyn or analysis-client packages installed.
-
-```sh
-python3 -m tools.contribution --help
-```
-
-Expected output (excerpt), exit 0:
-
-```text
-usage: python -m tools.contribution [-h] [--root ROOT]
-                                              {validate,check} ...
-```
-
-If this reports `No module named tools`, install `.[dev,contributor]`
-with the same Python interpreter. No access to `cosyn-experiment`, Cosyn or a
-native analysis Python client is required for these contributor commands.
 
 From this repository, use `make -C bench/utils/cat build`,
 `make -C bench/utils/cat test` or `make -C bench/utils/cat verify`
@@ -246,9 +141,7 @@ Spec → Core → Proof → entry structure as a utility contribution, with only
 IO calls. The complete files are in
 [`example/copy/`](example/copy).
 
-Complete the [native tool setup](#build-verify-and-evaluate-tasks), then run the
-commands below from this repository's root with its Python environment active.
-The example's Makefile uses `dafny` from `PATH`; set `DAFNY_BENCHMARK` to use a compiler at another path.
+Run the commands below in the development container from this repository's root.
 
 ### 1. Choose the behavior
 

@@ -1,6 +1,6 @@
-# Standalone benchmark checks; see README.md.
+# Standalone benchmark checks and local toolchain builds; see README.md.
 
-.PHONY: test test-unit test-integration test-final build-coreutils clean
+.PHONY: test test-unit test-integration test-final build-coreutils build-dafny clean
 
 test:
 	@$(MAKE) --no-print-directory test-unit
@@ -16,6 +16,9 @@ test-final:
 
 build-coreutils:
 	@tools/build-coreutils
+
+build-dafny:
+	@tools/build-dafny
 
 clean:
 	@test "$(abspath $(or $(BUILD_DIR),_build))" = "$(CURDIR)/_build" || \

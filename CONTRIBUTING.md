@@ -39,15 +39,9 @@ commands for checking both the proof and the executable.
 
 ### Set up your checkout
 
-Follow the [standalone setup](README.md#standalone-development) to edit benchmark
-data, work on Python tooling and run development tests. Run authoring commands,
-including the scaffold command below, from this repository's root with its
-virtual environment active. Install `.[dev,contributor]` in that environment.
-
-The executable checks in [Validate and submit](#validate-and-submit) also run
-locally. Complete the [native tool setup](README.md#build-verify-and-evaluate-tasks)
-for Dafny, .NET 8, GNU build tools, Rust and Docker before those checks. No other
-first-party checkout or native analysis Python client is required.
+Use the [development container](README.md#development-environment) for every
+command in this guide, including the scaffold command below. Run them from this
+repository's root.
 
 ### Find the right files
 
@@ -243,11 +237,9 @@ or empty fixed case set is an error, not an inapplicable test stage.
 
 ### Validate and submit
 
-For this section, complete the standalone
-[native tool setup](README.md#build-verify-and-evaluate-tasks), including the
-contributor extra and local CLI help check. Run commands from this repository's
-root with its virtual environment active. The contributor gate additionally
-builds, executes and proves benchmark tasks.
+Run the commands in this section in the development container from this
+repository's root. The contributor gate additionally builds, executes and proves
+benchmark tasks.
 
 #### Check the definition
 
@@ -406,7 +398,7 @@ ruff check .
 cargo fmt --manifest-path tools/coreutils_fuzzer/Cargo.toml --all -- --check
 ```
 
-Install `.[dev]` to use Ruff 0.15.12. CI reads Ruff's `required-version` from
+The development container provides Ruff 0.15.12. CI reads Ruff's `required-version` from
 `pyproject.toml`; keep the development dependency pin in sync when updating it.
 Rustup uses Rust 1.94.0 and its bundled rustfmt from `rust-toolchain.toml` in both
 the development container and CI. Python checks use the exclusions in

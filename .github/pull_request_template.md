@@ -29,9 +29,8 @@ options were left out for this reason.
 
 ## 1. Test results
 
-Run the commands below from the Dafnyutils root after the standalone
-[native tool setup](../README.md#build-verify-and-evaluate-tasks), with
-`.[dev,contributor]` installed in the active Python environment.
+Run the commands below from the Dafnyutils root in the
+[development container](../README.md#development-environment).
 Replace `<utility_name>` with your utility name before running each command.
 
 ```sh

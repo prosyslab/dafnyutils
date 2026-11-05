@@ -30,6 +30,7 @@ RUN apt-get update \
         help2man \
         jq \
         less \
+        libicu74 \
         libtool \
         locales \
         m4 \
@@ -58,6 +59,26 @@ RUN apt-get update \
 
 RUN ln -snf "/usr/share/zoneinfo/${TZ}" /etc/localtime \
     && echo "${TZ}" > /etc/timezone
+
+# Pinned .NET SDK for Dafny and the C# benchmark executables. Microsoft's versioned
+# tarball stays downloadable, unlike a superseded Ubuntu package version.
+ARG DOTNET_SDK_VERSION=8.0.133
+ARG DOTNET_SDK_SHA512=5a2a34c388f17ffb3c1adfec113428c70152749c23c0307ab65d2f17eeb56125f0f4a2ff2bb66c9b045a1d4241ea27926e223d6990b6cd7ea29b3cede20b6a7c
+ENV DOTNET_ROOT=/usr/share/dotnet \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_NOLOGO=1
+
+RUN if [ "$(dpkg --print-architecture)" != amd64 ]; then \
+        echo "The pinned .NET SDK checksum and Z3 snapshot support x86_64 only." >&2; exit 1; \
+    fi \
+    && curl -fsSL -o /tmp/dotnet-sdk.tar.gz \
+        "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz" \
+    && echo "${DOTNET_SDK_SHA512}  /tmp/dotnet-sdk.tar.gz" | sha512sum --check --strict - \
+    && mkdir -p "${DOTNET_ROOT}" \
+    && tar -xzf /tmp/dotnet-sdk.tar.gz -C "${DOTNET_ROOT}" \
+    && rm /tmp/dotnet-sdk.tar.gz \
+    && ln -s "${DOTNET_ROOT}/dotnet" /usr/local/bin/dotnet \
+    && test "$(dotnet --version)" = "${DOTNET_SDK_VERSION}"
 
 ENV PATH="/home/vscode/.cargo/bin:${PATH}"
 

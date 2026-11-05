@@ -1,0 +1,5 @@
+# Native Dafny fork pin for standalone Dafnyutils development; tools/build-dafny reads it.
+# Keep the commit equal to the integration repository's pin. It must be reachable from
+# origin/expecto. The HTTPS URL is anonymous; the integration pin uses SSH.
+repo = "https://github.com/prosyslab/dafny.git"
+commit = "0776df27c2449bad68e9a28e687bb6c70bf4b401"

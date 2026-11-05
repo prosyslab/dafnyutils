@@ -71,8 +71,7 @@ module StreamCopy {
 `old(io.stdout())` is needed because stdout changes. The frame covers all other
 state; do not restate it.
 
-Run this check from the owner checkout after the standalone
-[native tool setup](../README.md#build-verify-and-evaluate-tasks).
+Run this check from the Dafnyutils root in the development container.
 
 ```sh
 # Expected duration: Estimated 1–10 sec for this small client after tool installation.
