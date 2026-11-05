@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from benchmark_tools.execution import run_candidate
-from benchmark_tools.test_support import (
+from tools.execution import run_candidate
+from tools.test_support import (
     assert_result_matches_reference,
     bench_dll_path,
     build_bench_utility,

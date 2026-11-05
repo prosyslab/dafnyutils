@@ -10,12 +10,12 @@ import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from pathlib import Path
 
-from benchmark_tools.contribution.make_tasks import build_directory
-from benchmark_tools.contribution.validation import load_validated_benchmark
-from benchmark_tools.environment import EVAL_BENCH_DLL_ENV
 from benchmarks.checks import required_checks_for_evaluation_capabilities
 from benchmarks.definition import BenchmarkDefinition
 from benchmarks.repository import BenchmarkRepository
+from tools.contribution.make_tasks import build_directory
+from tools.contribution.validation import load_validated_benchmark
+from tools.environment import EVAL_BENCH_DLL_ENV
 
 
 @dataclass(frozen=True)
@@ -36,7 +36,7 @@ def check_commands(root: Path, definition: BenchmarkDefinition) -> tuple[CheckCo
     pytest_report = f"_build/contribution_checks/{definition.task_id}/implementation-tests.xml"
     bench_dll = f"_build/bench/{definition.task_id}_bench.dll"
     test_env = ((EVAL_BENCH_DLL_ENV, bench_dll),)
-    task_command = (python, "-m", "benchmark_tools.contribution.make_tasks")
+    task_command = (python, "-m", "tools.contribution.make_tasks")
     task_selection = ("--root", str(root), "--task", definition.task_id)
     steps: dict[str, tuple[CheckCommand, ...]] = {
         "impl_layout": (CheckCommand("build", (*task_command, "build", *task_selection)),),
@@ -62,7 +62,7 @@ def check_commands(root: Path, definition: BenchmarkDefinition) -> tuple[CheckCo
                 "dafny_verify",
                 f"{definition.item_directory}/Tests.py",
             ),
-            (("PYTEST_PLUGINS", "benchmark_tools.pytest_infrastructure"),),
+            (("PYTEST_PLUGINS", "tools.pytest_infrastructure"),),
         ),
     )
     reference = (

@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
-import benchmark_tools.test_support as support
+import tools.test_support as support
 
 
 # A direct oracle build uses the local contributor command with the selected benchmark root.
@@ -26,7 +26,7 @@ def test_benchmark_build_uses_local_contributor_command(monkeypatch: pytest.Monk
     assert calls[0][0] == [
         sys.executable,
         "-m",
-        "benchmark_tools.contribution.make_tasks",
+        "tools.contribution.make_tasks",
         "build",
         "--root",
         "/virtual/benchmark",

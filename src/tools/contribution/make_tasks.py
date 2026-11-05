@@ -95,7 +95,7 @@ def _test(root: Path, definition: BenchmarkDefinition | None) -> int:
 
     test_path = definition.evaluation.test_path
     environment = os.environ.copy()
-    environment["PYTEST_PLUGINS"] = "benchmark_tools.pytest_infrastructure"
+    environment["PYTEST_PLUGINS"] = "tools.pytest_infrastructure"
     return _run(
         [
             _python(),

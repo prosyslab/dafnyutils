@@ -197,7 +197,7 @@ def test_command_uses_tool_repository_default(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     memory = _MemoryFiles()
-    monkeypatch.setattr(scaffold, "__file__", str(memory.root / "tools/scaffold.py"))
+    monkeypatch.setattr(scaffold, "__file__", str(memory.root / "src/tools/scaffold.py"))
 
     with memory.patched(monkeypatch):
         status = scaffold.main(["--kind", "coreutils", "--id", "base32"])

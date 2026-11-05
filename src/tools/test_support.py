@@ -9,14 +9,14 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Callable, Sequence, TypeVar
 
-from benchmark_tools.environment import (
+from tools.environment import (
     EVAL_BENCH_BUILD_SCRIPT_ENV,
     EVAL_BENCH_DLL_ENV,
     EVAL_BENCH_EXECUTION_KIND_ENV,
     EVAL_COREUTILS_BIN_ENV,
     EVAL_TARGET_ROOT_ENV,
 )
-from benchmark_tools.execution import CandidateExecutionKind, run_candidate
+from tools.execution import CandidateExecutionKind, run_candidate
 
 BENCH_COMMAND_TIMEOUT_SEC = 60
 _SUBPROCESS_OUTPUT_TAIL_CHARS = 12_000
@@ -202,7 +202,7 @@ def build_bench_utility(root: Path, util: str) -> None:
         [
             sys.executable,
             "-m",
-            "benchmark_tools.contribution.make_tasks",
+            "tools.contribution.make_tasks",
             "build",
             "--root",
             str(root),

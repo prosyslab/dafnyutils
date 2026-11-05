@@ -12,8 +12,8 @@ from typing import Any
 
 import pytest
 
-from benchmark_tools.execution import CandidateInfrastructureError
-from benchmark_tools.infrastructure import record_check_failure
+from tools.execution import CandidateInfrastructureError
+from tools.infrastructure import record_check_failure
 
 
 @pytest.hookimpl(hookwrapper=True)

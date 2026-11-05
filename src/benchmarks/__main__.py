@@ -1,8 +1,8 @@
 """List benchmark definitions from the installed data package.
 
 Run independent contributor validation and checks with
-`python -m benchmark_tools.contribution`. Full source analysis remains root-owned.
-Create new contributions with the repository's tools/scaffold.py script.
+`python -m tools.contribution`. Full source analysis remains root-owned.
+Create new contributions with `python -m tools.scaffold`.
 """
 
 from __future__ import annotations

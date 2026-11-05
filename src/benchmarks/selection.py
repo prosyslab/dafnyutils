@@ -27,11 +27,14 @@ def affected_task_ids(
             affected.update(fuzzer_ids)
         elif raw_path == "tools/bench_test_support.py":
             affected.update(all_ids)
+        elif raw_path == "src/tools/scaffold.py":
+            # The scaffold only creates new contributions; it changes no existing task.
+            continue
         elif (
             raw_path.startswith("bench/core/")
             or raw_path.startswith("src/analysis/")
             or raw_path.startswith("src/benchmarks/")
-            or raw_path.startswith("src/benchmark_tools/")
+            or raw_path.startswith("src/tools/")
             or raw_path.startswith("src/evaluation/")
             or raw_path.startswith("src/entry_contract")
             or raw_path.startswith("src/protocol/")

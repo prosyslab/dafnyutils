@@ -108,7 +108,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--root",
         type=Path,
-        default=Path(__file__).resolve().parents[1],
+        default=Path(__file__).resolve().parents[2],
         help="benchmark repository root (default: this tool's repository)",
     )
     parser.add_argument(

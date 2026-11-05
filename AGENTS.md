@@ -8,21 +8,27 @@ a model of system state as well as program logic. This model lets us specify and
 verify effects on the system. We check the model through differential testing:
 we compare its behavior with the original GNU coreutils binaries.
 
-Dafnyutils owns problem data, specifications, hidden tests, reference material
-and benchmark-construction tooling. It retains the complete
-`tools/coreutils_fuzzer`, including its Rust engine, Python launcher and Docker
-support. The root integration repository owns compilation, analysis, submission
-grading, candidate isolation, oracle execution and scoring policy. Its evaluator
+Dafnyutils owns problem data, specifications, hidden tests, reference material,
+benchmark-construction tooling and the contributor tools in `src/tools/`. It
+retains the complete `tools/coreutils_fuzzer`, including its Rust engine, Python
+launcher and Docker support. The `tools` package (`src/tools/contribution`,
+`src/tools/test_support.py`, `src/tools/execution.py` and the modules they use)
+validates definitions, builds and verifies tasks and runs the contributor checks in
+the development container, without the integration repository. The root integration
+repository owns evaluation: analysis, submission grading, candidate isolation,
+oracle execution, scoring policy and public-profile release checks. Its evaluator
 invokes the retained fuzzer when the benchmark definition requires it, uses the
-definition's target and applies root-owned budgets. Cosyn owns
-reusable agent harnesses. The installed `benchmarks` package remains data-only
-and must not import the root package, evaluator, analysis client or Cosyn. Compose
+definition's target and applies root-owned budgets. Cosyn owns reusable agent
+harnesses. The installed `benchmarks` package remains data-only: it must not
+import the root package, evaluator, analysis client, Cosyn or `tools`. `tools`
+must not import the root package, evaluator, analysis client or Cosyn. Compose
 these packages only in the root integration repository. The evaluator must not
 import experiment policy or Cosyn. This ownership split records the explicitly
 authorized evaluator migration; benchmark behavior and integrity rules remain.
-Benchmark `Tests.py` files and their scaffold templates are test material run by
-the root evaluator; they may import its execution helpers. This exception does
-not apply to the installed `benchmarks` data package.
+Benchmark `Tests.py` files and their scaffold templates are test material; they
+import the execution helpers from `tools` (`tools.test_support`,
+`tools.execution`). This exception does not apply to the installed `benchmarks`
+data package.
 
 ## Instruction scope
 
@@ -200,12 +206,14 @@ not apply to the installed `benchmarks` data package.
   integration. Use function-level markers in mixed modules when practical.
   Keep `dafny_verify` for its existing benchmark test-selection meaning; it is
   not an execution-weight marker.
-- From the Dafnyutils root, `make test` without `TASK` and `make test-unit` run
-  the development unit tier serially. Run `make test-integration` only for final
-  validation after implementation and routine checks; `make test-final` runs
-  unit and integration tiers sequentially. Task execution belongs to root:
-  `make -C ../../.. test-task TASK=<utility>` runs the existing benchmark oracle
-  selection. `build-task`, `validate-task` and `check-task` also run from root.
+- From the Dafnyutils root, `make test` and `make test-unit` run the development
+  unit tier serially. Run `make test-integration` only for final validation after
+  implementation and routine checks; `make test-final` runs unit and integration
+  tiers sequentially. Task commands also run from this repository in the
+  development container: `make -C bench/utils/<utility> build|test|verify` (or
+  `bench/algorithm/<number>`) runs one task's stages, and
+  `python3 -m tools.contribution validate|check <task>` runs the contributor
+  checks and gate.
 - If no Dafny source file changes, exclude `tests/bench` from routine regression
   testing. This does not excuse skipping checks affected by changes to generated
   specifications, verifier invocation, toolchains, or evaluation code. Use focused

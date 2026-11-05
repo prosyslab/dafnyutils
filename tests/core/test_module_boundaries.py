@@ -30,8 +30,8 @@ FORBIDDEN = {
 @pytest.mark.parametrize(
     ("package", "forbidden"),
     [
-        ("src/benchmarks", FORBIDDEN | {"benchmark_tools"}),
-        ("src/benchmark_tools", FORBIDDEN),
+        ("src/benchmarks", FORBIDDEN | {"tools"}),
+        ("src/tools", FORBIDDEN),
         ("bench", FORBIDDEN),
         ("tools", FORBIDDEN),
     ],

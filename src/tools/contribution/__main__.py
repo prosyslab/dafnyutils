@@ -5,14 +5,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from benchmark_tools.contribution.checks import run_benchmark_checks
-from benchmark_tools.contribution.validation import validate_benchmark
 from benchmarks.repository import BenchmarkRepository
 from benchmarks.selection import affected_task_ids
+from tools.contribution.checks import run_benchmark_checks
+from tools.contribution.validation import validate_benchmark
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="python -m benchmark_tools.contribution")
+    parser = argparse.ArgumentParser(prog="python -m tools.contribution")
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="benchmark repository root")
     subparsers = parser.add_subparsers(dest="command", required=True)
 

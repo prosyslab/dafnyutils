@@ -208,8 +208,8 @@ solution inspection was performed.
 
 ## Contributor tooling
 
-Task Makefiles use the local `benchmark_tools.contribution.make_tasks` and
-`benchmark_tools.contribution.verify` modules. Benchmark `Tests.py` files use
-`benchmark_tools.test_support` and `benchmark_tools.execution`; no evaluator or
+Task Makefiles use the local `tools.contribution.make_tasks` and
+`tools.contribution.verify` modules. Benchmark `Tests.py` files use
+`tools.test_support` and `tools.execution`; no evaluator or
 analysis-client Python package is needed. Root evaluation remains responsible
 for entry-contract analysis, isolated grading and scoring.

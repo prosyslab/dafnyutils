@@ -10,8 +10,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import IO, Any
 
-from benchmark_tools.environment import EVAL_BENCH_EXECUTION_KIND_ENV
-from benchmark_tools.infrastructure import record_candidate_infrastructure_failure
+from tools.environment import EVAL_BENCH_EXECUTION_KIND_ENV
+from tools.infrastructure import record_candidate_infrastructure_failure
 
 
 class CandidateExecutionKind(StrEnum):

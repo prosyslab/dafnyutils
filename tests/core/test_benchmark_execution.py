@@ -11,12 +11,12 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-import benchmark_tools.execution as candidate_execution
-import benchmark_tools.infrastructure as infrastructure
-import benchmark_tools.pytest_infrastructure as pytest_infrastructure
-import benchmark_tools.test_support as benchmark_test_support
-from benchmark_tools.environment import EVAL_BENCH_EXECUTION_KIND_ENV
-from benchmark_tools.execution import (
+import tools.execution as candidate_execution
+import tools.infrastructure as infrastructure
+import tools.pytest_infrastructure as pytest_infrastructure
+import tools.test_support as benchmark_test_support
+from tools.environment import EVAL_BENCH_EXECUTION_KIND_ENV
+from tools.execution import (
     CandidateExecutionKind,
     CandidateInfrastructureError,
     run_candidate,

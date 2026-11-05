@@ -23,8 +23,8 @@ Follow [repository instructions](AGENTS.md), [bench rules](bench/AGENTS.md) and 
 
 Develop benchmark definitions and Python tools in this checkout. The installed
 `benchmarks` package provides definitions, discovery and selection;
-[`tools/scaffold.py`](tools/scaffold.py) creates new contribution files.
-The local `benchmark_tools` package runs contributor validation, task builds,
+[`python3 -m tools.scaffold`](src/tools/scaffold.py) creates new contribution files.
+The local `tools` package runs contributor validation, task builds,
 proofs and GNU comparison tests without another first-party repository.
 
 Utility Dafny sources live under `bench/utils/<utility>/Spec/`, `Impl/` and
@@ -131,26 +131,26 @@ environment installed this checkout with its contributor dependencies and ran
 the CLI without the evaluator, Cosyn or analysis-client packages installed.
 
 ```sh
-python3 -m benchmark_tools.contribution --help
+python3 -m tools.contribution --help
 ```
 
 Expected output (excerpt), exit 0:
 
 ```text
-usage: python -m benchmark_tools.contribution [-h] [--root ROOT]
+usage: python -m tools.contribution [-h] [--root ROOT]
                                               {validate,check} ...
 ```
 
-If this reports `No module named benchmark_tools`, install `.[dev,contributor]`
+If this reports `No module named tools`, install `.[dev,contributor]`
 with the same Python interpreter. No access to `cosyn-experiment`, Cosyn or a
 native analysis Python client is required for these contributor commands.
 
 From this repository, use `make -C bench/utils/cat build`,
 `make -C bench/utils/cat test` or `make -C bench/utils/cat verify`
 for a utility's individual stages. Use
-`python3 -m benchmark_tools.contribution validate cat` to check its YAML/schema,
+`python3 -m tools.contribution validate cat` to check its YAML/schema,
 source metadata, required files and paths, and
-`python3 -m benchmark_tools.contribution check cat` for the local contributor gate.
+`python3 -m tools.contribution check cat` for the local contributor gate.
 The gate builds the task and required GNU reference, checks runtime-test JUnit
 evidence, runs 20 generated cases with seed 1 when required, verifies project
 Dafny sources and runs marked proof tests. It does not perform native analysis
@@ -209,7 +209,7 @@ make test-final
 
 Benchmark oracle tests remain task-scoped and separate from development tiers.
 For example, `make -C bench/utils/cat test` selects
-`bench/utils/cat/Tests.py` through local `benchmark_tools` helpers. Required
+`bench/utils/cat/Tests.py` through local `tools` helpers. Required
 contributor evidence is described in the contribution guide.
 
 ## Repository structure
@@ -229,9 +229,11 @@ dafnyutils/
 ├── example/               # Worked examples
 │   └── copy/              # Stream-copy specification, implementation and proof
 ├── src/benchmarks/        # Problem definitions, schemas, paths and discovery
-├── src/benchmark_tools/   # Local contributor commands and benchmark test helpers
-├── tools/                 # Build scripts and repository maintenance tools
+├── src/tools/             # Importable `tools` package: contributor commands and test helpers
+│   ├── contribution/      # Local validation, task builds, proofs and contributor checks
 │   ├── scaffold.py        # Create incomplete benchmark contributions
+│   └── test_support.py    # Helpers that benchmark Tests.py files import
+├── tools/                 # Build scripts, templates and the fuzzer (not importable)
 │   ├── benchmark_templates/ # Templates for new utility and algorithm tasks
 │   └── coreutils_fuzzer/  # Generated-input comparison with GNU coreutils
 └── _build/                # Generated build artifacts

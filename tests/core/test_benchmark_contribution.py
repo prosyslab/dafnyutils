@@ -164,7 +164,8 @@ def test_affected_selection_includes_all_tasks_for_shared_benchmark_helpers() ->
     "path",
     (
         "src/analysis/client.py",
-        "src/benchmark_tools/contribution/checks.py",
+        "src/tools/contribution/checks.py",
+        "src/tools/execution.py",
         "src/dafny_cli.py",
         "dafny-version.toml",
     ),
@@ -173,6 +174,17 @@ def test_affected_selection_includes_all_tasks_for_shared_execution(path: str) -
     repository = BenchmarkRepository.open(ROOT)
 
     assert affected_task_ids(repository, (path,)) == repository.task_ids()
+
+
+# The scaffold and its templates are authoring aids, so they select no existing task.
+@pytest.mark.parametrize(
+    "path",
+    ("src/tools/scaffold.py", "tools/benchmark_templates/common/Makefile"),
+)
+def test_affected_selection_ignores_authoring_tools(path: str) -> None:
+    repository = BenchmarkRepository.open(ROOT)
+
+    assert affected_task_ids(repository, (path,)) == ()
 
 
 # Deleted and renamed item paths remain selected so CI fails closed on missing definitions.

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from benchmark_tools.execution import run_candidate
-from benchmark_tools.test_support import (
+from tools.execution import run_candidate
+from tools.test_support import (
     BENCH_COMMAND_TIMEOUT_SEC,
     assert_requested_message_behavior,
     assert_result_matches_reference,

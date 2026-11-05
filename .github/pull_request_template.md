@@ -12,7 +12,7 @@ Describe the problem and resulting behavior. Give a small before/after example w
 Keep the evidence sections below in **tests → fuzzing → verification** order. Copy and paste actual stdout into each fenced `text` block. Include the command and exit code outside the block. Keep stderr separately if it contains warnings or failures; do not omit failed or skipped work. Use `not run` or `not applicable` with a reason instead of fabricated output.
 
 For a utility contribution, open this PR only after the code is complete and
-verified: `python3 -m benchmark_tools.contribution check '<utility_name>'` passes and, for coreutils, every
+verified: `python3 -m tools.contribution check '<utility_name>'` passes and, for coreutils, every
 fuzzing campaign in section 2 completes without errors on the tested commit.
 
 ## Options left out due to IO.dfy
@@ -99,13 +99,13 @@ A build or runtime test is not proof verification.
 Check the utility definition:
 
 ```sh
-python3 -m benchmark_tools.contribution validate '<utility_name>'
+python3 -m tools.contribution validate '<utility_name>'
 ```
 
 Run the final checks, including layout checks:
 
 ```sh
-python3 -m benchmark_tools.contribution check '<utility_name>'
+python3 -m tools.contribution check '<utility_name>'
 ```
 
 Report the output and exit code for each command. Keep the results separate.

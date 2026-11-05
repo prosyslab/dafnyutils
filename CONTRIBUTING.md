@@ -57,11 +57,11 @@ first-party checkout or native analysis Python client is required.
 | `bench/core/` | System model, native contracts, protocol types and trusted runtime adapters |
 | `bench/utils/<utility>/Impl/CliSupport.dfy`, `bench/algorithm/<number>/CliSupport.dfy` | Fixed task-local parser and process runner protocol |
 | `coreutils/` | Pinned upstream GNU source and tests; keep its revision fixed |
-| `tools/scaffold.py` | Create incomplete contributions from the adjacent templates |
+| `src/tools/scaffold.py` | Create incomplete contributions from the templates in `tools/benchmark_templates/` |
 | `tools/benchmark_templates/common/` | Common incomplete Dafny layout used by both scaffold kinds |
 | `tools/coreutils_fuzzer/` | Differential runner, generators and comparison logic |
 | `src/benchmarks/` | Definitions, paths, discovery and selection |
-| `src/benchmark_tools/` | Local validation, builds, proof commands and executable test helpers |
+| `src/tools/` | Local validation, builds, proof commands and executable test helpers (imported as `tools`) |
 | `_build/` | Generated binaries and reports, created by build/check commands |
 
 Read [bench rules](bench/AGENTS.md) and [Dafny style](DAFNYSTYLE.md) before editing Dafny.
@@ -78,7 +78,7 @@ read the [implementation notes](docs/implementation-notes.md) and the
 Create the scaffold **before** creating its directory or scope document:
 
 ```sh
-python3 tools/scaffold.py --kind coreutils --id base32
+python3 -m tools.scaffold --kind coreutils --id base32
 ```
 
 The command uses this tool's repository as its default root, even from another
@@ -254,7 +254,7 @@ builds, executes and proves benchmark tasks.
 ```sh
 # Expected duration: Seconds for local metadata and path checks; no native toolchain needed.
 # Success criteria: Exit 0 and base32: valid.
-python3 -m benchmark_tools.contribution validate base32
+python3 -m tools.contribution validate base32
 ```
 
 Expected output for a completed utility, exit 0:
@@ -345,7 +345,7 @@ guidance before considering a larger time limit.
 ```sh
 # Expected duration: Unknown; includes builds, runtime tests, 20 fuzz cases and proofs.
 # Success criteria: Exit 0 and base32: checks passed; every required check completes.
-python3 -m benchmark_tools.contribution check base32
+python3 -m tools.contribution check base32
 ```
 
 Expected final output after all required stages, exit 0:
@@ -526,7 +526,7 @@ See [validation commands](#validate-and-submit) and [Collect PR evidence](docs/f
 Algorithm tasks require build/layout checks, runtime cases and Dafny verification.
 Their `cases.json` files remain benchmark data; the root evaluator runs those
 cases with the declared output contract. Fuzzing is required only when the task
-declares a fuzzer capability. Use `python3 -m benchmark_tools.contribution check algorithm-<number>`
+declares a fuzzer capability. Use `python3 -m tools.contribution check algorithm-<number>`
 for the contributor gate. `make -C bench/algorithm/<number> test` runs
 the runtime cases. For documentation-only changes, record link/content checks
 and explain why runtime verification and fuzzing were not run.
@@ -546,8 +546,8 @@ fuzzing and Dafny verification does not automatically approve the specification.
 
 ## Test runner ownership
 
-Benchmark `Tests.py` files import `benchmark_tools.test_support` and
-`benchmark_tools.execution` from this repository. The contributor runner selects
+Benchmark `Tests.py` files import `tools.test_support` and
+`tools.execution` from this repository. The contributor runner selects
 its local pytest evidence plugin. Tests must not import evaluator, harness or
 analysis-client modules, or execute their build callbacks.
 

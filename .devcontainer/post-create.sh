@@ -18,7 +18,7 @@ if [[ ! -f "$exclude_file" ]] || ! grep -Fxq '/m4/extern-inline.m4' "$exclude_fi
 fi
 export PATH="/workspace/dafnyutils/.venv/bin:$PATH"
 python3 -m benchmarks --help
-python3 -m benchmark_tools.contribution --help
+python3 -m tools.contribution --help
 make test
 
 versions_log="${setup_log%.log}-versions.txt"

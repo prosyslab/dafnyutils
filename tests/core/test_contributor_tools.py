@@ -8,9 +8,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from benchmark_tools.contribution import __main__ as cli
-from benchmark_tools.contribution import checks, make_tasks, validation, verify
 from benchmarks.definition import BenchmarkDefinition
+from tools.contribution import __main__ as cli
+from tools.contribution import checks, make_tasks, validation, verify
 
 ROOT = Path("/benchmark")
 
@@ -43,7 +43,7 @@ def test_check_plan_preserves_required_capability_checks() -> None:
         "dafny-verify",
         "benchmark-proof-tests",
     )
-    assert commands[0].argv[1:4] == ("-m", "benchmark_tools.contribution.make_tasks", "build")
+    assert commands[0].argv[1:4] == ("-m", "tools.contribution.make_tasks", "build")
     assert commands[-1].argv[-2:] == ("dafny_verify", "bench/utils/sample/Tests.py")
     implementation = commands[2]
     assert (
@@ -170,7 +170,7 @@ def test_implementation_tests_select_local_plugin(monkeypatch: pytest.MonkeyPatc
 
     assert make_tasks._test(ROOT, _definition()) == 0
 
-    assert calls[0][1]["env"]["PYTEST_PLUGINS"] == "benchmark_tools.pytest_infrastructure"
+    assert calls[0][1]["env"]["PYTEST_PLUGINS"] == "tools.pytest_infrastructure"
 
 
 # Explicit file enumeration covers standalone proof sources without making core a proof root.

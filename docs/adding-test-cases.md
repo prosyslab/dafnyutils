@@ -26,7 +26,7 @@ and install `.[dev,contributor]`. Run commands below in Bash or zsh from this
 repository's root with its virtual environment active. Python tests
 launch the GNU executable and .NET program through the existing helpers;
 they do not start the Rust fuzzer or its Compose service. These helpers live in
-the local `benchmark_tools` package; no external first-party Python package is
+the local `tools` package; no external first-party Python package is
 needed. The native Dafny/.NET and GNU binaries must still be installed or built.
 
 ```sh
