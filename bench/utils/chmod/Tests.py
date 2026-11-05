@@ -8,7 +8,9 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from evaluation.benchmark_test_support import (
+
+from benchmark_tools.execution import run_candidate
+from benchmark_tools.test_support import (
     BENCH_COMMAND_TIMEOUT_SEC,
     bench_dll_path,
     coreutils_binary_path,
@@ -17,7 +19,6 @@ from evaluation.benchmark_test_support import (
     run_coreutils_utility,
     run_dafny_verify,
 )
-from evaluation.submission.candidate_execution import run_candidate
 
 ROOT = evaluation_target_root(Path(__file__).resolve().parents[3])
 BENCH_CHMOD_DLL = bench_dll_path(ROOT, ROOT / "_build" / "bench" / "chmod_bench.dll")

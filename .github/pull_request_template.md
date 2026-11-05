@@ -12,7 +12,7 @@ Describe the problem and resulting behavior. Give a small before/after example w
 Keep the evidence sections below in **tests → fuzzing → verification** order. Copy and paste actual stdout into each fenced `text` block. Include the command and exit code outside the block. Keep stderr separately if it contains warnings or failures; do not omit failed or skipped work. Use `not run` or `not applicable` with a reason instead of fabricated output.
 
 For a utility contribution, open this PR only after the code is complete and
-verified: `make check TASK='<utility_name>'` passes and, for coreutils, every
+verified: `python3 -m benchmark_tools.contribution check '<utility_name>'` passes and, for coreutils, every
 fuzzing campaign in section 2 completes without errors on the tested commit.
 
 ## Options left out due to IO.dfy
@@ -29,7 +29,9 @@ options were left out for this reason.
 
 ## 1. Test results
 
-Run the commands below from the repository root in the contributor container.
+Run the commands below from the Dafnyutils root after the standalone
+[native tool setup](../README.md#build-verify-and-evaluate-tasks), with
+`.[dev,contributor]` installed in the active Python environment.
 Replace `<utility_name>` with your utility name before running each command.
 
 ```sh
@@ -52,7 +54,7 @@ Paste actual test stdout here, including the final result summary.
 
 For **each affected coreutils utility**, run generated campaigns with **three distinct seeds and at least 1,000 completed iterations per seed** (at least 3,000 total). All requested iterations must match, with **zero mismatches, timeouts, incomplete coverage and other errors**, and each run must exit 0. Use the same revision and full comparison settings, including stderr. A fixed JSON case set, repeating one seed, an early-stopped run or the short automatic contribution gate does not satisfy this requirement.
 
-Run this command from the repository root in the contributor container after
+Run this command from the repository root with Docker available after
 building the utility. Replace `<utility_name>` with your utility name.
 Keep all other values unchanged. Do not choose other seeds.
 
@@ -97,16 +99,20 @@ A build or runtime test is not proof verification.
 Check the utility definition:
 
 ```sh
-python3 -m benchmarks validate '<utility_name>'
+python3 -m benchmark_tools.contribution validate '<utility_name>'
 ```
 
 Run the final checks, including layout checks:
 
 ```sh
-make check TASK='<utility_name>'
+python3 -m benchmark_tools.contribution check '<utility_name>'
 ```
 
 Report the output and exit code for each command. Keep the results separate.
+Local validation checks metadata, files and paths; it does not analyze the
+entry contract. The local gate builds and runs runtime/proof tests and the
+required short fuzzer check. Public-profile generation and native analysis are
+maintainer integration checks, separate from this contributor workflow.
 
 - Exact verification command and exit code:
 - Verified files, included files, and termination limits:

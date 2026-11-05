@@ -1,7 +1,7 @@
 """List benchmark definitions from the installed data package.
 
-Validation and checks that analyze, build or run tasks are root-owned:
-`python -m evaluation.contribution` in the integration repository.
+Run independent contributor validation and checks with
+`python -m benchmark_tools.contribution`. Full source analysis remains root-owned.
 Create new contributions with the repository's tools/scaffold.py script.
 """
 

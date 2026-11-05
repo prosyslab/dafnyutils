@@ -14,7 +14,7 @@ Submit a focused change with reproducible code verification and fuzzing results.
     - [Specify first, then implement and prove](#specify-first-then-implement-and-prove)
     - [Add differential cases and a generator](#add-differential-cases-and-a-generator)
   - [Validate and submit](#validate-and-submit)
-    - [Check the definition and public profile](#check-the-definition-and-public-profile)
+    - [Check the definition](#check-the-definition)
     - [Build, test and verify](#build-test-and-verify)
     - [Open a pull request](#open-a-pull-request)
 - [Prepare the change](#prepare-the-change)
@@ -39,10 +39,15 @@ commands for checking both the proof and the executable.
 
 ### Set up your checkout
 
-Follow the integration [setup](README.md#build-verify-and-evaluate-tasks), including
-`make -C ../../.. check-contributor-env`. Run the commands below from
-`/workspace/bench/dafny/dafnyutils` inside the integration container, with its Python
-environment on `PATH`. The standalone data container supports only data checks.
+Follow the [standalone setup](README.md#standalone-development) to edit benchmark
+data, work on Python tooling and run development tests. Run authoring commands,
+including the scaffold command below, from this repository's root with its
+virtual environment active. Install `.[dev,contributor]` in that environment.
+
+The executable checks in [Validate and submit](#validate-and-submit) also run
+locally. Complete the [native tool setup](README.md#build-verify-and-evaluate-tasks)
+for Dafny, .NET 8, GNU build tools, Rust and Docker before those checks. No other
+first-party checkout or native analysis Python client is required.
 
 ### Find the right files
 
@@ -50,13 +55,13 @@ environment on `PATH`. The standalone data container supports only data checks.
 | --- | --- |
 | `bench/utils/<utility>/` | Utility definition, description, oracle tests and local Makefile; Dafny sources under `Spec/`, `Impl/` and `Proof/` |
 | `bench/core/` | System model, native contracts, protocol types and trusted runtime adapters |
-| `bench/*/<item>/CliSupport.dfy` | Fixed task-local parser and process runner protocol |
+| `bench/utils/<utility>/Impl/CliSupport.dfy`, `bench/algorithm/<number>/CliSupport.dfy` | Fixed task-local parser and process runner protocol |
 | `coreutils/` | Pinned upstream GNU source and tests; keep its revision fixed |
 | `tools/scaffold.py` | Create incomplete contributions from the adjacent templates |
 | `tools/benchmark_templates/common/` | Common incomplete Dafny layout used by both scaffold kinds |
 | `tools/coreutils_fuzzer/` | Differential runner, generators and comparison logic |
 | `src/benchmarks/` | Definitions, paths, discovery and selection |
-| `../../../src/evaluation/` | Root-owned validation, builds and contribution checks |
+| `src/benchmark_tools/` | Local validation, builds, proof commands and executable test helpers |
 | `_build/` | Generated binaries and reports, created by build/check commands |
 
 Read [bench rules](bench/AGENTS.md) and [Dafny style](DAFNYSTYLE.md) before editing Dafny.
@@ -222,7 +227,7 @@ Follow [Add test cases](docs/adding-test-cases.md) to port named scenarios from 
 For a new utility, start with [the generated test adapter](docs/adding-test-cases.md#start-a-new-utility-test-file).
 It includes the build fixture, strict comparison helper, and three
 `@pytest.mark.dafny_verify` cases for Entry/Core/Proof. Keep those proof cases:
-`make check` runs them after project verification. Without them pytest selects
+The contributor gate runs them after project verification. Without them pytest selects
 no proof tests and exits 5, even if `make verify` succeeded.
 
 For a new utility, add its generator under `tools/coreutils_fuzzer/src/fuzz/input/generators/`, declare the module in `generators/mod.rs`, and register `GENERATOR` in `src/utils/capabilities.rs`. Reuse `PatternInputGenerator` and the shared argument-pattern engine. See [generator extension](docs/fuzzing.md#support-a-new-utility) for the concrete registration points. A case JSON file alone does not register a new utility.
@@ -238,12 +243,18 @@ or empty fixed case set is an error, not an inapplicable test stage.
 
 ### Validate and submit
 
-#### Check the definition and public profile
+For this section, complete the standalone
+[native tool setup](README.md#build-verify-and-evaluate-tasks), including the
+contributor extra and local CLI help check. Run commands from this repository's
+root with its virtual environment active. The contributor gate additionally
+builds, executes and proves benchmark tasks.
+
+#### Check the definition
 
 ```sh
-# Expected duration: Unknown; depends on source analysis and the completed utility.
+# Expected duration: Seconds for local metadata and path checks; no native toolchain needed.
 # Success criteria: Exit 0 and base32: valid.
-make -C ../../.. validate-task TASK=base32
+python3 -m benchmark_tools.contribution validate base32
 ```
 
 Expected output for a completed utility, exit 0:
@@ -258,24 +269,13 @@ Expected output for an untouched scaffold, exit 1:
 base32: source details are incomplete
 ```
 
-This checks the completed item and its contract structure. The untouched scaffold
-must fail with `source details are incomplete`; that is an expected unfinished state.
-
-```sh
-# Expected duration: Unknown; requires the completed item and Dafny analysis.
-# Success criteria: Exit 0 and _build/profile-review/base32/task.json exists.
-python3 -m evaluation.contribution.generate_task_profiles --utility base32 --output-dir _build/profile-review
-```
-
-Expected result, exit 0:
-
-```text
-(no stdout; _build/profile-review/base32/task.json is created)
-```
-
-Review the specification and all files it includes, the read-only support files,
-and the editable/output paths. Confirm that tests and reference answers are absent.
-Generating a profile does not verify its proof.
+This validates YAML/schema, completed source metadata, required files and paths.
+The untouched scaffold must fail with `source details are incomplete`; that is
+an expected unfinished state. This command does not analyze the Dafny entry
+contract, prove the specification or generate a public task profile. Review the
+specification, its includes and the intended editable/support boundary yourself;
+keep tests and reference answers out of candidate-visible resources. The
+integration repository owns analysis and public-profile release checks.
 
 #### Build, test and verify
 
@@ -331,15 +331,13 @@ make -C bench/utils/base32 verify
 Expected output, exit 0:
 
 ```text
-Verification targets (<count> files):
-...
 Dafny program verifier finished with <count> verified, 0 errors
-...
-DAFNY_VERIFICATION_OUTCOME=verified phase=verify
-DAFNY_VERIFICATION_RESULT total=<count> failed=0
 ```
 
 These commands check compilation, executable behavior and proof separately.
+The local verifier selects all project `.dfy` files directly, verifies included
+files, disables standard libraries and supplies explicit core dependencies.
+It does not inherit the project's `no-verify = true` build setting.
 A build is not verification, and matching a finite test set is not proof of the
 specification. On a timeout, locate the expensive condition and add local proof
 guidance before considering a larger time limit.
@@ -347,7 +345,7 @@ guidance before considering a larger time limit.
 ```sh
 # Expected duration: Unknown; includes builds, runtime tests, 20 fuzz cases and proofs.
 # Success criteria: Exit 0 and base32: checks passed; every required check completes.
-make -C ../../.. check-task TASK=base32
+python3 -m benchmark_tools.contribution check base32
 ```
 
 Expected final output after all required stages, exit 0:
@@ -357,7 +355,7 @@ Expected final output after all required stages, exit 0:
 base32: checks passed
 ```
 
-This is the final contribution gate. Required checks are `impl_layout`,
+This is the local contribution gate. Required checks are `impl_layout`,
 `implementation_tests`, `fuzzer`, `proof_layout` and `dafny_verify`, defined in
 [checks.py](src/benchmarks/checks.py). The implementation report is
 `_build/contribution_checks/base32/implementation-tests.xml`; it must contain an
@@ -365,30 +363,16 @@ executed, non-skipped case. The verification stage also runs the marked proof
 tests in `Tests.py`. Missing tools, unsupported fuzzing, skipped required work
 and timeouts are failures. Run this gate only after completing the utility;
 the untouched scaffold is not a passing example.
+The local gate does not perform native entry-contract analysis or produce
+candidate profiles; maintainers run the integration release checks separately.
 
 #### Open a pull request
 
-Follow [the contribution guidelines below](#prepare-the-change) and use the
-[pull request template](.github/pull_request_template.md).
-
-Submit the pull request only when the code is complete and verified: every
-required stage of `make -C ../../.. check-task TASK=base32` passes and, for a coreutils utility,
-each fuzzing campaign below completes without errors on the same revision.
-A failed, skipped or unrun required check means the utility is not ready to
-submit; fix it and rerun the affected checks first.
-
-- Paste actual stdout in **tests → fuzzing → verification** order, with commands,
-  exit codes. Explain inapplicable checks and any failures fixed along the way.
-- For each affected coreutils utility, run the command in the PR template with
-  seeds `1,7,19` and 1,000 iterations per seed. Paste its actual output. Each seed
-  must complete 1,000 matches with no errors and full comparison settings. The
-  20-case automatic gate does not replace these runs.
-- Include the source revision/license, specified scope, trusted APIs, main
-  specification, and any proof or termination limits.
-- Identify the seeds, case counts and built artifacts. Preserve original mismatch
-  bundles and report fixed-case regression results separately.
-
-The maintainer reviews whether the specification describes GNU behavior, rejects wrong behavior, and relies only on the approved library contracts. Automated checks do not replace this review. Keep failed and unrun checks visible and rerun affected checks after corrections.
+Complete the [pull request template](.github/pull_request_template.md) after the
+contributor gate and required fuzzing campaigns pass on the same revision.
+[Show verification and fuzzing results](#show-verification-and-fuzzing-results)
+describes the evidence to include. Maintainers also review whether the
+specification describes GNU behavior and uses only approved library contracts.
 
 ## Prepare the change
 
@@ -542,8 +526,8 @@ See [validation commands](#validate-and-submit) and [Collect PR evidence](docs/f
 Algorithm tasks require build/layout checks, runtime cases and Dafny verification.
 Their `cases.json` files remain benchmark data; the root evaluator runs those
 cases with the declared output contract. Fuzzing is required only when the task
-declares a fuzzer capability. Use `make -C ../../.. check-task TASK=algorithm-<number>`
-for the contributor gate. `make -C ../../.. test-task TASK=algorithm-<number>` runs
+declares a fuzzer capability. Use `python3 -m benchmark_tools.contribution check algorithm-<number>`
+for the contributor gate. `make -C bench/algorithm/<number> test` runs
 the runtime cases. For documentation-only changes, record link/content checks
 and explain why runtime verification and fuzzing were not run.
 
@@ -559,3 +543,17 @@ Maintainers check whether the specification describes the required behavior and
 uses only approved library contracts, separately from automated checks. Leave
 their review decision pending until a human reviewer records it. Passing tests,
 fuzzing and Dafny verification does not automatically approve the specification.
+
+## Test runner ownership
+
+Benchmark `Tests.py` files import `benchmark_tools.test_support` and
+`benchmark_tools.execution` from this repository. The contributor runner selects
+its local pytest evidence plugin. Tests must not import evaluator, harness or
+analysis-client modules, or execute their build callbacks.
+
+When `EVAL_BENCH_DLL` is explicitly supplied, it selects a prebuilt candidate
+artifact. The helper requires that file to exist and does not run a build script.
+Without a selected artifact, task fixtures use the local contributor build command.
+A legacy `EVAL_BENCH_BUILD_SCRIPT` request without a prebuilt artifact is an error;
+external build callbacks are unsupported. Native versus .NET execution remains
+selected by `EVAL_BENCH_EXECUTION_KIND`.

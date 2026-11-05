@@ -4,7 +4,11 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-dafny format bench
+mapfile -d '' dfy_files < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.dfy')
+if (( ${#dfy_files[@]} > 0 )); then
+  dafny format "${dfy_files[@]}"
+  git add -- "${dfy_files[@]}"
+fi
 
 ruff_bin="${RUFF_BIN:-}"
 if [[ -z "$ruff_bin" ]]; then

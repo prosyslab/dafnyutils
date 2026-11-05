@@ -14,16 +14,17 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pyright", "pytest", "pytest-xdist", "ruff==0.15.12"]
-contributor = ["click"]
+contributor = ["click", "pytest", "pytest-xdist"]
 
 [project.scripts]
 dafnyutils-benchmarks = "benchmarks.__main__:main"
+dafnyutils-contribute = "benchmark_tools.contribution.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
-addopts = "-n 16"
+addopts = "-n0 -m 'not integration'"
 testpaths = ["tests"]
 norecursedirs = ["bench", "tools"]
 markers = [

@@ -1,4 +1,4 @@
-DAFNY := dafny-benchmark
+DAFNY ?= $(or $(DAFNY_BENCHMARK),dafny)
 PROJECT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(PROJECT_DIR)/../..)
 OUTPUT_DIR := $(REPO_ROOT)/_build/tutorial-copy

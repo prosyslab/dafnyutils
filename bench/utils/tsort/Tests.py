@@ -7,7 +7,10 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from evaluation.benchmark_test_support import (
+
+from benchmark_tools.environment import EVAL_COREUTILS_BIN_ENV
+from benchmark_tools.execution import run_candidate
+from benchmark_tools.test_support import (
     BENCH_COMMAND_TIMEOUT_SEC,
     assert_result_matches_reference,
     bench_dll_path,
@@ -20,8 +23,6 @@ from evaluation.benchmark_test_support import (
     run_coreutils_utility,
     run_dafny_verify,
 )
-from evaluation.environment import EVAL_COREUTILS_BIN_ENV
-from evaluation.submission.candidate_execution import run_candidate
 
 ROOT = evaluation_target_root(Path(__file__).resolve().parents[3])
 UTILITY = "tsort"

@@ -24,8 +24,7 @@
         "python.defaultInterpreterPath": "/workspace/dafnyutils/.venv/bin/python",
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": [
-          "-c",
-          "pytest-dev.ini"
+          "tests"
         ],
         "files.watcherExclude": {
           "**/_build/**": true,

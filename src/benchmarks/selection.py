@@ -31,6 +31,7 @@ def affected_task_ids(
             raw_path.startswith("bench/core/")
             or raw_path.startswith("src/analysis/")
             or raw_path.startswith("src/benchmarks/")
+            or raw_path.startswith("src/benchmark_tools/")
             or raw_path.startswith("src/evaluation/")
             or raw_path.startswith("src/entry_contract")
             or raw_path.startswith("src/protocol/")

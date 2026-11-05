@@ -71,10 +71,13 @@ module StreamCopy {
 `old(io.stdout())` is needed because stdout changes. The frame covers all other
 state; do not restate it.
 
+Run this check from the owner checkout after the standalone
+[native tool setup](../README.md#build-verify-and-evaluate-tasks).
+
 ```sh
 # Expected duration: Estimated 1–10 sec for this small client after tool installation.
 # Success criteria: Exit 0 and zero verification errors.
-dafny-benchmark verify --standard-libraries:false tools/fixtures/contributor/StreamCopy.dfy
+dafny verify --standard-libraries:false tools/fixtures/contributor/StreamCopy.dfy
 ```
 
 This checks only the client contract, not the native build, GNU `cat` parity or

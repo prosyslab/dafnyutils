@@ -21,7 +21,13 @@ This guide uses `bench/utils/comm/Tests.py`. Its upstream source is `coreutils/t
 
 ## Prepare the environment and find the source
 
-Use the [setup guide](../README.md#setup). Run commands below in Bash or zsh from `/workspace/dafnyutils`, inside the prepared contributor container. Python tests launch the GNU executable and .NET program through the existing helpers in that environment; they do not start the Rust fuzzer or its Compose service.
+Complete the standalone [native tool setup](../README.md#build-verify-and-evaluate-tasks)
+and install `.[dev,contributor]`. Run commands below in Bash or zsh from this
+repository's root with its virtual environment active. Python tests
+launch the GNU executable and .NET program through the existing helpers;
+they do not start the Rust fuzzer or its Compose service. These helpers live in
+the local `benchmark_tools` package; no external first-party Python package is
+needed. The native Dafny/.NET and GNU binaries must still be installed or built.
 
 ```sh
 # Expected duration: Estimated < 1 sec; searches the local upstream checkout.

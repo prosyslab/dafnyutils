@@ -7,7 +7,8 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from evaluation.benchmark_test_support import (
+
+from benchmark_tools.test_support import (
     BENCH_COMMAND_TIMEOUT_SEC,
     assert_result_matches_reference,
     bench_dll_path,

@@ -21,43 +21,69 @@ Follow [repository instructions](AGENTS.md), [bench rules](bench/AGENTS.md) and 
 
 ## Setup
 
-Dafnyutils owns problem data, specifications, hidden tests, reference material
-and benchmark-construction tooling. It retains the complete
-`tools/coreutils_fuzzer`, including its Rust engine, Python launcher and Docker
-support. Root owns submission grading and the policy for fuzzer applicability,
-budgets and score treatment. Its evaluator uses the benchmark definition's target
-and invokes the retained launcher.
-The installed `benchmarks` package provides definitions, paths, profiles,
-discovery and selection, and remains data-only. The repository's
-[`tools/scaffold.py`](tools/scaffold.py) creates incomplete contributions from
-the adjacent templates. Cosyn owns agent harnesses.
-Benchmark `Tests.py` files are test material consumed by that evaluator; their
-execution helpers live in the integration package. The installed `benchmarks`
-package does not import the evaluator or a harness.
+Develop benchmark definitions and Python tools in this checkout. The installed
+`benchmarks` package provides definitions, discovery and selection;
+[`tools/scaffold.py`](tools/scaffold.py) creates new contribution files.
+The local `benchmark_tools` package runs contributor validation, task builds,
+proofs and GNU comparison tests without another first-party repository.
 
 Utility Dafny sources live under `bench/utils/<utility>/Spec/`, `Impl/` and
 `Proof/`. The task directory retains its manifest, description, tests, Makefile
 and project configuration. Algorithm sources retain their flat layout. See the
 [source responsibilities](docs/benchmark-layout.md) for details.
 
-### Edit problem data
+### Standalone development
 
 Use the [standalone development container](.devcontainer/devcontainer.json) to
-edit data and run Python checks. It requires Git, Docker and VS Code with the
+edit benchmark data, maintain Python tools and run development tests. It requires
+Git, Docker and VS Code with the
 Dev Containers extension. Open this checkout in VS Code and select **Dev
-Containers: Reopen in Container**. Setup installs the data package and development
+Containers: Reopen in Container**. Setup installs the data package, contributor and development
 tools, initializes GNU reference sources and runs the serial data checks.
-It does not provision the evaluator or a Dafny toolchain.
+The package, scaffolding tool and development tests need only this checkout and
+its development dependencies. This container does not install Dafny or .NET; install the native prerequisites
+below before running task builds or proofs.
+Fuzzing also needs a usable Docker daemon and Compose.
 
-For an existing Python 3.12 environment, install the data package from this
-repository's root. Initial installation needs network access for dependencies;
-duration depends on downloads.
+For development on the host, use Python 3.12 or newer with virtual-environment
+support and Make. On Ubuntu, virtual-environment support is provided by
+`python3-venv`. Run these commands from this repository's root.
+Creating the environment uses the installed Python; its duration depends on the
+host. Expected result: exit 0 with a `.venv/` directory and no output.
 
 ```sh
-python3 -m pip install -e '.[dev]'
+python3 -m venv .venv
+```
+
+```text
+(no output)
+```
+
+Activate it in the current shell; expected duration is less than a second,
+with exit 0 and no output.
+
+```sh
+. .venv/bin/activate
+```
+
+```text
+(no output)
+```
+
+Install the data package and its declared development and contributor tools. Initial installation
+needs network access for dependencies; duration depends on downloads.
+
+```sh
+python -m pip install -e '.[dev,contributor]'
 ```
 
 Expected result: pip installs `dafnyutils` and its development tools, then exits 0.
+
+```text
+...
+Successfully installed ...
+```
+
 Check the data CLI after installation; this takes less than a second in the
 current Python 3.12 environment.
 
@@ -71,33 +97,68 @@ Expected output (excerpt), exit 0:
 usage: python -m benchmarks [-h] [--root ROOT] {list} ...
 ```
 
+Continue with the [developer test tiers](#developer-test-tiers) below. Both tiers
+use this standalone environment.
+
 ### Build, verify and evaluate tasks
 
-Use the integration repository's development container for executable checks.
-Follow its [setup instructions](../../../README.md) in an integration checkout,
-where this repository lives at `/workspace/bench/dafny/dafnyutils`. The root owns
-`dafny-version.toml`, `make build-dafny` and `/usr/bin/dafny-benchmark`; native
-Dafny development uses a separate checkout at `/workspace/dafny`.
+Task builds, proofs and executable comparison tests run from this checkout with
+the same Python environment. Install these public toolchain prerequisites:
 
-From `/workspace`, run the root environment check after setup. It checks Python,
-Docker/Compose, Rust, Z3, tmux and the pinned Dafny build; duration depends on
-Docker access and native verification.
+- The .NET 8 SDK as `dotnet` and a compatible native Dafny as `dafny`. Set
+  `DAFNY_BENCHMARK` to select another installed Dafny executable.
+- Git and GNU build tools for the pinned `coreutils` submodule, including a C
+  compiler, Make, Autoconf, Automake, Gettext, Perl and bootstrap dependencies.
+- Rust and Cargo using this repository's `rust-toolchain.toml` for the fuzzer.
+- Docker with Compose and access to its daemon for generated fuzz campaigns.
+
+The standalone container supplies Rust and GNU build tools. Install Dafny and
+.NET separately before executable checks. No integration checkout or analysis
+Python client is needed by these contributor commands.
+
+Initialize the pinned GNU sources from the repository root. Duration depends on
+network access; success is exit 0 with `coreutils/` and its submodules populated.
 
 ```sh
-make check-contributor-env
+git submodule update --init --recursive
 ```
 
-Expected final output (from source; not executed for this migration), exit 0:
+Expected output is Git's clone/checkout progress, or no output if already initialized.
+
+After installing `.[dev,contributor]`, run this lightweight help check from the
+repository root. It does not build a benchmark. On 2026-11-05, a fresh virtual
+environment installed this checkout with its contributor dependencies and ran
+the CLI without the evaluator, Cosyn or analysis-client packages installed.
+
+```sh
+python3 -m benchmark_tools.contribution --help
+```
+
+Expected output (excerpt), exit 0:
 
 ```text
-Environment ready. The StreamCopy result checks the verifier, not a utility proof.
+usage: python -m benchmark_tools.contribution [-h] [--root ROOT]
+                                              {validate,check} ...
 ```
 
-The root contributor targets are `build-task`, `test-task`, `validate-task` and
-`check-task`, each with `TASK=<task-id>`. For example, from this repository use
-`make -C ../../.. check-task TASK=cat` after installing the integration package. Task-local
-Makefiles use the same root execution modules. Native builds and proofs are
-separate from the data checks below.
+If this reports `No module named benchmark_tools`, install `.[dev,contributor]`
+with the same Python interpreter. No access to `cosyn-experiment`, Cosyn or a
+native analysis Python client is required for these contributor commands.
+
+From this repository, use `make -C bench/utils/cat build`,
+`make -C bench/utils/cat test` or `make -C bench/utils/cat verify`
+for a utility's individual stages. Use
+`python3 -m benchmark_tools.contribution validate cat` to check its YAML/schema,
+source metadata, required files and paths, and
+`python3 -m benchmark_tools.contribution check cat` for the local contributor gate.
+The gate builds the task and required GNU reference, checks runtime-test JUnit
+evidence, runs 20 generated cases with seed 1 when required, verifies project
+Dafny sources and runs marked proof tests. It does not perform native analysis
+of entry contracts or generate public task profiles. Integration grading and
+scoring remain separate. These task checks are separate from development tests.
+The complete gate uses the default `_build/` directory. Unset `BUILD_DIR` or set
+it to `_build` before running `check`; custom build paths are rejected so task,
+reference and native helper artifacts cannot come from different builds.
 
 ## Developer test tiers
 
@@ -107,27 +168,49 @@ Run the serial unit suite during development:
 make test
 ```
 
-This is equivalent to `make test-unit`. Tests that invoke Dafny, run a process or
-shell script, or exercise a composed evaluation/release/archive workflow carry
-the `integration` marker and are excluded from the routine unit command.
+This is equivalent to `make test-unit` and `python -m pytest -q`. All use the
+serial unit selection in `pyproject.toml`. The unit tier checks data models,
+selection, scaffolding and package boundaries without a native toolchain.
+It normally takes seconds; expect exit 0 and a summary of this form:
+
+```text
+...
+<count> passed, <count> deselected in <seconds>s
+```
 
 Run integration tests only for final validation after implementation and routine
-checks:
+checks. This tier checks the registered benchmark definitions using the same
+standalone dependencies; it does not execute benchmark programs or proofs.
+Duration depends on the number of definitions. Expect exit 0 and passed data
+integration cases:
 
 ```sh
 make test-integration
 ```
 
-To run both tiers in order:
+```text
+...
+<count> passed, <count> deselected in <seconds>s
+```
+
+To run both tiers in order, use the following. Duration is the sum of the two
+tiers; expect exit 0 with both summaries:
 
 ```sh
 make test-final
 ```
 
+```text
+...
+<count> passed, <count> deselected in <seconds>s
+...
+<count> passed, <count> deselected in <seconds>s
+```
+
 Benchmark oracle tests remain task-scoped and separate from development tiers.
-For example, `make -C ../../.. test-task TASK=cat` selects
-`bench/utils/cat/Tests.py` through the root evaluator. Required checks and scoring
-semantics are unchanged.
+For example, `make -C bench/utils/cat test` selects
+`bench/utils/cat/Tests.py` through local `benchmark_tools` helpers. Required
+contributor evidence is described in the contribution guide.
 
 ## Repository structure
 
@@ -146,6 +229,7 @@ dafnyutils/
 ├── example/               # Worked examples
 │   └── copy/              # Stream-copy specification, implementation and proof
 ├── src/benchmarks/        # Problem definitions, schemas, paths and discovery
+├── src/benchmark_tools/   # Local contributor commands and benchmark test helpers
 ├── tools/                 # Build scripts and repository maintenance tools
 │   ├── scaffold.py        # Create incomplete benchmark contributions
 │   ├── benchmark_templates/ # Templates for new utility and algorithm tasks
@@ -160,9 +244,9 @@ Spec → Core → Proof → entry structure as a utility contribution, with only
 IO calls. The complete files are in
 [`example/copy/`](example/copy).
 
-Use the integration [development container](#build-verify-and-evaluate-tasks).
-Run the commands below from `/workspace/bench/dafny/dafnyutils` with the integration
-Python environment on `PATH`. The standalone data container cannot run them.
+Complete the [native tool setup](#build-verify-and-evaluate-tasks), then run the
+commands below from this repository's root with its Python environment active.
+The example's Makefile uses `dafny` from `PATH`; set `DAFNY_BENCHMARK` to use a compiler at another path.
 
 ### 1. Choose the behavior
 

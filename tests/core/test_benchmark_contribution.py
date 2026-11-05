@@ -164,6 +164,7 @@ def test_affected_selection_includes_all_tasks_for_shared_benchmark_helpers() ->
     "path",
     (
         "src/analysis/client.py",
+        "src/benchmark_tools/contribution/checks.py",
         "src/dafny_cli.py",
         "dafny-version.toml",
     ),

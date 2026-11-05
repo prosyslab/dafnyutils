@@ -24,7 +24,7 @@ Utilities use `bench/utils/<task>/{Spec,Impl,Proof}/`, matching Leanutils' per-u
 | `Impl/<Name>Cli.dfy` | Native process entry and shared runner call |
 | `Impl/CliSupport.dfy` | Fixed task-local parser, stream checks and process runner |
 | `dfyconfig.toml` | Builds `Impl/<Name>Cli.dfy` with the common native IO adapter |
-| `Tests.py` | Evaluator-owned executable behavior checks and proof probes |
+| `Tests.py` | Benchmark-owned executable behavior checks and proof probes using local helpers |
 
 Auxiliary Spec modules and shared mathematical models stay in `Spec/`. Auxiliary implementation modules stay in `Impl/`. Connecting lemmas stay in `Proof/`, including `DateCalendar.dfy`, `DateFormat.dfy` and `CpPathBridge.dfy`. Existing dependencies and proof obligations are preserved; directory placement does not change their trust status.
 
@@ -205,3 +205,11 @@ GNU differential cases and fuzzers were not repeated for task 2 because its
 utility changes only add capability metadata; their existing mandatory
 requirements remain enabled. No evaluated agent run or private reference-
 solution inspection was performed.
+
+## Contributor tooling
+
+Task Makefiles use the local `benchmark_tools.contribution.make_tasks` and
+`benchmark_tools.contribution.verify` modules. Benchmark `Tests.py` files use
+`benchmark_tools.test_support` and `benchmark_tools.execution`; no evaluator or
+analysis-client Python package is needed. Root evaluation remains responsible
+for entry-contract analysis, isolated grading and scoring.

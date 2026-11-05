@@ -3,14 +3,14 @@
 from pathlib import Path
 
 import pytest
-from evaluation.benchmark_test_support import (
+
+from benchmark_tools.test_support import (
     bench_dll_path,
     build_bench_utility,
     evaluation_target_root,
     run_bench_utility,
     run_dafny_verify,
 )
-
 from benchmarks.definition import BenchmarkDefinition
 from benchmarks.runtime_cases import RuntimeCase, assert_runtime_observation, load_runtime_cases
 

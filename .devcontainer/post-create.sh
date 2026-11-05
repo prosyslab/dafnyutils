@@ -8,7 +8,7 @@ exec > >(tee "$setup_log") 2>&1
 trap 'printf "Setup failed at line %s. Log: %s\nRetry: bash .devcontainer/post-create.sh\n" "$LINENO" "$setup_log" >&2' ERR
 printf 'Setup log: %s\n' "$setup_log"
 python3 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python -m pip install -e '.[dev,contributor]'
 git submodule update --init --recursive
 # Ignore only this known GNU bootstrap output, without changing the pinned source.
 exclude_file=$(git -C coreutils rev-parse --path-format=absolute --git-path info/exclude)
@@ -18,6 +18,7 @@ if [[ ! -f "$exclude_file" ]] || ! grep -Fxq '/m4/extern-inline.m4' "$exclude_fi
 fi
 export PATH="/workspace/dafnyutils/.venv/bin:$PATH"
 python3 -m benchmarks --help
+python3 -m benchmark_tools.contribution --help
 make test
 
 versions_log="${setup_log%.log}-versions.txt"

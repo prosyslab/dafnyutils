@@ -55,7 +55,9 @@ If any of these fail with a missing binary, DLL or image, go through
 
 ## 1. One-time setup
 
-Follow the [setup guide](../README.md#setup) first. Then clear any old
+Complete the standalone [native tool setup](../README.md#build-verify-and-evaluate-tasks)
+and install `.[dev,contributor]`. The launcher and task helpers are local; no
+integration installation is required. Then clear any old
 `REF_BIN_TEMPLATE`, `DUT_BIN_TEMPLATE`, `EVAL_REPO_ROOT` or `EVAL_TARGET_ROOT`
 overrides so the fuzzer picks up the normal project artifacts.
 

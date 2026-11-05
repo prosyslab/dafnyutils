@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2] / "src"
+ROOT = Path(__file__).resolve().parents[2]
 
 
 # Evaluator, analysis and harness modules are root- or Cosyn-owned and never imported here.
@@ -26,8 +26,16 @@ FORBIDDEN = {
 }
 
 
-# Benchmark data packages stay importable without evaluator or harness code.
-@pytest.mark.parametrize(("package", "forbidden"), [("benchmarks", FORBIDDEN)])
+# Authored data, contributor tooling and oracle tests share the independent package boundary.
+@pytest.mark.parametrize(
+    ("package", "forbidden"),
+    [
+        ("src/benchmarks", FORBIDDEN | {"benchmark_tools"}),
+        ("src/benchmark_tools", FORBIDDEN),
+        ("bench", FORBIDDEN),
+        ("tools", FORBIDDEN),
+    ],
+)
 def test_package_dependencies_follow_ownership(package: str, forbidden: set[str]) -> None:
     violations = []
     for source in sorted((ROOT / package).rglob("*.py")):
