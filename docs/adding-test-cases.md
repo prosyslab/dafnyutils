@@ -45,8 +45,20 @@ The current adapter already covers basic columns, delimiters, totals, several NU
 
 ## Start a new utility test file
 
-`python3 -m benchmarks init --kind coreutils --id base32` creates a `Tests.py`
-with shared runner imports, an `executables` fixture, and `assert_parity`.
+The scaffold command creates an incomplete utility, including a `Tests.py`
+with shared runner imports, an `executables` fixture, and `assert_parity`:
+
+```sh
+python3 -m tools.scaffold --kind coreutils --id base32
+```
+
+Expected output, exit 0 when the task does not already exist:
+
+```text
+bench/utils/base32
+scaffold is incomplete; replace TODO content and source status before validation
+```
+
 The fixture builds the pinned GNU binary and the utility DLL. Proof-only tests
 do not request this fixture, so they need no executable build.
 
@@ -183,7 +195,9 @@ Keep success and failure scenarios in separate tests. Use parameterization only 
 
 Place a one-line intention comment above the test. Put an exact `# upstream: coreutils/tests/misc/comm.pl` marker **inside** its body, and put the case name on a separate comment line so the source path and scenario remain clear. For repository-only cases, use `# upstream: none - <specific repository-only reason>`, continuing a long reason with `# upstream-reason: <text>`. These comments document provenance for review; they are not checked automatically by `make test`.
 
-Record the pinned GNU revision and case name in the PR. Preserve copyright and license notices if copying upstream source; adapting a scenario is not a reason to remove attribution. The example's source revision is `2cf491412c199e2211880ec3f4ba387026638a33`.
+Record your checkout's pinned GNU revision and case name in the PR. Preserve
+copyright and license notices if copying upstream source; adapting a scenario
+is not a reason to remove attribution.
 
 Map the parts of any other upstream test in the same way:
 
@@ -215,7 +229,7 @@ Expected Python-stage summary after adding the case, exit 0:
 ```text
 ...
 1 passed, <count> deselected in <seconds>s
-make: Leaving directory '/workspace/dafnyutils/bench/utils/comm'
+make: Leaving directory '<repository>/bench/utils/comm'
 ```
 
 The target runs executable behavior cases from `Tests.py`. `PYTEST_ARGS` selects cases in that suite. Build errors must be resolved before interpreting parity. The XML path is supplied explicitly; choose a fresh path for each run to avoid confusing old and new evidence.
@@ -235,7 +249,10 @@ Expected summary after adding the case, exit 0:
 1 passed in <seconds>s
 ```
 
-This reuses the module's build fixture and runners. The lowercase `test_` function name makes it discoverable once the explicit `Tests.py` path is selected. Root `make test` targets source tests; use the utility target or explicit adapter path for utility cases.
+This reuses the module's build fixture and runners. The lowercase `test_`
+function name makes it discoverable once the explicit `Tests.py` path is
+selected. Repository `make test` runs development tests; use the utility target
+or explicit adapter path for utility cases.
 
 The example node exists only after you add the function. Record your own result.
 
@@ -253,7 +270,7 @@ Expected output shape, exit 0:
 CommTests.<case>: PASSED
 ...
 <count> passed, <count> deselected in <seconds>s
-make: Leaving directory '/workspace/dafnyutils/bench/utils/comm'
+make: Leaving directory '<repository>/bench/utils/comm'
 ```
 
 If existing cases are skipped, the summary includes a skipped count. Report their

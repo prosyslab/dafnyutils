@@ -27,4 +27,4 @@ quartet as EOF. A close error follows ordinary EOF decoding. Invalid input in
 an already completed buffer takes precedence over a later read or close error,
 and valid decoded bytes preceding an invalid character are retained. Broader
 stream-ordering and finalization limits are recorded in
-[the failure audit](../../../docs/trustbase-failures.md).
+[the API model limits](../../../docs/core-api.md#trust-limits-and-api-changes).

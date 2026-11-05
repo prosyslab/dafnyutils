@@ -29,7 +29,10 @@ Submit a focused change with reproducible code verification and fuzzing results.
 
 ## Extending benchmark
 
-Contribute a utility by writing its behavior contract, implementing it, proving the entry point, and comparing the executable with the pinned GNU binary. Do this on your own: define the scope within the system that `bench/core/IO.dfy` models, and submit all four kinds of evidence for human review once the code is complete and verified.
+Contribute a utility by writing its behavior contract, implementing it, proving
+the entry point and comparing the executable with the pinned GNU binary. Define
+its scope within the system that `bench/core/IO.dfy` models, then submit the code
+and validation evidence for human review.
 
 This guide follows `base32`, an open utility with byte-stream input. The scaffold is a starting point, not a working implementation. Use the existing `base64` and `cat` projects to learn the structure; do not copy their specifications as the meaning of `base32`.
 
@@ -370,13 +373,9 @@ specification describes GNU behavior and uses only approved library contracts.
 
 Explain the problem, the intended behavior and the files affected. Keep specification, implementation, proof and evaluator changes distinct. Reuse model types and relations, and implement derived algorithms and proofs inside the item. Keep the approved inputs and native library assumptions unchanged.
 
-Put the utility scope you defined in `bench/utils/<utility>/<utility>.md`. Local
-notes may live under `_build/contribution-notes/`; copy relevant evidence into
-the PR so reviewers can access it. No separate wiki or plan directory is required.
-
-These are contributor-maintenance records. Evaluated benchmark runs must follow
-their own permitted-input and artifact rules; do not feed these notes into a run
-unless its protocol permits them.
+Put the utility's scope, supported options and model limitations in
+`bench/utils/<utility>/<utility>.md`. Include the source revision/license and
+trusted API assumptions so reviewers can assess the contract.
 
 For an upstream scenario, record the GNU source revision and test path. Keep evaluator cases and oracle material out of candidate-visible resources. Preserve original mismatch bundles and store post-fix expectations separately.
 
@@ -405,6 +404,10 @@ the development container and CI. Python checks use the exclusions in
 `pyproject.toml`; Rust formatting covers the repository's fuzzer crate.
 CI does not run tests, Pyright, Dafny verification, or benchmark checks. Run the
 applicable validation described in this guide and include its evidence in PRs.
+
+If you enable the optional Git hook, it formats Dafny only when `.dfy` files are
+staged. Python and documentation changes use Ruff and the standalone unit suite.
+Staged Dafny changes still require an installed native Dafny formatter.
 
 - Import a name from the module that defines it. For example, use `from benchmarks.definition import BenchmarkKind`, not a package-root re-export.
 - Keep `__init__.py` empty. Do not use wildcard imports, `__all__`, `importlib` or import tricks to avoid redesigning a cyclic dependency.
@@ -484,21 +487,13 @@ Write the entire message in English. Use this subject format:
 [Docs] explain contribution evidence requirements
 ```
 
-After a blank line, include a detailed body explaining the problem, approach, affected boundaries, validation commands and actual results, and remaining limitations or follow-up work. This is a message template, not a record of completed checks:
+After a blank line, write three or four short sentences explaining the problem,
+the fix, affected boundaries and any important limitation. Put test commands and
+execution evidence in the PR rather than the commit message.
 
-```text
-[Docs] explain contribution evidence requirements
-
-Problem: <what was unclear or incorrect>
-Approach: <what changed and why>
-Boundaries: <specification, implementation, proof, evaluator or dataset impact>
-Validation: <exact commands, tested revision, results and artifact links>
-Limitations: <unrun checks, remaining risks or follow-up; say none if appropriate>
-
-Co-authored-by: Full Name <email>
-```
-
-Replace the template fields with facts. Include an accurate `Co-authored-by: Full Name <email>` trailer for every material co-author, including Codex when it contributed. Use the contributor's actual configured identity; do not invent an email or copy the placeholders. Keep required trailers at the end of the message.
+Credit each material co-author, including Codex when it contributed, with an
+accurate `Co-authored-by: Full Name <email>` trailer. Use the co-author's actual
+identity and keep trailers at the end of the message.
 
 Do not create merge commits. Integrate branches by rebasing onto the target branch (`git pull --rebase`) and land pull requests with GitHub's **Rebase and merge**.
 
@@ -511,13 +506,12 @@ Report evidence in **tests → fuzzing → verification** order. Copy and paste 
 - **Verification:** Show Dafny stdout with verified/error/timeout counts and the verified files, their included files, and whether termination was proved. Also report definition/layout checks and the final contribution gate. A build is not proof verification.
 
 The short automatic gate currently runs 20 fuzz cases with seed 1; it does not satisfy the separate PR requirement of three campaigns with at least 1,000 iterations each. See [Collect PR evidence](docs/fuzzing.md#collect-pr-evidence) for the command.
-For example, a one-case differential run should identify its case ID and completed outcome; a proof result should identify the verified files, their included files, and the verifier summary. Copy actual results from the run. Do not treat example output in a guide as evidence for your PR.
-
-See [validation commands](#validate-and-submit) and [Collect PR evidence](docs/fuzzing.md#collect-pr-evidence). Paste the output directly into the PR; no file attachments are needed. Never include credentials or restricted evaluator payloads.
+Paste the actual output directly into the PR; example output in a guide is not
+run evidence. Never include credentials or restricted evaluator payloads.
 
 Algorithm tasks require build/layout checks, runtime cases and Dafny verification.
-Their `cases.json` files remain benchmark data; the root evaluator runs those
-cases with the declared output contract. Fuzzing is required only when the task
+Their `cases.json` files remain benchmark data; local test helpers and the
+integration evaluator run those cases with the declared output contract. Fuzzing is required only when the task
 declares a fuzzer capability. Use `python3 -m tools.contribution check algorithm-<number>`
 for the contributor gate. `make -C bench/algorithm/<number> test` runs
 the runtime cases. For documentation-only changes, record link/content checks

@@ -119,9 +119,9 @@ not issue a native write. A failed help write or diagnostic write contributes
 to the final nonzero exit status.
 
 The following validation is historical: it describes the earlier filesystem
-implementation, not the later native-failure contract changes. Current checks
-are recorded separately in
-[the failure-model audit](../../../docs/trustbase-failures.md).
+implementation, not the later native-failure contract changes. Current failure
+semantics and model limits are described in
+[the API model limits](../../../docs/core-api.md#trust-limits-and-api-changes).
 
 Historical validation used `/workspace/tmp/fs-benchmarks-20261020/integration`,
 with `PYTHONPATH="$PWD/src:$PWD"`, based on

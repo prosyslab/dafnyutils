@@ -1,13 +1,13 @@
 # Benchmark agent protocol v1
 
-The root integration evaluator defines the task delivered to an agent, the
-report received from it, candidate filesystem layout, container lifecycle,
-host-side workspace collection and acceptance rules in `src/evaluation`.
-Dafnyutils retains problem definitions, specifications and test material.
+Use this contract when integrating an agent with the
+[`cosyn-experiment` evaluator](https://github.com/prosyslab/cosyn-experiment).
 `AgentProtocolVersion.V1` identifies this contract. The JSON payload versions are
 `benchmark.agent-task.v2` and `benchmark.agent-result.v7`. Any incompatible wire
 change must bump the corresponding version and update conformance tests in the
-integration repository and Cosyn.
+integration repository and harness.
+
+## Task delivery
 
 `evaluation.agent.protocol.AgentTaskPayload` contains the validated public task
 profile plus `submission`, the task roots and archive exclusions from the public
@@ -24,17 +24,15 @@ A public check may include the optional `proof_reuse` object with protocol
 `benchmark.dafny-proof-reuse.v1`. Its `proof_roots` identify the
 workspace-relative source paths passed as native Dafny roots,
 `verification_options` is the ordered native policy, and `describe_argv` and
-`compile_argv` are explicit command vectors. An absent object preserves the
-older public-check JSON shape and execution behavior. Unknown protocol versions,
+`compile_argv` are explicit command vectors. Proof reuse is optional. Unknown protocol versions,
 absolute or traversing roots, empty options, and empty command vectors are
 invalid task payloads.
 
 The describe command writes exactly one JSON object to standard output. It repeats
 the protocol, proof roots and verification options, adds a lowercase SHA-256
 `source_identity`, and lists every final native target as an exact
-`source_path`/`symbol` pair. The owner derives that data through
-`EntryContractCheckSession.validate()` and the same `verification_targets` and
-native ambiguity checks as full verification. The identity binds the manifest,
+`source_path`/`symbol` pair. The descriptor uses the same native target and
+ambiguity checks as full verification. The identity binds the manifest,
 project configuration, candidate Dafny sources, and analyzed immutable support
 dependencies. Empty scopes, duplicate or ambiguous targets, forbidden bodyless
 declarations, and source changes fail closed without a partial descriptor.
@@ -54,16 +52,18 @@ After complete proof coverage, the host may run `compile_argv`. The owner valida
 the same source identity before and after one explicitly no-verify build and does
 not call proof verification in this mode. Compilation has its own
 `DAFNY_COMPILE_OUTCOME` records and cannot be interpreted as proof evidence. The
-ordinary public check and independent benchmark evaluator remain unchanged: they
-build and natively verify the complete target scope rather than trusting reused
+ordinary public check and independent benchmark evaluator build and natively
+verify the complete target scope rather than trusting reused
 agent results.
+
+## Results and workspace
 
 `evaluation.agent.protocol.AgentReport` is the `benchmark.agent-result.v7` JSON
 contract. It records run, comparison, task, agent and backend identity labels;
 status, exit code, timing and observed turn/token usage; public resource/rule/check
 consumption; and optional artifacts. Identity labels are opaque strings to the
-benchmark. The `submission` artifact kind remains readable for historical
-reports, but new agents do not emit it. Turn usage records only `used_turns`, without a turn allowance. Cosyn defines the separate invocation
+benchmark. Agents report workspace outputs rather than submission archives.
+Turn usage records only `used_turns`, without a turn allowance. Cosyn defines the separate invocation
 wire and validates invocation-specific consistency.
 
 The default `CandidateLayout` mounts a public workspace at `/workspace`, the
@@ -75,50 +75,23 @@ are writable bind mounts. Public task and fixed inputs are read-only mounts.
 The private run directory, artifact directory, runtime bundle, home and temporary
 directory remain outside the model's permitted file view, while the harness may
 execute tools from them. The evaluator's oracle executable is blocked by the candidate
-mount plan. The root evaluator owns container staging, Compose rendering,
-candidate termination and cleanup. The integration execution layer supplies
-image/provider configuration, the conforming launcher and command observation
-callbacks. The evaluator does not import that execution policy or a harness.
+mount plan.
 
 The benchmark lifecycle owns the sequence from preparation through execution,
 confirmed container termination and host collection. A preparation failure,
 timeout, nonzero exit, invalid report or unconfirmed termination prevents
 collection. Diagnostic retention never retains running candidate containers.
-After normal agent exit and confirmed container termination, this lifecycle calls
-`evaluation.submission.archive.package_workspace(workspace, manifest, archive)`.
-It packages declared roots without following links, rejects hard links and
-special entries, excludes names and paths declared in the manifest, and commits
-the archive atomically. Traversal is iterative. The unchanged
-`receive_submission` validates archive limits, released fixed-file hashes and
+After normal agent exit and confirmed container termination, the host packages
+the declared roots without following links, rejects hard links and special
+entries, and applies the manifest's exclusions. Submission acceptance checks
+archive limits, released fixed-file hashes and
 required outputs before evaluator checks. A missing required output therefore
 causes a receiver error, `required outputs missing`, even if the agent report
 said `completed`.
 
-The integration consumes the lifecycle result to report failures and pass the
-archive to `evaluate_submission`; it does not implement a separate termination or
-collection gate. Batch cancellation can call the same label-scoped cleanup helper.
-This ownership change preserves protocol v1, task v2, report v7 and archive policy.
-
-The Python entry point is `evaluation.agent.runtime.run_candidate_lifecycle`.
-Its `prepare` callback returns an `AgentSandboxContext`; integrations use
-`prepare_agent_sandbox_context` to construct it from a verified release, a base
-Compose file, `CandidateRunContext`, environment and harness preparation callback.
-The latter receives `AgentPreparationContext` and returns `AgentLaunchSpec` with
-the selected image, environment and sandbox profile. A launch-record callback
-observes the benchmark-generated argv and prompt before any container starts.
-
-The `execute` callback receives the prepared context and returns
-`CandidateExecution[T]`: execution presence, exit code, timeout, protocol error and
-an opaque integration payload. Integrations may record logs, events and harness
-consistency checks there. The lifecycle always attempts candidate shutdown and
-cleanup after execution, including exceptions. It returns
-`CandidateLifecycleOutcome[T]` with the context, execution, failure reason and
-structured `agent_failed` status, so callers do not classify failures by parsing
-messages. Host packaging failure is distinguishable from agent execution failure.
-Unexpected execution exceptions propagate after cleanup; they do not collect an
-archive. The caller supplies `manifest` and a host-only `archive_path`.
-
-The integration repository composes this protocol with a harness such as Cosyn.
-The installed Dafnyutils data package and Cosyn remain independent. Local checks
-use controlled filesystems and fake providers; a passing local check is not a
-paid experiment or a Dafny proof result.
+For host integrations, use `evaluation.agent.runtime.run_candidate_lifecycle`.
+It coordinates preparation, execution, shutdown and host collection, returns
+structured failure status, and attempts cleanup after execution exceptions.
+Unexpected execution exceptions propagate without collecting an archive. See the
+[runtime API](https://github.com/prosyslab/cosyn-experiment/blob/main/src/evaluation/agent/runtime.py)
+for callback types and integration parameters.

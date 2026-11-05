@@ -1,14 +1,10 @@
 # Run the coreutils fuzzer
 
-The complete fuzzer is Dafnyutils benchmark-construction tooling. Its Rust
-engine, Python launcher and Docker support remain in `tools/coreutils_fuzzer`.
-Root owns submission grading and the policy for fuzzer checks, budgets and score
-treatment. The benchmark definition supplies the target, and the root evaluator
-invokes this launcher.
-
 The fuzzer runs the **pinned GNU executable** and **your Dafny executable** on
 the same generated inputs and reports any difference in output, exit status or
-filesystem effects.
+filesystem effects. Its launcher and generators live in `tools/coreutils_fuzzer`.
+The integration evaluator also uses this launcher for tasks that declare a
+fuzzer capability; its short check does not replace the PR campaigns below.
 
 The typical loop looks like this:
 
@@ -79,14 +75,14 @@ Cargo on first use, which may download dependencies on a fresh machine.
 
 ```text
 ...
-make[1]: Leaving directory '/workspace/dafnyutils/_build/coreutils'
+make[1]: Leaving directory '<repository>/_build/coreutils'
 ```
 
 `make -C bench/utils/cat build`, exit 0:
 
 ```text
 Dafny program verifier did not attempt verification
-make: Leaving directory '/workspace/dafnyutils/bench/utils/cat'
+make: Leaving directory '<repository>/bench/utils/cat'
 ```
 
 `docker compose ... build`, exit 0:
@@ -221,7 +217,8 @@ and every error count is zero.
 
 **Things that do not count**
 
-- The fuzzer check inside root `make check-task TASK=<utility>` (20 cases, seed 1).
+- The fuzzer check inside `python3 -m tools.contribution check <utility>`
+  (20 cases, seed 1).
 - A fixed JSON case set or regression suite. Those are separate checks.
 - Picking three favorable seeds while leaving out failing ones.
 - Missing output. A setup failure may stop before any Results section appears;
@@ -272,16 +269,16 @@ Replay **always exits nonzero**, by design:
 | You see | Meaning |
 | --- | --- |
 | `FUZZER_OUTCOME=semantic_mismatch` | The saved mismatch still reproduces exactly. |
-| `FUZZER_OUTCOME=replay_not_reproduced` | The program now behaves differently, e.g. after your fix. |
+| `FUZZER_OUTCOME=replay_not_reproduced` | The saved mismatch did not reproduce with these binaries. |
 
 Diagnostic wording and paths vary. To show that a fix works, add a
 [regression expectation](#pin-it-as-a-regression); never rewrite the original
 bundle.
 
-Replay accepts bundle schema 8 only and rejects older schemas. The bundle keeps
-raw metadata, typed process outcomes, the container image identity and numeric
-target identity. Without an image override, replay uses the saved image. Bundles
-are not signed, so they do not prove who created them.
+Replay accepts bundle schema 8 only. Keep the recorded binaries and container
+image available; without an image override, replay uses the saved image. For
+older bundles, rerun their saved inputs with `--case-set` and keep the originals.
+Bundles are unsigned and do not authenticate who produced them.
 
 ### Rerun an input saved after an execution error
 
@@ -301,8 +298,8 @@ Keep in mind:
 
 - These bundles use schema `coreutils-fuzzer.failure-input.v2`. `run.py replay`
   does not accept them.
-- The rerun starts at iteration zero, so iteration-dependent settings (such as
-  the `chmod` umask and read-only time anchor) can differ. Compare with the
+- The rerun starts at iteration zero, so seed/iteration-dependent settings such
+  as the process umask can differ. Compare with the
   original values in `manifest.json`.
 - A Docker stall may not reproduce.
 
@@ -468,21 +465,14 @@ performance improvement.
 
 ### Container sandbox
 
-For each run, the host starts one disposable Compose service, copies in the
-runner and target artifacts, collects observations, and removes the service.
-Both GNU and Dafny run inside it, including option discovery. There is no
-fallback to running targets on the host, and no public `--work-root` option.
-
-- Both targets share the service filesystem and staged executables. Docker is
-  the only boundary; there is no extra per-target filesystem or oracle
-  isolation.
-- No Docker socket, no external network, read-only root, writable tmpfs mounts
-  for staging and fixtures. The `/fuzz` fixture mount uses `noatime`, so reading
-  a file or directory does not update its access timestamp. Explicit timestamp
-  changes, such as those made by `touch`, still take effect.
-- Default Docker seccomp/AppArmor and `no-new-privileges` stay on. Trusted setup
-  uses limited ownership/identity capabilities; targets run as the runner's
-  non-root user.
+Each campaign runs both targets in a disposable Compose service, including
+option discovery. Docker is required; targets do not fall back to host execution.
+Both targets share the service filesystem and staged executables, so this is a
+contributor comparison environment rather than per-target oracle isolation.
+The service has no external network or Docker socket, a read-only root and
+writable fixture/staging mounts. Targets run as a non-root user.
+The service uses Docker's default seccomp/AppArmor profiles and enables `no-new-privileges`.
+Capabilities are dropped except those required for fixture and process setup.
 
 ### Target environment
 
@@ -494,12 +484,10 @@ the fixture, and invalid links are rejected.
 ### What is compared
 
 Process outcomes, raw stdout/stderr, and filesystem contents, metadata and
-identity transitions are compared. Both targets run sequentially at the same
-absolute fixture path. The DUT reuses the reference's original objects only
-when the raw pre/post states are exactly equal and observation and target
-preparation leave metadata unchanged. Otherwise it receives a fresh copy of
-the original fixture. Absolute host inode numbers are not compared across
-independent copies.
+identity transitions are compared. Both targets start from equivalent fixtures
+at the same absolute path and run sequentially. Absolute host inode numbers are
+not compared across independent fixture copies. Timestamp limitations are
+described below.
 
 <a id="what-the-fuzzer-does-not-check"></a>
 
@@ -513,7 +501,7 @@ about these behaviors.
 
 In practice:
 
-- Timestamps are still used to prepare fixtures, restore inputs and show raw
+- Timestamps are used to prepare fixtures, restore inputs and show raw
   diagnostics, but they are **excluded** from filesystem mismatch and replay
   decisions.
 - Raw streams are still compared **exactly**. If a mismatch comes from a clock
@@ -522,18 +510,9 @@ In practice:
 - There is no time tolerance, timestamp stripping or utility-specific time
   oracle.
 
-Time-dependent inputs remain reachable. Read-only `ls -t -c` and
-`ls -t --time=ctime` can reuse unchanged original objects on the `noatime`
-fixture mount, so both targets see the same change timestamps. Timestamp
-restoration avoids redundant writes: even setting atime/mtime to their existing
-values with `utimensat` would advance ctime and invalidate exact reuse. The
-saved ctime-order cases are checked by
-`tools/fixtures/coreutils_fuzzer/v1/regressions/ls.json`.
-
-This does not make clocks deterministic or allow ctime to be restored. If a
-reference changes its fixture and requires an independent copy, time-dependent
-stdout differences remain inconclusive under this policy. Excluding timestamps
-from filesystem comparison does not exclude their effects on output bytes.
+Time-dependent inputs remain reachable. Excluding timestamps from filesystem
+comparison does not exclude their effects on output bytes; investigate such
+differences without weakening the comparator.
 
 Generated option pools are restricted to the current benchmark scope, even
 when informational output matches GNU's complete help text. The declared
@@ -550,7 +529,7 @@ in the campaign log.
 `stat` run cases retain an explicit `-c`/`--format` option during generation,
 corpus mutation and shrinking. Help/version requests and missing format-value
 errors remain eligible; default output without a format is not modeled. A
-fixed case set is evaluated as supplied, so explicit diagnostic and historical
+fixed case set is evaluated as supplied, so explicit diagnostic and
 regression inputs are never silently removed.
 
 Dafny specification and proof verification are separate checks.
@@ -577,7 +556,7 @@ All of a utility's input grammar and scenarios live in one module. Start from
    fields appear in fresh metrics.
 
 Then complete the
-[utility contribution gate](../CONTRIBUTING.md#build-test-and-verify).
+[utility contribution gate](../CONTRIBUTING.md#validate-and-submit).
 
 **Reuse shared helpers** (paths under `tools/coreutils_fuzzer/src/fuzz/`):
 
@@ -610,53 +589,13 @@ small generic generator with fixed scenarios.
 | `tools/coreutils_fuzzer/docker-compose.yaml` | Shared container execution policy |
 | `tools/fixtures/coreutils_fuzzer/v1/` | Persistent case sets and fixed regression expectations |
 
-### Schema versions and removed features
+### Artifact versions
 
 | Artifact | Current version |
 | --- | --- |
-| Capabilities | schema 4 (reports the time limitation) |
-| Metrics | `coreutils-fuzzer.metrics.v3` (no time classifications) |
-| Replay bundle | schema 8 (no checker/anchor provenance) |
-| Failure-input bundle | `coreutils-fuzzer.failure-input.v2` (new execution context) |
+| Capabilities | schema 4 |
+| Metrics | `coreutils-fuzzer.metrics.v3` |
+| Replay bundle | schema 8 |
+| Failure-input bundle | `coreutils-fuzzer.failure-input.v2` |
 | Case set | `coreutils-fuzzer.case-set.v1` |
 | Regression suite | `coreutils-fuzzer.regression-suite.v1` |
-| Private container protocol | 2 (no trace/anchor fields) |
-
-The implementation-dependent `observed_spec_checker`, syscall tracing and clock
-adapter have been removed, and `--checker`, `--ls-checker` and `--stat-checker`
-are no longer supported. Old replay bundles must be rerun from their saved
-inputs with `--case-set`; keep the original bundles.
-
-### Maintenance validation: time checker removal (2026-09-30)
-
-This is contributor-maintenance evidence, not an authorized input snapshot for
-an evaluated benchmark run. Tested the working tree based on
-`2f7558765e59dcbfe9862f3931ee0ff542801ad7`, including pre-existing concurrent
-changes; no commit was created. Commands below ran from
-`/workspace/dafnyutils/tools/coreutils_fuzzer` with Rust/Cargo 1.94.0,
-Python 3.12.3, pytest 9.1.1 and Ruff 0.15.12.
-
-- `cargo test --offline`: exit 0; 480 unit tests and two CLI integration tests
-  passed. An initial run passed 480 tests and failed
-  `chmod_explicit_mtime_mutation_is_detected`; that test depended on the removed
-  timestamp verdict and was removed with the feature, then the suite passed.
-- `PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -n0 -p no:cacheprovider
-  /workspace/dafnyutils/tests/core/test_fuzzer_capabilities.py
-  /workspace/dafnyutils/tests/core/test_benchmark_contribution.py
-  /workspace/dafnyutils/tests/evaluation/test_fuzzer_outcomes.py
-  --junitxml=target/maintenance/time-checker-removal/python-tests.xml`:
-  exit 0; 50 tests passed, including real capability-producer/consumer
-  conformance, malformed limitation rejection and legacy-schema rejection.
-- `cargo fmt --all -- --check` and `git diff --check`: exit 0.
-- `ruff check --no-cache` and `ruff format --check --no-cache` on
-  `native/build.py`, `/workspace/dafnyutils/src/benchmarks/contribution.py` and
-  `/workspace/dafnyutils/tests/core/test_fuzzer_capabilities.py`: exit 0.
-
-Logs and the Python JUnit report are under
-`tools/coreutils_fuzzer/target/maintenance/time-checker-removal/`. This maintenance
-change does not alter benchmark specifications, implementations or their proofs.
-No Dafny verification, `tests/bench` regression or GNU/Dafny benchmark campaign
-was run; runtime tests do not establish proof success. The removed standalone
-Dafny checker has no remaining verification target. Work is complete with no
-blocking checks; the next operational step is to regenerate inputs/results for
-any legacy replay bundle that needs to be rerun under schema 8.

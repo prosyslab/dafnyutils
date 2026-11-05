@@ -105,7 +105,7 @@ committed prefix; a failed stderr write can truncate its diagnostic.
 
 The current whole-read API does not represent GNU's bounded reads or all
 ordered read/write/close phases. The pending required scope and concrete
-limitations are recorded in [the failure audit](../../../docs/trustbase-failures.md).
+limitations are described in [the API model limits](../../../docs/core-api.md#trust-limits-and-api-changes).
 
 Examples:
 

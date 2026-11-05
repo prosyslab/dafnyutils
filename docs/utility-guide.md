@@ -27,7 +27,7 @@ for this final obligation. For a concrete example, read
 [`HeadSpec`](../bench/utils/head/Spec/HeadSpec.dfy) and
 [`HeadProof`](../bench/utils/head/Proof/HeadProof.dfy).
 The fixed CLI parser and process runner sit outside this principal proof
-boundary; see [the ownership boundary](trustbase-boundary.md#fixed-command-line-protocol).
+boundary; see [the entry and CLI contract](core-api.md#entry-and-cli-contract).
 
 For a loop, the main proof idea is usually to relate the processed prefix to
 the accumulated result. For a recursive traversal, it is to relate child

@@ -161,8 +161,8 @@ the primary read error when both reading and closing fail.
 
 The following records describe the earlier filesystem implementation. They
 are historical evidence, not verification of the subsequent native-failure
-contract changes. Current failure-model checks are recorded separately in
-[the failure-model audit](../../../docs/trustbase-failures.md).
+contract changes. Current failure semantics and model limits are described in
+[the API model limits](../../../docs/core-api.md#trust-limits-and-api-changes).
 
 Maintenance starts at repository revision
 `1ed3144e6b092f50ce99b0450d242a43309e1bd4`. Integrated commands run in

@@ -37,7 +37,7 @@ Supported behavior:
 
 The current whole-read API does not represent every ordered native phase.
 Required scope decisions and concrete limitations remain recorded in
-[the failure audit](../../../docs/trustbase-failures.md).
+[the API model limits](../../../docs/core-api.md#trust-limits-and-api-changes).
 
 Deferred GNU behavior:
 
