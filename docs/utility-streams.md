@@ -373,6 +373,35 @@ establish these properties from the candidate scan and retained-index witnesses.
 Separate set-decoding and command proofs account for validation, expansion, and
 warnings before the output relation is applied.
 
+## tsort
+
+### Implementation
+
+[`Tokenize` and `BuildGraph`](../bench/utils/tsort/Impl/TsortGraphBuildCore.dfy) split
+input into pairs, register every distinct name, and retain duplicate edges in
+reverse input order. [`SortGraph`](../bench/utils/tsort/Impl/TsortCore.dfy) starts
+with zero-indegree vertices in byte order and uses a FIFO queue for vertices
+released later.
+When the queue is empty but vertices remain,
+[`BreakStalledCycle`](../bench/utils/tsort/Impl/TsortCycleCore.dfy) selects GNU's cycle,
+removes one edge occurrence, and resumes the sort. Cycles produce diagnostics
+and failure status while preserving emitted vertices.
+
+### Proof idea
+
+[`SortCertificate` and `EventText`](../bench/utils/tsort/Spec/TsortSpec.dfy) relate
+vertex ranks, edge-removal ranks, release order, and selected cycles to exact
+output and diagnostic fragments. The step and cycle lemmas record a finite
+sequence of emission and edge-cut events.
+[`Certificate` and `Finish`](../bench/utils/tsort/Proof/TsortProof.dfy) connect that
+sequence to `GraphResult`. Input and stream relations then account for odd-token
+rejection, read/close failures, and committed output prefixes. The fully proved
+[`PreparedRun`](../bench/utils/tsort/Proof/TsortProof.dfy) bridge assembles these
+read and result relations before the final
+[`RunCore`](../bench/utils/tsort/Impl/Tsort.dfy) contract. The
+[task specification](../bench/utils/tsort/tsort.md) records the CLI and native IO
+trust boundary.
+
 ## uniq
 
 ### Implementation

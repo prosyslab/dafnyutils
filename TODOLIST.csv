@@ -47,7 +47,7 @@ benchmark,logname,identity_and_permissions,GNU-compatible supported subset,relea
 benchmark,ls,filesystem_and_paths,GNU-compatible supported subset,released,Existing benchmark,
 candidate,md5sum,encoding_and_checksums,"Digest generation; -b, -t, -z; ordered file/stdin operands.",open_for_contribution,Contribution guide: CONTRIBUTING.md#define-the-observable-behavior,
 benchmark,mkdir,filesystem_and_paths,Default one-directory creation; -v; ordered operands and partial progress.,released,Filesystem benchmark: bench/utils/mkdir/mkdir.md,Parent creation and explicit modes need process umask mutation/restoration; security-context options need label APIs; see mkdir.md.
-candidate,mkfifo,filesystem_and_paths,Default FIFO creation with mode 0666 and process umask; ordered operands.,open_for_contribution,Contribution guide: CONTRIBUTING.md#define-the-observable-behavior,
+benchmark,mkfifo,filesystem_and_paths,"FIFO creation with default umask or octal/symbolic -m modes; ordered operands and partial effects.",released,Filesystem benchmark: bench/utils/mkfifo/mkfifo.md,Security-context options -Z and --context require label APIs; see mkfifo.md.
 candidate,mknod,filesystem_and_paths,FIFO form NAME p (including GNU first-character type matching); default mode 0666 and umask.,open_for_contribution,Contribution guide: CONTRIBUTING.md#define-the-observable-behavior,
 candidate,mktemp,filesystem_and_paths,Filesystem and path behavior,model_preparation,Reviewed blocker: see remaining_preparation,No randomness/unique-name allocation observation and exclusive atomic creation contract; do not use a deterministic guessed name.
 benchmark,mv,filesystem_and_paths,GNU-compatible supported subset,released,Existing benchmark,
@@ -95,7 +95,7 @@ benchmark,touch,filesystem_and_paths,GNU-compatible supported subset,released,Ex
 benchmark,tr,text_and_streams,GNU-compatible supported subset,released,Existing benchmark,
 benchmark,true,shell_and_control,GNU-compatible supported subset,released,Existing benchmark,
 benchmark,truncate,filesystem_and_paths,"All GNU command-line options for the documented stable regular-file profile; creation, references, relative sizes, units and ordered partial progress.",released,Filesystem benchmark: bench/utils/truncate/truncate.md,Descriptor-specific faults/races and nonregular reference seeking need a descriptor API; overlong-reference errno mapping remains a documented boundary.
-candidate,tsort,text_and_streams,"Zero or one file/stdin operand; space/tab/newline-separated pairs; self pairs, duplicate edges and cycles; legacy -w no-op.",open_for_contribution,Contribution guide: CONTRIBUTING.md#define-the-observable-behavior,
+benchmark,tsort,text_and_streams,"Zero or one file/stdin operand; space/tab/newline-separated pairs; GNU ordering for self pairs, duplicate edges and cycles; legacy -w no-op.",released,Stream benchmark: bench/utils/tsort/tsort.md,
 candidate,tty,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: see remaining_preparation,No executable ttyname/isatty result and terminal error model.
 candidate,uname,system_information,System terminal user and filesystem-information reporting,model_preparation,Reviewed blocker: see remaining_preparation,No kernel/node/release/version/machine/platform observations.
 candidate,unexpand,text_and_streams,"Default leading blanks; -a, --first-only, -t tab lists including continuation; ordered file/stdin operands.",open_for_contribution,Contribution guide: CONTRIBUTING.md#define-the-observable-behavior,

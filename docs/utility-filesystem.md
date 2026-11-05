@@ -192,6 +192,32 @@ stderr into exactly the pieces belonging to those results.
 outcomes. The normal creation result succeeds only if every creation succeeded;
 a later failure preserves earlier created directories.
 
+## mkfifo
+
+### Implementation
+
+[`DecideMode`](../bench/utils/mkfifo/Impl/MkfifoCore.dfy) resolves the optional octal
+or symbolic MODE before processing any operand.
+[`ParseMode` and `ComputeMeaning`](../bench/utils/mkfifo/Impl/MkfifoModeCore.dfy)
+use loops to parse and evaluate the expression. Symbolic modes start from `0666`;
+octal modes specify the result directly.
+`RunOperands` creates each FIFO in order. With `-m`, it sets permissions after
+successful creation; otherwise the creation contract applies the process umask.
+It continues after operand failures and retains earlier effects, including a
+FIFO whose permission change fails. Security-context options remain outside
+the [documented scope](../bench/utils/mkfifo/mkfifo.md).
+
+### Proof idea
+
+[`ModeDenotes`](../bench/utils/mkfifo/Spec/MkfifoSpec.dfy) describes valid MODE
+strings through abstract expressions, their `Render` text, and their `Meaning`.
+[`ParseModeOfRender` and `ParseModeRenders`](../bench/utils/mkfifo/Proof/MkfifoModeProof.dfy)
+connect the parser to that relation in both directions. `OperandResults` and
+`OrderedDiagnostics` require connected filesystem states and diagnostic pieces
+for every operand. [`ExtendLoop`, `AssembleRun`, and `Complete`](../bench/utils/mkfifo/Proof/MkfifoProof.dfy)
+combine those witnesses with native creation, permission, and stream contracts
+to establish the final [`RunCore`](../bench/utils/mkfifo/Impl/Mkfifo.dfy) obligation.
+
 ## mv
 
 ### Implementation
