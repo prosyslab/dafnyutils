@@ -44,10 +44,11 @@ def affected_task_ids(
             or raw_path == "src/verification.py"
             or raw_path
             in {
+                ".devcontainer/Dockerfile",
+                ".devcontainer/dafny-version.toml",
                 ".gitmodules",
                 "Makefile",
                 "pyproject.toml",
-                "dafny-version.toml",
                 "tools/generate_task_profiles.py",
             }
         ):

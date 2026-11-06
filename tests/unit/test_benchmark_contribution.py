@@ -170,11 +170,12 @@ def test_affected_selection_includes_all_tasks_for_shared_benchmark_helpers(
 @pytest.mark.parametrize(
     "path",
     (
+        ".devcontainer/Dockerfile",
+        ".devcontainer/dafny-version.toml",
         "src/analysis/client.py",
         "src/tools/contribution/checks.py",
         "src/tools/execution.py",
         "src/dafny_cli.py",
-        "dafny-version.toml",
     ),
 )
 def test_affected_selection_includes_all_tasks_for_shared_execution(

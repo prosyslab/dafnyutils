@@ -138,8 +138,7 @@ data package.
 ## Build
 
 - Use the repository's development container for builds, verification and tests.
-  It provides the pinned .NET SDK and builds the Dafny commit pinned in
-  `dafny-version.toml` (`make build-dafny`).
+  It provides the pinned .NET SDK and Dafny fork.
 - If the relevant project has a `Makefile`, use its supported build targets.
   Inspect the file and project documentation; do not invent target names.
 - Prefer existing test and verification targets when they provide the required

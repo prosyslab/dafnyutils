@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04 AS base
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -43,6 +43,8 @@ RUN apt-get update \
         python3 \
         python-is-python3 \
         python3-pip \
+        python3-pytest \
+        python3-pytest-xdist \
         python3-venv \
         ripgrep \
         rsync \
@@ -79,6 +81,35 @@ RUN if [ "$(dpkg --print-architecture)" != amd64 ]; then \
     && rm /tmp/dotnet-sdk.tar.gz \
     && ln -s "${DOTNET_ROOT}/dotnet" /usr/local/bin/dotnet \
     && test "$(dotnet --version)" = "${DOTNET_SDK_VERSION}"
+
+FROM base AS dafny-build
+
+# dafny-version.toml is the only place that records the Dafny fork URL and commit.
+COPY dafny-version.toml /tmp/dafny-version.toml
+RUN read_pin() { \
+        python3 -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))[sys.argv[2]])' \
+            /tmp/dafny-version.toml "$1"; \
+    } \
+    && repo="$(read_pin repo)" \
+    && commit="$(read_pin commit)" \
+    && [[ "${commit}" =~ ^[0-9a-f]{40}$ ]] \
+    && git init --quiet /tmp/dafny \
+    && git -C /tmp/dafny fetch --depth 1 "${repo}" "${commit}" \
+    && git -C /tmp/dafny checkout --detach FETCH_HEAD \
+    && mkdir /tmp/z3-download \
+    && cd /tmp/z3-download \
+    && make -f /tmp/dafny/Makefile z3-ubuntu \
+    && dotnet build /tmp/dafny/Source/Dafny.sln --no-incremental -m:1 -nodeReuse:false \
+        -p:UseSharedCompilation=false -p:PathMap=/tmp/dafny=/src/dafny \
+        -p:ContinuousIntegrationBuild=true -p:Deterministic=true \
+    && [[ "$(/tmp/dafny/Binaries/Dafny --version)" == *"+${commit}" ]] \
+    && test -x /tmp/dafny/Binaries/z3/bin/z3-4.16.0 \
+    && test -x /tmp/dafny/Binaries/z3/bin/z3-4.12.1
+
+FROM base
+
+COPY --from=dafny-build /tmp/dafny/Binaries /opt/dafny
+RUN ln -s /opt/dafny/Dafny /usr/local/bin/dafny
 
 ENV PATH="/home/vscode/.cargo/bin:${PATH}"
 

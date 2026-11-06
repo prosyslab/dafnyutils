@@ -36,7 +36,9 @@ and project configuration. Algorithm sources retain their flat layout. See the
 
 Use the [development container](.devcontainer/devcontainer.json) for all
 development: open this checkout in VS Code and select Dev Containers: Reopen in
-Container.
+Container. The image provides the pinned .NET SDK and Dafny fork, including its
+Z3 solvers. The Dockerfile builds the fork from the repository URL and commit in
+[`.devcontainer/dafny-version.toml`](.devcontainer/dafny-version.toml).
 
 ### Build, verify and evaluate tasks
 

@@ -1,0 +1,4 @@
+# Native Dafny fork pin; .devcontainer/Dockerfile reads it to build the image.
+# The commit must be reachable from origin/expecto. The HTTPS URL is anonymous.
+repo = "https://github.com/prosyslab/dafny.git"
+commit = "0776df27c2449bad68e9a28e687bb6c70bf4b401"
