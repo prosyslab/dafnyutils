@@ -45,3 +45,19 @@ def test_full_output_device() -> None:
             check=False,
         )
     assert (result.stderr, result.returncode) == (b"", 1)
+
+
+# Reading a directory as stdin must return failure without emitting data.
+def test_directory_input() -> None:
+    descriptor = os.open(Path(__file__).resolve().parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        result = subprocess.run(
+            ["dotnet", str(PROGRAM)],
+            stdin=descriptor,
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+    finally:
+        os.close(descriptor)
+    assert (result.stdout, result.stderr, result.returncode) == (b"", b"", 1)

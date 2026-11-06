@@ -15,5 +15,6 @@ build:
 	$(DAFNY) build $(FLAGS) --no-verify --output "$(OUTPUT_DIR)/copy.dll" \
 		CopyCli.dfy "$(REPO_ROOT)/bench/core/IOExtern.cs"
 
+# pyproject.toml deselects integration tests by default, and every test here is one.
 test: build
-	python3 -m pytest -q -n0 Tests.py
+	python3 -m pytest -q -n0 -m integration Tests.py
