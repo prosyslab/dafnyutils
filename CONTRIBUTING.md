@@ -284,7 +284,7 @@ Expected output, exit 0 (paths and build steps vary):
 
 ```text
 ...
-make[1]: Leaving directory '/workspace/bench/dafny/dafnyutils/_build/coreutils'
+make[1]: Leaving directory '/workspace/dafnyutils/_build/coreutils'
 ```
 
 This builds the pinned original utilities. It may need network access for build inputs.
@@ -299,7 +299,7 @@ Expected output, exit 0:
 
 ```text
 Dafny program verifier did not attempt verification
-make: Leaving directory '/workspace/bench/dafny/dafnyutils/bench/utils/base32'
+make: Leaving directory '/workspace/dafnyutils/bench/utils/base32'
 ```
 
 ```sh
@@ -314,7 +314,7 @@ Expected output shape, exit 0 (names and counts depend on your cases):
 Base32Tests.<case>: PASSED
 ...
 <count> passed, <count> deselected in <seconds>s
-make: Leaving directory '/workspace/bench/dafny/dafnyutils/bench/utils/base32'
+make: Leaving directory '/workspace/dafnyutils/bench/utils/base32'
 ```
 
 ```sh
