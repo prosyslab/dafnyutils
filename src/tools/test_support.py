@@ -25,6 +25,7 @@ _DAFNY_VERIFY_FLAGS = (
     "--standard-libraries:false",
     "--allow-external-contracts",
     "--dont-verify-dependencies",
+    "--boogie=/randomSeed:42",
 )
 GNULIB_DIRNAME_CLI_PATHS = (
     ".",

@@ -134,6 +134,7 @@ def test_verify_uses_ordinary_dafny_and_runtime_limits(monkeypatch: pytest.Monke
         "--standard-libraries:false",
         "--allow-external-contracts",
         "--dont-verify-dependencies",
+        "--boogie=/randomSeed:42",
         "--cores:1",
     ]
     assert calls[0][1]["cwd"] == "/tmp"
