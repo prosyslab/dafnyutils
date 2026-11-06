@@ -705,6 +705,24 @@ module CatProof {
     }
   }
 
+  // Kept outside the revealed FragmentsConcatenate context: inline, these slice
+  // facts timed out at 30 s with the gate's random seed 42.
+  lemma EqualSlicesAgreeAt(
+    first: BW.Bytes,
+    second: BW.Bytes,
+    lo: nat,
+    hi: nat,
+    index: nat
+  )
+    requires lo <= index < hi
+    requires hi <= |first| && hi <= |second|
+    requires first[lo..hi] == second[lo..hi]
+    ensures first[index] == second[index]
+  {
+    assert first[index] == first[lo..hi][index - lo];
+    assert second[index] == second[lo..hi][index - lo];
+  }
+
   lemma {:isolate_assertions} FragmentsConcatenateFunctional(
     fragments: seq<BW.Bytes>,
     first: BW.Bytes,
@@ -753,14 +771,7 @@ module CatProof {
           firstCuts[i] <= index < firstCuts[i + 1];
         assert first[firstCuts[i]..firstCuts[i + 1]] == fragments[i];
         assert second[firstCuts[i]..firstCuts[i + 1]] == fragments[i];
-        assert first[index] ==
-               first[firstCuts[i]..firstCuts[i + 1]][
-               index - firstCuts[i]
-               ];
-        assert second[index] ==
-               second[firstCuts[i]..firstCuts[i + 1]][
-               index - firstCuts[i]
-               ];
+        EqualSlicesAgreeAt(first, second, firstCuts[i], firstCuts[i + 1], index);
       }
     }
   }
