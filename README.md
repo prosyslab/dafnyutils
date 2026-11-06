@@ -66,6 +66,10 @@ make test
 This is equivalent to `make test-unit` and `python -m pytest -q`. All use the
 serial unit selection in `pyproject.toml`. The unit tier checks data models,
 selection, scaffolding and package boundaries without a native toolchain.
+Unit-dominant modules live in `tests/unit/`; fully integration-marked modules
+live in `tests/integration/`. Use the `integration` marker for real processes,
+native tools, concurrent lifecycles and multi-component workflows. Mixed modules
+can mark individual tests. Benchmark `dafny_verify` remains a separate selector.
 It normally takes seconds; expect exit 0 and a summary of this form:
 
 ```text

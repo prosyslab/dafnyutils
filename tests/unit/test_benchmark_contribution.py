@@ -9,8 +9,6 @@ from benchmarks.profiles import ResolvedBenchmark, utility_paths
 from benchmarks.repository import BenchmarkRepository
 from benchmarks.selection import affected_task_ids
 
-ROOT = Path(__file__).resolve().parents[2]
-
 
 # Utility profiles publish role directories while algorithm profiles retain flat paths.
 @pytest.mark.parametrize(
@@ -47,23 +45,6 @@ def test_profile_source_paths_follow_task_layout(
         expected = f"{directory}/{role}" if kind is BenchmarkKind.COREUTILS else directory
         assert str(Path(paths[key]).parent) == expected
     assert paths["project_config"] == f"{directory}/dfyconfig.toml"
-
-
-# Registered definitions preserve canonical IDs across utility and algorithm directory layouts.
-@pytest.mark.integration
-def test_repository_round_trips_every_registered_task() -> None:
-    repository = BenchmarkRepository.open(ROOT)
-
-    for task_id in repository.task_ids():
-        definition = repository.load_definition(task_id)
-        assert definition.task_id == task_id
-        assert repository.definition_path(task_id) == (
-            ROOT / definition.item_directory / "benchmark.yaml"
-        )
-
-    assert "cat" in repository.task_ids(BenchmarkKind.COREUTILS)
-    assert "algorithm-1" in repository.task_ids(BenchmarkKind.ALGORITHM)
-    assert "1" not in repository.task_ids()
 
 
 # Only the fixed migration baseline can use unknown legacy provenance.
@@ -139,9 +120,34 @@ def test_verified_provenance_rejects_placeholder_or_malformed_fields(
         BenchmarkSource.model_validate(source)
 
 
+@pytest.fixture
+def repository(monkeypatch: pytest.MonkeyPatch) -> BenchmarkRepository:
+    definitions = {}
+    for task_id, kind, capabilities in (
+        ("cat", "coreutils", {"gnu_reference": True, "fuzzer": True}),
+        ("algorithm-1", "algorithm", {"fixed_cases": True, "output_contract": "integer"}),
+    ):
+        definition = BenchmarkDefinition.model_validate(
+            {
+                "schema_version": "benchmark.definition.v2",
+                "task_id": task_id,
+                "kind": kind,
+                "source": {"status": "legacy-unverified", "name": "Existing task"},
+                "capabilities": capabilities,
+            }
+        )
+        definitions[task_id] = (
+            Path("/benchmark") / definition.item_directory / "benchmark.yaml",
+            definition,
+        )
+    monkeypatch.setattr(
+        BenchmarkRepository, "_definitions_by_id", lambda self: dict(sorted(definitions.items()))
+    )
+    return BenchmarkRepository(Path("/benchmark"))
+
+
 # Shared changes expand selection; item changes stay focused and algorithms use canonical IDs.
-def test_affected_task_selection_uses_manifest_families() -> None:
-    repository = BenchmarkRepository.open(ROOT)
+def test_affected_task_selection_uses_manifest_families(repository: BenchmarkRepository) -> None:
 
     assert affected_task_ids(repository, ("bench/utils/cat/Spec/CatSpec.dfy",)) == ("cat",)
     assert affected_task_ids(repository, ("bench/algorithm/1/Algorithm1Spec.dfy",)) == (
@@ -153,8 +159,9 @@ def test_affected_task_selection_uses_manifest_families() -> None:
 
 
 # Shared benchmark helpers affect every item rather than naming a nonexistent task.
-def test_affected_selection_includes_all_tasks_for_shared_benchmark_helpers() -> None:
-    repository = BenchmarkRepository.open(ROOT)
+def test_affected_selection_includes_all_tasks_for_shared_benchmark_helpers(
+    repository: BenchmarkRepository,
+) -> None:
 
     assert affected_task_ids(repository, ("tools/bench_test_support.py",)) == repository.task_ids()
 
@@ -170,8 +177,9 @@ def test_affected_selection_includes_all_tasks_for_shared_benchmark_helpers() ->
         "dafny-version.toml",
     ),
 )
-def test_affected_selection_includes_all_tasks_for_shared_execution(path: str) -> None:
-    repository = BenchmarkRepository.open(ROOT)
+def test_affected_selection_includes_all_tasks_for_shared_execution(
+    repository: BenchmarkRepository, path: str
+) -> None:
 
     assert affected_task_ids(repository, (path,)) == repository.task_ids()
 
@@ -181,15 +189,17 @@ def test_affected_selection_includes_all_tasks_for_shared_execution(path: str) -
     "path",
     ("src/tools/scaffold.py", "tools/benchmark_templates/common/Makefile"),
 )
-def test_affected_selection_ignores_authoring_tools(path: str) -> None:
-    repository = BenchmarkRepository.open(ROOT)
+def test_affected_selection_ignores_authoring_tools(
+    repository: BenchmarkRepository, path: str
+) -> None:
 
     assert affected_task_ids(repository, (path,)) == ()
 
 
 # Deleted and renamed item paths remain selected so CI fails closed on missing definitions.
-def test_affected_selection_retains_missing_deleted_or_renamed_ids() -> None:
-    repository = BenchmarkRepository.open(ROOT)
+def test_affected_selection_retains_missing_deleted_or_renamed_ids(
+    repository: BenchmarkRepository,
+) -> None:
 
     assert affected_task_ids(
         repository,
