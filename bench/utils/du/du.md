@@ -294,3 +294,18 @@ for a set of files, rather than as a measure of space consumed in the
 underlying devices.
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: apparent-size byte counts for named regular files: `-b`/`--bytes`,
+`--apparent-size --block-size=1`, `-s`/`--summarize`, several operands in argument order,
+`--help` and `--version`.
+
+Not implemented:
+
+- Default block usage without `-b`: it is rejected with an explicit benchmark diagnostic because
+  allocated block counts are not modeled.
+- Recursive directory traversal, hard-link deduplication, inode mode, dereference policy, mount
+  and device boundaries, excludes, thresholds, totals, timestamps, max-depth, and sparse-file
+  and device behavior: all are outside the current `World` metadata model.
+- `--files0-from` and NUL-delimited operand streams.

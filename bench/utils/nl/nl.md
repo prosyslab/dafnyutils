@@ -127,3 +127,21 @@ The starting number can be negative.
 Use number characters for line numbers (default 6).
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: standard input, `-` and file operands numbered as one document; `-b`/`--body-numbering`
+with `a`, `t` and `n`; `-n`/`--number-format` with `ln`, `rn` and `rz`;
+`-s`/`--number-separator`; numbers start at 1, increase by 1 and have width 6; `--help` and
+`--version`.
+
+Not implemented. These need parser coverage and semantic models for logical pages, numeric
+option parsing and regular expressions that the current `World` model does not have:
+
+- Logical page sections: input that contains a default section delimiter line (`\:\:\:`,
+  `\:\:` or `\:`) is rejected with a benchmark diagnostic and no stdout.
+- `-d`/`--section-delimiter`, `-f`/`--footer-numbering`, `-h`/`--header-numbering`,
+  `-i`/`--line-increment`, `-l`/`--join-blank-lines`, `-p`/`--no-renumber`,
+  `-v`/`--starting-line-number` and `-w`/`--number-width`.
+- The `pBRE` regular-expression numbering styles of `-b`, `-f` and `-h`, and locale-sensitive
+  regular expression and diagnostic behavior.

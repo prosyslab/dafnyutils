@@ -52,3 +52,19 @@ or a directory loop)
 ```
 
 Also see Common options.
+
+## Benchmark scope
+
+Implemented: a deterministic, verification-oriented subset over the modeled file system, in the
+UTC time zone and the C locale: `-a`, `-A`, `-d`, `-n`, `-s`, `-S`, `-t`, `-r`, `-u`, `-c`, `-H`,
+`-L`, `-R`, `--block-size`, `--time-style` (`full-iso`, `long-iso`, `iso`, `locale`, `+%s` and the
+`posix-` variants), `--help` and `--version`.
+
+Not implemented:
+
+- Terminal-width columns, color, quoting styles, ACL and security-context marks,
+  human-readable suffixes, locale collation, owner and group name lookup, indicator suffixes,
+  hyperlinks, tab stops, directory-ignore patterns, device major and minor rendering, and
+  arbitrary date-format strings (a custom `+FORMAT` other than `+%s`).
+- GNU's `?` placeholder and minor exit status for dangling entries that need metadata under a
+  name-only `-L` scan.

@@ -53,3 +53,10 @@ For compatibility `fold` supports an obsolete option syntax
 instead.
 
 ### Exit Status
+
+## Benchmark scope
+
+Not implemented:
+
+- Locale-sensitive multibyte display widths: columns are counted in the `LC_ALL=C` model.
+- Zero-width combining characters are not modeled separately from their bytes.

@@ -66,3 +66,27 @@ avoid `head`, e.g., by using `sed 5q` instead of
 `head -5`.
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: line and byte selection (`-n`, `-c`, negative counts, the GNU count suffixes and
+the obsolete first-option syntax `-[NUM][bkmclqvz]...`), `-z`, `-q`, `-v`, `--help` and
+`--version`. Counts are unbounded mathematical numbers.
+
+Not implemented. Paths below are under `coreutils/tests`:
+
+- Obsolete syntax beyond `-[NUM][bkmclqvz]...` (`head/head.pl`): unsupported trailing letters
+  produce a GNU-style diagnostic and are not modeled as selections.
+- Overflow diagnostics for very large counts (the disabled cases in `head/head.pl`): they depend
+  on GNU's `uintmax_t` overflow behavior.
+- Unbounded device input and write failures: `head -z -n-1 /dev/zero` in
+  `misc/write-errors.sh`, and `/dev/full`, closed pipes and injected EIO in
+  `head/head-write-error.sh` and `misc/io-errors.sh`. The current runner does not expose such
+  effects.
+- A stdin file offset shared across commands, memory limits for huge negative byte counts and
+  procfs/sysfs quasi-seekable files (`head/head-c.sh`); the input descriptor position after
+  `head` exits and large seekable-file positioning (`head/head-pos.sh`).
+- Internal buffering strategy and compile-time pipe assumptions (the expensive and
+  `---presume-input-pipe` variants of `head/head-elide-tail.pl`).
+- GNU's bounded reads and all ordered read, write and close phases: the whole-read API cannot
+  represent them. See [the API model limits](../../../docs/core-api.md#trust-limits-and-api-changes).

@@ -34,3 +34,16 @@ permission bits. File permissions.
 mkfifo
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: one FIFO per operand in command-line order, `-m MODE`/`--mode=MODE` with octal and
+symbolic modes, `--help` and `--version`.
+
+Not implemented:
+
+- `-Z`/`--context[=CTX]`: GNU checks whether SMACK or SELinux is enabled and then calls
+  `selabel_open`/`defaultcon`, `setfscreatecon` or `smack_set_label_for_self`
+  (`src/mkfifo.c`). `IO.dfy` has no operation for the kernel's security-module state, file
+  labels or the default creation context. Without SELinux or SMACK, GNU ignores `-Z` and warns
+  for `--context=CTX`, but that depends on kernel state the model cannot observe.

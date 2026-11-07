@@ -170,11 +170,17 @@ why it is omitted and the evidence:
 ```markdown
 ## Benchmark scope
 
-- `<option>`: not implemented. <why it is omitted, with the evidence>
+Implemented: <the options and behaviors the contribution covers, in one short paragraph>.
+
+Not implemented:
+
+- `<option>`: <why it is omitted, with the evidence>
 ```
 
-Use exactly this heading and write the section after the generated text. A
-contribution that implements everything has no scope section.
+Use exactly this heading and write the section after the generated text. The
+`Implemented:` paragraph is optional. Record only what is left out and why; leave
+out run output and test results. A contribution that implements everything has no
+scope section.
 
 Do not extend shared IO contracts or runtime adapters to add a left-out option;
 maintainers own them. Report the missing operation in the PR instead. Do not

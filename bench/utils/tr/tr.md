@@ -55,3 +55,18 @@ the last specified array, with a single occurrence of that character.
 Truncate array1 to the length of array2.
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: standard input only, with `tr SET1 SET2` translation, `tr -d SET1` deletion,
+`tr -s SET1` squeezing and `tr -d -s SET1 SET2`. Sets contain literal ASCII bytes and ordered
+ASCII ranges such as `a-z`. When `SET1` is longer than `SET2`, the last byte of `SET2` is
+reused.
+
+Not implemented. These are rejected with visible benchmark diagnostics until the formal
+specification models them:
+
+- Bracket character classes such as `[:lower:]`, equivalence classes, repeat constructs and
+  escapes.
+- Complement modes and truncate mode.
+- Locale behavior and multibyte characters.

@@ -441,3 +441,28 @@ This option is mutually exclusive with the `--preserve=context`
 option, and overrides the `--preserve=all` and `-a` options.
 
 ### Exit Status
+
+## Benchmark scope
+
+Not implemented. Each item needs an observation or operation that `IO.dfy` does not provide:
+
+- Preservation of ownership, extended attributes, security contexts, sparse allocation and
+  reflink allocation. Archive mode and ordinary `-p` are left out with them; disabling these
+  preservations is supported.
+- Interactive replacement: there is no interactive input observation.
+- `--debug`: the exact GNU text depends on copy-backend decisions (offload attempts, reflink
+  outcomes, `SEEK_HOLE` versus zero scanning; `src/copy.c:emit_debug`) that `ReadFile` and
+  `WriteFile` do not expose.
+- Recursive replication of FIFOs, block and character devices and sockets, and copying FIFO
+  content. `CreateSpecialNodeSpec` does not guarantee the created kind, the new namespace entry
+  or the preservation of other entries and aliases; block and character devices also lack the
+  source `st_rdev`; sockets have no creation constructor; FIFO content needs an endpoint
+  protocol instead of finite file reads.
+- Atomic forced-link replacement (`src/force-link.c`) needs an entropy observation for its
+  temporary name. Left out are an effective force combined with explicit hard or symbolic link
+  replacement, and replacement of a later destination through the remembered-alias path,
+  including preserved aliases and the `--update=older` skipped-alias case. Ordinary forced data
+  copy, ordinary links and alias preservation into fresh destination names are supported.
+- Backup basenames that need GNU's truncation: `pathconf(_PC_NAME_MAX)`
+  (`lib/backupfile.c:check_extension`) is not observable.
+- Requested set-ID bits on created files, because Linux writes can clear them.

@@ -109,3 +109,13 @@ many fields and want to print all but a few of them.
 cut
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: `-b`/`--bytes`, `-c`/`--characters` (modeled with the byte-position semantics of
+`-b`), `--complement`, `-n` (accepted and ignored), `--output-delimiter`, `-z`/`--zero-terminated`,
+`--help` and `--version`.
+
+Not implemented:
+
+- Field selection: `-f`/`--fields`, `-d`/`--delimiter` and `-s`/`--only-delimited`.

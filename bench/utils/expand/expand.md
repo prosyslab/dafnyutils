@@ -43,3 +43,9 @@ Only convert initial tabs (those that precede all non-space or non-tab
 characters) on each line to spaces.
 
 ### Exit Status
+
+## Benchmark scope
+
+Not implemented:
+
+- Locale-sensitive multibyte display width: the benchmark counts byte columns in `LC_ALL=C`.

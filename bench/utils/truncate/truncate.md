@@ -55,3 +55,24 @@ the size of each file based on its current size:
 ```
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: decimal absolute sizes from 0 through `9223372036854775807`, the six relative size
+modifiers, the GNU size suffixes, `-c`/`--no-create`, `-o`/`--io-blocks`,
+`-r`/`--reference`, `-s`/`--size`, long-option abbreviations, option permutation, `--`, `--help`
+and `--version`. Regular files, hard-link aliases, symbolic links including dangling ones,
+repeated operands and continuing after operand failures are in scope, as are directory, missing
+path, symlink-loop, access-control and size-limit failures. No GNU option is left out because of
+`IO.dfy`; only the environments below are.
+
+Not implemented:
+
+- Descriptor-specific injected faults and concurrent path replacement: there is no descriptor
+  open, `fstat`, `lseek`, `ftruncate` or close interface, so path-based metadata cannot
+  reproduce a descriptor kept across a rename, and `CreateFile` combines open and close into
+  one result.
+- Devices, FIFOs, sockets and seeking in nonregular reference files.
+- Overlong reference pathnames: `GetFileStatus` maps native `ENAMETOOLONG` to `ENOENT`.
+- Signal delivery and externally closed output pipes: the IO interface returns errno outcomes,
+  not process signals.

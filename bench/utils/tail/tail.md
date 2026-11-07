@@ -234,3 +234,21 @@ main.c; avoid `tail -c 4`, since it might mean either tail
 mean either `tail ./+4` or `tail -n +4`.
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: line and byte selection (`-n`, `-c`, `+NUM`, the GNU count suffixes through exa
+scale and the leading obsolete forms `-NUM`, `+NUM`, `-NUMl`, `-NUMc` and `-NUMb`), `-z`, `-q`,
+`--silent`, `-v`, `--help` and `--version`, for finite byte streams. A close failure after
+reading keeps the selected bytes and header and reports `tail: error reading`.
+
+Not implemented:
+
+- Follow mode: `-f`/`--follow`, PID waiting, retry and inotify behavior are outside the finite
+  `World` input model. Obsolete forms with follow markers, such as `-1f`, are also left out.
+- The `Z`, `Y`, `R` and `Q` count suffix families, which overflow on the reference platform for
+  nonzero counts.
+- Sparse files, special devices, procfs and sysfs, descriptor-position effects and huge seek
+  stress cases: they need host effects that `World` does not represent.
+- All ordered native read, write and close phases: the whole-read API cannot represent them.
+  See [the API model limits](../../../docs/core-api.md#trust-limits-and-api-changes).

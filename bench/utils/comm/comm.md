@@ -89,3 +89,23 @@ $ comm -12 file1 file2 | wc -l # number of lines common to both files
 ```
 
 comm
+
+## Benchmark scope
+
+Implemented: the sorted byte-record subset in the C locale: two operands with at most one
+`-`, `-1`, `-2`, `-3`, `-z`/`--zero-terminated`, `--output-delimiter`, `--total`, `--help`
+and `--version`.
+
+Not implemented:
+
+- Repeated standard input operands (`comm - -`) are rejected with a benchmark diagnostic. GNU
+  reads standard input twice and can report a file-descriptor error after partial output; the
+  `World` model represents standard input as a consumable byte stream, not as a reusable
+  descriptor.
+- GNU's sortedness diagnostics: default disorder detection, `--check-order` and
+  `--nocheck-order`. Unsorted input is rejected without GNU's partial output and file-specific
+  diagnostics. Upstream cases are `ooo`, `ooo2`, `ooo3`, `ooo4`, `ooo5`, `ooo5b`, `ooo5c`,
+  `ooo6`, `ooo7` and `ooo-prefix` in `coreutils/tests/misc/comm.pl`.
+- Locale-sensitive collation and multibyte behavior: lines are ordered by bytes.
+- Host write failures and low-level IO faults: output goes through the shared `World` stdout and
+  stderr transitions.

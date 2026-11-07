@@ -62,3 +62,14 @@ During decoding, ignore unrecognized bytes,
 to permit distorted data to be decoded.
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: standard input, `-` or one named file; encoding; `-d`/`--decode`;
+`-i`/`--ignore-garbage` while decoding; `-w`/`--wrap` (`-w 0` disables wrapping).
+
+Not implemented:
+
+- The broader `basenc` alphabet family.
+- Streaming memory stress behavior for very large inputs.
+- Exact partial-output diagnostics for every malformed decode edge case.

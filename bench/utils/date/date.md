@@ -34,3 +34,21 @@ is not set. TZ Variable,, Specifying the Time Zone with
 `TZ`, libc, The GNU C Library Reference Manual.
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: `-r`/`--reference`, `-d`/`--date` through the trusted gnulib date parser, the UTC
+spellings, `-I`/`--iso-8601`, `-R`/`--rfc-email`, `--rfc-3339`, and formats made of literal
+characters, the plain `strftime` directives and the UTC forms `%:z`, `%::z` and `%:::z`. The
+environment is GNU/Linux with glibc, the C locale and `TZ=UTC0`. This is a bounded expansion of
+the required minimum, not full GNU `date` equivalence.
+
+Not implemented:
+
+- Current-time nanoseconds: `Now` observes whole seconds only, so formats that need the `%N` of
+  the current time are outside scope. Reference and parsed instants keep their nanoseconds.
+- `--resolution` (clock resolution), `--debug` (parser diagnostic trace), `--set` and the legacy
+  numeric clock-setting operand (system clock mutation), and locale or non-UTC formatting.
+- Format flags, widths and the `E` and `O` modifiers, and `--file` batch conversion. These are
+  implementation and proof work, not `IO.dfy` gaps.
+- Long option aliases that share a prefix: the fixed parser's ambiguity rule applies.

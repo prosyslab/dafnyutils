@@ -195,3 +195,13 @@ tar chof - "$tardir" \
 ```
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: `-a`/`--append`, `-i`/`--ignore-interrupts` (parsed as a no-op), `--help`,
+`--version` and any number of regular output file operands.
+
+Not implemented:
+
+- Signal handling for `-i`: the `World` model has no signals.
+- Signal delivery and the optional `--output-error` policies.

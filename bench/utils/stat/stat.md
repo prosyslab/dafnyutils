@@ -212,3 +212,18 @@ the `TZ` environment variable, or by the system default rules if
 with `TZ`, libc, The GNU C Library Reference Manual.
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: `-c`/`--format`, with the last format winning and one newline after each result;
+`-L`/`--dereference`; several operands in command-line order; `--help` and `--version`. The
+supported format directives are `%a`, `%b`, `%B`, `%d`, `%D`, `%f`, `%g`, `%u`, `%h`, `%i`, `%o`,
+`%s`, `%X`, `%Y`, `%Z` and `%%`. Any other directive prints `?`, and a trailing `%` prints `%`.
+
+Not implemented:
+
+- The default output format: `-c` is required.
+- The `-` operand (metadata of the standard input descriptor).
+- User and group name lookup.
+- Width, precision and format flags.
+- Human-readable times, birth time, and the real values of filesystem-specific directives.

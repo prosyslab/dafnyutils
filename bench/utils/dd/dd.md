@@ -491,3 +491,26 @@ On systems lacking the `INFO` signal `dd` responds to the
 environment variable is set.
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: finite captured standard input copied to standard output with an explicit
+`status=none`; `bs=`, `ibs=`, `obs=`, `count=` (with `iflag=count_bytes`) and the GNU size
+suffixes; `iflag=fullblock`; `conv=lcase`, `conv=ucase`, `conv=swab` and `conv=sync`; `cbs=N` is
+validated.
+
+Not implemented. A valid GNU operand outside this scope gets an explicit benchmark-scope
+diagnostic, which makes no claim of GNU parity:
+
+- File operands and descriptor flags: `dd` opens and truncates the output before copying, keeps
+  descriptors across reads and can seek them. Whole-file `ReadFile` and `WriteFile` cannot
+  express that failure ordering.
+- `skip`, `seek` and their aliases, record and character-set conversions (`conv=block`,
+  `conv=unblock` and the other conversions that use `cbs=N`), sparse output, `noerror`, physical
+  synchronization, and descriptor cache and permission flags.
+- Transfer statistics: the default statistics and `status=progress` use clock values that
+  `IO.dfy` does not provide, so copying requires an explicit `status=none`. `status=noxfer` is
+  pending exact record-count reporting. Help, version and parse errors do not need
+  `status=none`.
+- Interactive, infinite or device input, injected asynchronous or late failures, concurrent
+  changes, forced resource exhaustion and signal-driven statistics.

@@ -138,3 +138,31 @@ compared.
 uniq
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: adjacent-line grouping of newline-delimited records from standard input or one
+input operand (`-` reads standard input); the output operand `-`; the default mode; `-c`/`--count`;
+`-d`/`--repeated`; `-u`/`--unique`; `-d -u` together; `-i`/`--ignore-case` with ASCII case
+folding; `--help` and `--version`.
+
+Not implemented. Upstream paths are under `coreutils/tests`:
+
+- `-f`/`--skip-fields`, traditional `-N`, `-s`/`--skip-chars`, traditional `+N` and
+  `-w`/`--check-chars`; a `+N` operand is rejected as unsupported. They need field and
+  character skipping, width-limited comparison, obsolete option syntax, overflow handling and
+  multibyte character counting (`uniq/uniq.pl` cases `obs30`, `31`-`65`, `91`-`94`,
+  `121`-`122`, and `uniq/uniq-perf.sh`).
+- `-z`/`--zero-terminated`, which needs NUL-delimited record parsing and NUL output delimiters
+  (`uniq/uniq.pl` cases `2z`-`20z`, `123`-`124` and the generated `*-z` variants).
+- `-D`/`--all-repeated[=METHOD]` and `--group[=METHOD]`, which need delimiter modes,
+  all-repeated output, invalid-delimiter diagnostics and mutual-exclusion checks with `-c`, `-d`
+  and `-u` (`uniq/uniq.pl` cases `110`-`119` and `128`-`145`, and `misc/option-aliases.sh`).
+- Output operands other than `-`: GNU writes to the named file, including truncation and
+  output-is-input handling (the `triple_test` file-output variants of `uniq/uniq.pl`). That
+  needs `World` file write and truncation effects.
+- Locale-sensitive collation, locale blank classification and multibyte character and case
+  behavior (`uniq/uniq-collate.sh`, the `schar` case of `uniq/uniq.pl`, and the generated
+  `*-mb` and `w1-mb` cases).
+- Write failures and injected host IO faults, which need `/dev/full`, closed pipes or injected
+  EIO (`misc/io-errors.sh` and `misc/write-errors.sh`).

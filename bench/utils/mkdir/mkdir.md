@@ -67,3 +67,21 @@ Print a message for each created directory. This is most useful with
 mkdir
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: one directory per operand in command-line order, `-v`/`--verbose`, `--help`
+and `--version`.
+
+Not implemented. Each option needs a process-state operation that `IO.dfy` does not provide:
+
+- `-p`/`--parents`: GNU computes an ancestor umask with the owner write and search bits cleared
+  and sets it while creating ancestors (`src/mkdir.c`). `IO.dfy` has `GetUmask` but no setter.
+  Creating and then calling chmod would add a failure and partial-effect point that GNU does not
+  have.
+- `-m`/`--mode`, numeric and symbolic: GNU calls `umask(0)` and sets an adjusted mask so that
+  explicit mode bits survive the original umask. `CreateDirectory` always uses the actual process
+  umask, and a post-creation chmod would add a non-GNU error point.
+- `-Z`/`--context[=CTX]`: `IO.dfy` has no SELinux or SMACK enablement, label,
+  default-creation-context or restoration operation, so the kernel-dependent warnings and label
+  effects cannot be specified.

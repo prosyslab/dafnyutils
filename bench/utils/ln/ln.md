@@ -234,3 +234,17 @@ Better Example:
 ln -s afile anotherfile
 ln -s ../adir/afile yetanotherfile
 ```
+
+## Benchmark scope
+
+Implemented: hard links and symbolic links (`-s`/`--symbolic`) with one source and an implicit
+link name, two operands with a directory destination, or several sources and a final target
+directory operand; `--help` and `--version`. A symbolic link stores the raw `SOURCE` string.
+
+Not implemented:
+
+- Every other option, including `-f`/`--force`, `-i`/`--interactive`, `-b`/`--backup`,
+  `-S`/`--suffix`, `-L`/`--logical`, `-P`/`--physical`, `-n`/`--no-dereference`,
+  `-r`/`--relative`, `-t`/`--target-directory`, `-T`/`--no-target-directory` and
+  `-v`/`--verbose`. The option parser declares only `-s`, `--symbolic`, `--help` and
+  `--version`.

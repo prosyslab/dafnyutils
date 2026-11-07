@@ -116,3 +116,11 @@ $ paste -d '%_' num2 let3 num2
 paste
 
 ### Exit Status
+
+## Benchmark scope
+
+Not implemented:
+
+- Terminal text and binary mode distinctions on non-Unix platforms.
+- Locale-sensitive diagnostics beyond the deterministic `LC_ALL=C` environment.
+- Detailed host filesystem effects that the `World` model does not represent.

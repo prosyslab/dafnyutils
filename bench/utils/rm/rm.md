@@ -133,3 +133,25 @@ The Unix `rm` program's use of a single `-` for this purpose
 predates the development of the `getopt` standard syntax.
 
 ### Exit Status
+
+## Benchmark scope
+
+Implemented: `-f`/`--force`, `-v`/`--verbose`, `-d`/`--dir`, `-r`/`-R`/`--recursive`,
+`--one-file-system`, `--preserve-root[=all]`, `--no-preserve-root` (full spelling only),
+`--interactive=never|no|none`, `--help` and `--version`. Once-only interaction (`-I` or
+`--interactive=once`) is supported only when GNU does not prompt: at most three operands and no
+recursion.
+
+Not implemented:
+
+- Effective prompting with operands: `-i`, `--interactive[=always|once|yes]`, once-only
+  interaction when its prompt is required, and the terminal write-protection prompts enabled by
+  the internal `---presume-input-tty` switch. The model has neither `isatty` nor a
+  line-at-a-time answer input that preserves the unconsumed input suffix; `ReadStdin` consumes
+  the whole stream and cannot implement GNU `yesno()`. An effective `-f` or `--interactive=never`
+  still cancels these prompts in either option order. An interactive command that would prompt
+  reports a scope diagnostic.
+- Recursive traversal that needs paths beyond `PATH_MAX`, and concurrent renames or namespace
+  replacement: the API uses whole path strings, not descriptor-relative operations.
+- GNU's filesystem-type-dependent inode ordering for directories with more than 10,000 entries:
+  `gnulib/lib/fts.c` selects it with `fstatfs`, and `IO.dfy` has no filesystem-type query.
