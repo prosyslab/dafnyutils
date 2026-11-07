@@ -290,6 +290,7 @@ pub(crate) static UTILITY_CAPABILITIES: &[UtilityCapability] = &[
         option_value_flags: &["-d", "--delimiters"],
         ..capability!("paste", paste)
     },
+    capability!("pathchk", pathchk),
     capability!("printenv", printenv),
     capability!("printf", printf),
     capability!("pwd", pwd),
@@ -544,8 +545,8 @@ mod tests {
             BTreeSet::from([
                 "cat", "chmod", "comm", "cp", "csplit", "cut", "date", "dd", "du", "expand",
                 "head", "join", "link", "ln", "ls", "mkdir", "mkfifo", "mv", "nl", "paste",
-                "readlink", "realpath", "rm", "rmdir", "stat", "tail", "touch", "truncate",
-                "tsort", "uniq", "unlink", "wc",
+                "pathchk", "readlink", "realpath", "rm", "rmdir", "stat", "tail", "touch",
+                "truncate", "tsort", "uniq", "unlink", "wc",
             ])
         );
     }
