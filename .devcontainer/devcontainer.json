@@ -8,6 +8,11 @@
   "containerUser": "vscode",
   "updateRemoteUserUID": true,
   "init": true,
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1.10.1": {
+      "moby": false
+    }
+  },
   "workspaceFolder": "/workspace/dafnyutils",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/dafnyutils,type=bind",
   "containerEnv": {

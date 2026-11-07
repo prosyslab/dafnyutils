@@ -46,6 +46,10 @@ Use the [development container](README.md#development-environment) for every
 command in this guide, including the scaffold command below. Run them from this
 repository's root.
 
+The container mounts the host's Docker socket because the fuzzer and `check` start
+containers on the host's Docker. Any process in the container can therefore control
+the host's Docker, so use it only on a machine where you accept that.
+
 ### Find the right files
 
 | Path | Purpose |
