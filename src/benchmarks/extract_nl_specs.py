@@ -14,6 +14,7 @@ from benchmarks.repository import BenchmarkRepository
 MACRO_RE = re.compile(r"@([A-Za-z]+)\{([^{}]*)\}")
 CODE_LIKE_MACROS = {"command", "option", "file", "code", "samp", "env", "url", "w"}
 TEXT_LIKE_MACROS = {"var", "dfn", "xref", "pxref", "ref"}
+SCOPE_HEADING = "## Benchmark scope"
 HEADING_PREFIXES = (("@section ", "##"), ("@subsection ", "###"))
 CODE_BLOCK_STARTS = {"@example", "@smallexample", "@display"}
 CODE_BLOCK_ENDS = {"@end example", "@end smallexample", "@end display"}
@@ -419,6 +420,16 @@ def convert_texinfo_to_markdown(section_lines: list[str]) -> list[str]:
     return _compact_blank_lines(out)
 
 
+def keep_scope_section(generated: str, existing: str | None) -> str:
+    """Append the hand-written scope section of the existing description to a new one."""
+    if existing is None:
+        return generated
+    start = existing.find(f"\n{SCOPE_HEADING}\n")
+    if start < 0:
+        return generated
+    return generated.rstrip("\n") + "\n" + existing[start:]
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -490,7 +501,9 @@ def main(argv: list[str] | None = None) -> int:
             "`python3 -m benchmarks.extract_nl_specs`.",
             "",
         ]
-        out_path.write_text("\n".join(header + markdown_lines) + "\n", encoding="utf-8")
+        generated = "\n".join(header + markdown_lines) + "\n"
+        existing = out_path.read_text(encoding="utf-8") if out_path.is_file() else None
+        out_path.write_text(keep_scope_section(generated, existing), encoding="utf-8")
         print(f"[ok] wrote {out_path}")
 
     return 0
