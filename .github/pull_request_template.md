@@ -30,7 +30,7 @@ options were left out for this reason.
 ## 1. Test results
 
 Run the commands below from the Dafnyutils root in the
-[development container](../README.md#development-environment).
+[development container](../README.md#setup).
 Replace `<utility_name>` with your utility name before running each command.
 
 ```sh

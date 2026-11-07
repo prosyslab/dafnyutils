@@ -1,4 +1,4 @@
-# Standalone benchmark checks and local toolchain builds; see README.md.
+# Standalone benchmark checks and local toolchain builds.
 
 .PHONY: test test-unit test-integration test-final build-coreutils clean
 

@@ -42,7 +42,7 @@ commands for checking both the proof and the executable.
 
 ### Set up your checkout
 
-Use the [development container](README.md#development-environment) for every
+Use the [development container](README.md#setup) for every
 command in this guide, including the scaffold command below. Run them from this
 repository's root.
 

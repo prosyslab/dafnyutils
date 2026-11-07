@@ -61,7 +61,7 @@ warn_if_docker_unreachable() {
     docker info > /dev/null 2>&1 && return
     printf '%s\n' \
         'Warning: the host Docker daemon is not reachable from this container.' \
-        'Fuzzing needs it; see "Development environment" in README.md.' >&2
+        'Fuzzing needs it; see "Set up your checkout" in CONTRIBUTING.md.' >&2
 }
 
 section() {

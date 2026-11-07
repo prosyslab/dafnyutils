@@ -21,96 +21,15 @@ Follow [repository instructions](AGENTS.md), [bench rules](bench/AGENTS.md) and 
 
 ## Setup
 
-Develop benchmark definitions and Python tools in this checkout. The installed
-`benchmarks` package provides definitions, discovery and selection;
-[`python3 -m tools.scaffold`](src/tools/scaffold.py) creates new contribution files.
-The local `tools` package runs contributor validation, task builds,
-proofs and GNU comparison tests without another first-party repository.
+Use the [development container](.devcontainer/devcontainer.json) for every command
+in this repository. In VS Code, select Dev Containers: Reopen in Container.
+
+## Repository structure
 
 Utility Dafny sources live under `bench/utils/<utility>/Spec/`, `Impl/` and
 `Proof/`. The task directory retains its manifest, description, tests, Makefile
 and project configuration. Algorithm sources retain their flat layout. See the
 [source responsibilities](docs/benchmark-layout.md) for details.
-
-### Development environment
-
-To contribute, build the [development container](.devcontainer/devcontainer.json)
-(in VS Code, select Dev Containers: Reopen in Container) and run every command in it.
-
-### Build, verify and evaluate tasks
-
-From this repository, use `make -C bench/utils/cat build`,
-`make -C bench/utils/cat test` or `make -C bench/utils/cat verify`
-for a utility's individual stages. Use
-`python3 -m tools.contribution validate cat` to check its YAML/schema,
-source metadata, required files and paths, and
-`python3 -m tools.contribution check cat` for the local contributor gate.
-The gate builds the task and required GNU reference, checks runtime-test JUnit
-evidence, runs 20 generated cases with seed 1 when required, verifies project
-Dafny sources and runs marked proof tests. It does not perform native analysis
-of entry contracts or generate public task profiles. Integration grading and
-scoring remain separate. These task checks are separate from development tests.
-The complete gate uses the default `_build/` directory. Unset `BUILD_DIR` or set
-it to `_build` before running `check`; custom build paths are rejected so task,
-reference and native helper artifacts cannot come from different builds.
-
-## Developer test tiers
-
-Run the serial unit suite during development:
-
-```sh
-make test
-```
-
-This is equivalent to `make test-unit` and `python -m pytest -q`. All use the
-serial unit selection in `pyproject.toml`. The unit tier checks data models,
-selection, scaffolding and package boundaries without a native toolchain.
-Unit-dominant modules live in `tests/unit/`; fully integration-marked modules
-live in `tests/integration/`. Use the `integration` marker for real processes,
-native tools, concurrent lifecycles and multi-component workflows. Mixed modules
-can mark individual tests. Benchmark `dafny_verify` remains a separate selector.
-It normally takes seconds; expect exit 0 and a summary of this form:
-
-```text
-...
-<count> passed, <count> deselected in <seconds>s
-```
-
-Run integration tests only for final validation after implementation and routine
-checks. This tier checks the registered benchmark definitions using the same
-standalone dependencies; it does not execute benchmark programs or proofs.
-Duration depends on the number of definitions. Expect exit 0 and passed data
-integration cases:
-
-```sh
-make test-integration
-```
-
-```text
-...
-<count> passed, <count> deselected in <seconds>s
-```
-
-To run both tiers in order, use the following. Duration is the sum of the two
-tiers; expect exit 0 with both summaries:
-
-```sh
-make test-final
-```
-
-```text
-...
-<count> passed, <count> deselected in <seconds>s
-...
-<count> passed, <count> deselected in <seconds>s
-```
-
-Benchmark oracle tests remain task-scoped and separate from development tiers.
-For example, `make -C bench/utils/cat test` selects
-`bench/utils/cat/Tests.py` through local `tools` helpers. Required
-contributor evidence is described in the contribution guide.
-
-## Repository structure
 
 ```text
 dafnyutils/
