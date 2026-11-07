@@ -85,7 +85,7 @@ RUN if [ "$(dpkg --print-architecture)" != amd64 ]; then \
 FROM base AS dafny-build
 
 # dafny-version.toml is the only place that records the Dafny fork URL and commit.
-COPY dafny-version.toml /tmp/dafny-version.toml
+COPY .devcontainer/dafny-version.toml /tmp/dafny-version.toml
 RUN read_pin() { \
         python3 -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))[sys.argv[2]])' \
             /tmp/dafny-version.toml "$1"; \
@@ -118,6 +118,11 @@ RUN usermod --shell /usr/bin/zsh vscode \
 
 USER vscode
 
-# The differential checker is built with the Rust toolchain.
-RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \
-    && /home/vscode/.cargo/bin/rustup component add clippy rustfmt
+# The differential checker is built with the Rust toolchain. rust-toolchain.toml is the only
+# place that records its version, profile and components, so install exactly what it pins and
+# make that toolchain the default outside the repository too.
+COPY --chown=vscode:vscode rust-toolchain.toml /tmp/rust-pin/rust-toolchain.toml
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none \
+    && cd /tmp/rust-pin \
+    && rustup toolchain install \
+    && rustup default "$(rustup show active-toolchain | cut -d' ' -f1)"

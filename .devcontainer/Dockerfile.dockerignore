@@ -1,0 +1,4 @@
+# The build context is the repository root, but the image copies only these pin files.
+*
+!.devcontainer/dafny-version.toml
+!rust-toolchain.toml

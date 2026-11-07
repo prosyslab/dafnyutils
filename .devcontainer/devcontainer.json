@@ -1,7 +1,8 @@
 {
   "name": "Dafnyutils problem data (Ubuntu 24.04)",
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "context": ".."
   },
   "remoteUser": "vscode",
   "containerUser": "vscode",
