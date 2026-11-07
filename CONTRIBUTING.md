@@ -320,9 +320,9 @@ The command exits 0 only after every required check completes. Run it after the
 utility is complete; the untouched scaffold is not a passing example.
 
 The gate runs the stages above itself, so you need not run them first. It also runs
-the marked proof tests in `Tests.py` and 20 generated cases with seed 1 in a
-container on the host's Docker. If the host has no fuzz image, the first run builds
-it, which takes a few minutes.
+the marked proof tests in `Tests.py` and the PR fuzz campaign (seeds `1,7,19`,
+1,000 iterations each) in a container on the host's Docker. If the host has no
+fuzz image, the first run builds it, which takes a few minutes.
 
 - Required checks are `impl_layout`, `implementation_tests`, `fuzzer`,
   `proof_layout` and `dafny_verify`, defined in [checks.py](src/benchmarks/checks.py).
@@ -480,7 +480,7 @@ Report evidence in **tests → fuzzing → verification** order. Copy and paste 
 - **Fuzzing:** For each affected coreutils utility, run the command in the PR template. Replace `<utility_name>` with your utility name. Keep seeds `1,7,19` and **1,000 iterations per seed**. Every requested iteration must match, with zero mismatches, timeouts, incomplete coverage or other errors. Paste the full stdout from the command into one block without changes. No file attachments are needed. Include stderr in the comparison and use the same code revision. Fixed JSON cases do not meet this requirement. Record failed runs and fixes too.
 - **Verification:** Show Dafny stdout with verified/error/timeout counts and the verified files, their included files, and whether termination was proved. Also report definition/layout checks and the final contribution gate. A build is not proof verification.
 
-The short automatic gate currently runs 20 fuzz cases with seed 1; it does not satisfy the separate PR requirement of three campaigns with at least 1,000 iterations each. See [Collect PR evidence](docs/fuzzing.md#collect-pr-evidence) for the command.
+The gate runs the same fuzz campaign, but its output is mixed with the other stages. Run the command in [Collect PR evidence](docs/fuzzing.md#collect-pr-evidence) separately and paste its stdout.
 Paste the actual output directly into the PR; example output in a guide is not
 run evidence. Never include credentials or restricted evaluator payloads.
 

@@ -88,10 +88,10 @@ def check_commands(root: Path, definition: BenchmarkDefinition) -> tuple[CheckCo
                     "tools/coreutils_fuzzer/run.py",
                     "fuzz",
                     definition.task_id,
+                    "--seeds",
+                    "1,7,19",
                     "--iterations",
-                    "20",
-                    "--seed",
-                    "1",
+                    "1000",
                 ),
             ),
         )

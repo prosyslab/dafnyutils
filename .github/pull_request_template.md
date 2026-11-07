@@ -51,7 +51,7 @@ Paste actual test stdout here, including the final result summary.
 
 ## 2. Fuzzing results
 
-For **each affected coreutils utility**, run generated campaigns with **three distinct seeds and at least 1,000 completed iterations per seed** (at least 3,000 total). All requested iterations must match, with **zero mismatches, timeouts, incomplete coverage and other errors**, and each run must exit 0. Use the same revision and full comparison settings, including stderr. A fixed JSON case set, repeating one seed, an early-stopped run or the short automatic contribution gate does not satisfy this requirement.
+For **each affected coreutils utility**, run generated campaigns with **three distinct seeds and at least 1,000 completed iterations per seed** (at least 3,000 total). All requested iterations must match, with **zero mismatches, timeouts, incomplete coverage and other errors**, and each run must exit 0. Use the same revision and full comparison settings, including stderr. A fixed JSON case set, repeating one seed, an early-stopped run or the output of the contribution gate does not satisfy this requirement.
 
 Run this command from the repository root with Docker available after
 building the utility. Replace `<utility_name>` with your utility name.
@@ -110,7 +110,7 @@ make -C 'bench/utils/<utility_name>' final-check
 Report the output and exit code for each command. Keep the results separate.
 Local validation checks metadata, files and paths; it does not analyze the
 entry contract. The local gate builds and runs runtime/proof tests and the
-required short fuzzer check. Public-profile generation and native analysis are
+required fuzzer check. Public-profile generation and native analysis are
 maintainer integration checks, separate from this contributor workflow.
 
 - Exact verification command and exit code:

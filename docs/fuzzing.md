@@ -218,8 +218,8 @@ and every error count is zero.
 
 **Things that do not count**
 
-- The fuzzer check inside `make -C bench/utils/<utility> final-check`
-  (20 cases, seed 1).
+- The fuzzer check inside `make -C bench/utils/<utility> final-check`. It runs the
+  same campaign, but its output is mixed with the other stages.
 - A fixed JSON case set or regression suite. Those are separate checks.
 - Picking three favorable seeds while leaving out failing ones.
 - Missing output. A setup failure may stop before any Results section appears;
