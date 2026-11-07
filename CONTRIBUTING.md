@@ -335,7 +335,8 @@ Dafny program verifier finished with <count> verified, 0 errors
 
 These commands check compilation, executable behavior and proof separately.
 The local verifier selects all project `.dfy` files directly, verifies included
-files, disables standard libraries and supplies explicit core dependencies.
+files, disables standard libraries, fixes the Boogie random seed to 42 and
+supplies explicit core dependencies.
 It does not inherit the project's `no-verify = true` build setting.
 A build is not verification, and matching a finite test set is not proof of the
 specification. On a timeout, locate the expensive condition and add local proof

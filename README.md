@@ -271,8 +271,10 @@ Dafny program verifier finished with 10 verified, 0 errors
 ```
 
 The target uses `--verify-included-files` to check all five `Copy*.dfy` files.
-It uses the repository's `--library` setting for `bench/core`: those existing
-contracts are assumptions of this example, not newly proved native IO code.
+It fixes the Boogie random seed to 42, as the task verifier does, so the same
+sources give the same result on every run. It uses the repository's `--library`
+setting for `bench/core`: those existing contracts are assumptions of this
+example, not newly proved native IO code.
 Dafny warns that these are source-library files. The target allows those warnings,
 as the repository's utility verifier does. It does not skip any example proof.
 

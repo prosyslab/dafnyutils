@@ -7,7 +7,7 @@ FLAGS := --standard-libraries:false
 .PHONY: verify build test
 
 verify:
-	$(DAFNY) verify $(FLAGS) --verify-included-files \
+	$(DAFNY) verify $(FLAGS) --verify-included-files --boogie=/randomSeed:42 \
 		--library:$(REPO_ROOT)/bench/core --allow-warnings CopyCli.dfy
 
 build:

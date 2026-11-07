@@ -75,7 +75,7 @@ Run this check from the Dafnyutils root in the development container.
 ```sh
 # Expected duration: Estimated 1–10 sec for this small client after tool installation.
 # Success criteria: Exit 0 and zero verification errors.
-dafny verify --standard-libraries:false tools/fixtures/contributor/StreamCopy.dfy
+dafny verify --standard-libraries:false --boogie=/randomSeed:42 tools/fixtures/contributor/StreamCopy.dfy
 ```
 
 This checks only the client contract, not the native build, GNU `cat` parity or
