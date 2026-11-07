@@ -362,6 +362,23 @@ Follow the surrounding code and reuse existing helpers before adding new ones. K
 
 Use Python 3.12 or newer, four-space indentation, and the 100-character line length configured in [pyproject.toml](pyproject.toml). Add type annotations to new interfaces. Ruff checks include import order and complexity; the configured complexity limit is 10.
 
+Format your change from the repository root before you push:
+
+```sh
+make fmt
+```
+
+The command exits 0. `ruff` and `cargo fmt` rewrite files in place, and the counts vary:
+
+```text
+<count> files left unchanged
+All checks passed!
+```
+
+It runs `ruff format`, `ruff check --fix` and `cargo fmt` on the whole repository.
+It runs `dafny format` only on the `.dfy` files you changed or added. Fixes that
+`ruff check --fix` cannot apply are printed but do not fail the command.
+
 The [CI checks](.github/workflows/checks.yml) run only Python formatting, Python
 lint, and Rust formatting on pull requests and pushes to `main`. Run the same
 checks from the repository root:
@@ -380,9 +397,9 @@ the development container and CI. Python checks use the exclusions in
 CI does not run tests, Pyright, Dafny verification, or benchmark checks. Run the
 applicable validation described in this guide and include its evidence in PRs.
 
-If you enable the optional Git hook, it formats Dafny only when `.dfy` files are
-staged. Python and documentation changes use Ruff and the standalone unit suite.
-Staged Dafny changes still require an installed native Dafny formatter.
+If you enable the optional Git hook, it formats staged `.dfy` and `.py` files and
+then runs the standalone unit suite. Staged Dafny changes still require an installed
+native Dafny formatter.
 
 - Import a name from the module that defines it. For example, use `from benchmarks.definition import BenchmarkKind`, not a package-root re-export.
 - Keep `__init__.py` empty. Do not use wildcard imports, `__all__`, `importlib` or import tricks to avoid redesigning a cyclic dependency.
