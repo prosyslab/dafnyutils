@@ -342,6 +342,9 @@ A build is not verification, and matching a finite test set is not proof of the
 specification. On a timeout, locate the expensive condition and add local proof
 guidance before considering a larger time limit.
 
+The gate's `fuzzer` check runs both executables in a container on the host's Docker.
+If the host has no fuzz image, the first run builds it, which takes a few minutes.
+
 ```sh
 # Expected duration: Unknown; includes builds, runtime tests, 20 fuzz cases and proofs.
 # Success criteria: Exit 0 and base32: checks passed; every required check completes.

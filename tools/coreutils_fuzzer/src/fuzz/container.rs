@@ -209,6 +209,7 @@ impl DockerCaseExecutor {
             std::process::id()
         );
         let name = std::env::var("FUZZ_CONTAINER_NAME").unwrap_or(default_name);
+        ensure_image(&args.common.container_image)?;
         let mut compose = Command::new("docker");
         compose
             .args(["compose", "-f"])
@@ -656,6 +657,42 @@ fn container_child_failure(
     )
 }
 
+/// Build the execution image from the Compose file when the daemon does not have it.
+///
+/// `docker compose run` would otherwise build a missing image itself and print the build log
+/// on stdout, where the container id is expected. The build log goes to our stderr instead.
+fn ensure_image(image: &str) -> Result<(), String> {
+    let present = Command::new("docker")
+        .args(["image", "inspect", "--format", "{{.Id}}", image])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|error| format!("failed to run docker image inspect for {image}: {error}"))?
+        .success();
+    if present {
+        return Ok(());
+    }
+    eprintln!("Fuzz image {image} not found; building it from {COMPOSE_SERVICE}");
+    let mut build = Command::new("docker");
+    build
+        .args(["compose", "-f"])
+        .arg(compose_file())
+        .args(["build", COMPOSE_SERVICE])
+        .env("COREUTILS_FUZZER_IMAGE", image)
+        .stdout(Stdio::from(std::io::stderr()));
+    let rendered = format!("{build:?}");
+    let status = build
+        .status()
+        .map_err(|error| format!("failed to build fuzz image with {rendered}: {error}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "failed to build fuzz image {image}: status={status}"
+        ))
+    }
+}
+
 fn docker_output(command: &mut Command, operation: &str) -> Result<String, String> {
     let rendered = format!("{command:?}");
     let output = command
@@ -752,30 +789,39 @@ mod tests {
         assert!(error.contains("create fuzz container"), "{error}");
     }
 
-    fn fake_docker_boundary(test: &str, help: bool, stderr: &str, stdout: &str) -> String {
+    // Run `test` again in a child process whose PATH holds only a `docker` that runs `script`.
+    // The parent returns false after the child passes; the child returns true and runs the body.
+    fn in_fake_docker_child(test: &str, script: &str) -> bool {
         const CHILD_ENV: &str = "DAFNYUTILS_FAKE_DOCKER_CHILD";
-        if std::env::var(CHILD_ENV).as_deref() != Ok(test) {
-            use std::os::unix::fs::PermissionsExt;
-            let tools = tempfile::tempdir().unwrap();
-            let docker = tools.path().join("docker");
-            let script = format!(
-                "#!/bin/sh\n/bin/cat >/dev/null\nprintf '%s\\n' '{stdout}'\n\
-                 printf '%s\\n' '{stderr}' >&2\nexit 2\n"
-            );
-            std::fs::write(&docker, script).unwrap();
-            std::fs::set_permissions(&docker, std::fs::Permissions::from_mode(0o755)).unwrap();
-            let output = std::process::Command::new(std::env::current_exe().unwrap())
-                .args(["--exact", test, "--nocapture"])
-                .env(CHILD_ENV, test)
-                .env("PATH", tools.path())
-                .output()
-                .unwrap();
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            assert!(output.status.success(), "{stdout}");
-            assert!(
-                stdout.contains("running 1 test"),
-                "child test did not execute: {stdout}"
-            );
+        if std::env::var(CHILD_ENV).as_deref() == Ok(test) {
+            return true;
+        }
+        use std::os::unix::fs::PermissionsExt;
+        let tools = tempfile::tempdir().unwrap();
+        let docker = tools.path().join("docker");
+        std::fs::write(&docker, script).unwrap();
+        std::fs::set_permissions(&docker, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", test, "--nocapture"])
+            .env(CHILD_ENV, test)
+            .env("PATH", tools.path())
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(output.status.success(), "{stdout}");
+        assert!(
+            stdout.contains("running 1 test"),
+            "child test did not execute: {stdout}"
+        );
+        false
+    }
+
+    fn fake_docker_boundary(test: &str, help: bool, stderr: &str, stdout: &str) -> String {
+        let script = format!(
+            "#!/bin/sh\n/bin/cat >/dev/null\nprintf '%s\\n' '{stdout}'\n\
+             printf '%s\\n' '{stderr}' >&2\nexit 2\n"
+        );
+        if !in_fake_docker_child(test, &script) {
             return String::new();
         }
         let target = ContainerTarget {
@@ -880,6 +926,48 @@ mod tests {
             "",
             &marker,
         );
+    }
+
+    // A fake `docker` that has the image, so any other command fails the test.
+    const IMAGE_PRESENT_DOCKER: &str =
+        "#!/bin/sh\n[ \"$1 $2\" = \"image inspect\" ] && exit 0\nexit 3\n";
+
+    // A fake `docker` that lacks the image and builds it only for the Compose build command.
+    fn image_missing_docker(build_exit_code: i32) -> String {
+        format!(
+            "#!/bin/sh\n[ \"$1 $2\" = \"image inspect\" ] && exit 1\n\
+             [ \"$1\" = compose ] && [ \"$4 $5\" = \"build coreutils-fuzzer\" ] \
+             && [ \"$COREUTILS_FUZZER_IMAGE\" = fuzz-image:tested ] && exit {build_exit_code}\n\
+             exit 3\n"
+        )
+    }
+
+    // An image the daemon already has is used as is, without a build.
+    #[test]
+    fn present_image_is_not_built() {
+        let test = "fuzz::container::tests::present_image_is_not_built";
+        if in_fake_docker_child(test, IMAGE_PRESENT_DOCKER) {
+            super::ensure_image("fuzz-image:tested").unwrap();
+        }
+    }
+
+    // A missing image is built from the Compose service under the requested image name.
+    #[test]
+    fn missing_image_is_built_by_compose() {
+        let test = "fuzz::container::tests::missing_image_is_built_by_compose";
+        if in_fake_docker_child(test, &image_missing_docker(0)) {
+            super::ensure_image("fuzz-image:tested").unwrap();
+        }
+    }
+
+    // A failed image build stops the fuzz run and names the image.
+    #[test]
+    fn failed_image_build_is_reported() {
+        let test = "fuzz::container::tests::failed_image_build_is_reported";
+        if in_fake_docker_child(test, &image_missing_docker(5)) {
+            let error = super::ensure_image("fuzz-image:tested").unwrap_err();
+            assert!(error.contains("fuzz-image:tested"), "{error}");
+        }
     }
 
     // False's normal help exit still exposes its informational options.

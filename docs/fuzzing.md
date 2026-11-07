@@ -46,7 +46,7 @@ python3 tools/coreutils_fuzzer/run.py fuzz cat --iterations 20 --seed 1
 python3 tools/coreutils_fuzzer/run.py fuzz '<utility_name>' --seeds 1,7,19 --iterations 1000
 ```
 
-If any of these fail with a missing binary, DLL or image, go through
+If any of these fail with a missing binary or DLL, go through
 [setup](#1-one-time-setup) first.
 
 ## 1. One-time setup
@@ -64,7 +64,7 @@ them as campaign time.
 | --- | --- | --- |
 | Pinned GNU binary (reference) | `make build-coreutils` | `_build/coreutils/src/cat` exists and is executable |
 | Dafny utility under test (DUT) | `make -C bench/utils/cat build` | `_build/bench/cat_bench.dll` exists |
-| Execution image (needs Docker) | `docker compose -f tools/coreutils_fuzzer/docker-compose.yaml build` | Output ends with `Image dafnyutils-coreutils-fuzzer:latest Built` |
+| Execution image (needs Docker) | Built by the first run when the host has none; to build it ahead, run `docker compose -f tools/coreutils_fuzzer/docker-compose.yaml build` | Output ends with `Image dafnyutils-coreutils-fuzzer:latest Built` |
 
 Replace `cat` with your utility. The wrapper builds its own Rust runner with
 Cargo on first use, which may download dependencies on a fresh machine.
