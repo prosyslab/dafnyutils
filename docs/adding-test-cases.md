@@ -49,7 +49,7 @@ The scaffold command creates an incomplete utility, including a `Tests.py`
 with shared runner imports, an `executables` fixture, and `assert_parity`:
 
 ```sh
-python3 -m tools.scaffold --kind coreutils --id base32
+make scaffold KIND=coreutils ID=base32
 ```
 
 Expected output, exit 0 when the task does not already exist:

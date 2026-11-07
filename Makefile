@@ -1,6 +1,6 @@
 # Standalone benchmark checks and local toolchain builds.
 
-.PHONY: test test-unit test-integration test-final build-coreutils clean
+.PHONY: test test-unit test-integration test-final scaffold build-coreutils clean
 
 test:
 	@$(MAKE) --no-print-directory test-unit
@@ -13,6 +13,11 @@ test-integration:
 
 test-final:
 	@$(MAKE) --no-print-directory test-unit && $(MAKE) --no-print-directory test-integration
+
+scaffold:
+	@test -n "$(KIND)" -a -n "$(ID)" || \
+		{ echo 'usage: make scaffold KIND=<coreutils|algorithm> ID=<task-id>' >&2; exit 2; }
+	@python3 -m tools.scaffold --kind "$(KIND)" --id "$(ID)"
 
 build-coreutils:
 	@tools/build-coreutils

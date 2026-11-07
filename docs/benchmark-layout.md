@@ -33,9 +33,10 @@ implementation, proof or CLI modules. The final obligation is
 does not replace it. See the [bench rules](../bench/AGENTS.md).
 
 The common scaffold is in `tools/benchmark_templates/common`; category templates
-provide descriptions, provenance and oracle examples. Task Makefiles expose
-`build`, `test` and `verify` through local `tools.contribution` modules,
-using the toolchain in the development container. See
+provide descriptions, provenance and oracle examples. Task Makefiles include
+`tools/task.mk`, which exposes `build`, `test`, `verify`, `lint` and `final-check`
+through local `tools.contribution` modules, using the toolchain in the development
+container. See
 [adding a utility](../CONTRIBUTING.md#extending-benchmark).
 Scaffolds use the same fixed CLI protocol as registered items.
 

@@ -49,6 +49,7 @@ def affected_task_ids(
                 ".gitmodules",
                 "Makefile",
                 "pyproject.toml",
+                "tools/task.mk",
                 "tools/generate_task_profiles.py",
             }
         ):

@@ -218,7 +218,7 @@ and every error count is zero.
 
 **Things that do not count**
 
-- The fuzzer check inside `python3 -m tools.contribution check <utility>`
+- The fuzzer check inside `make -C bench/utils/<utility> final-check`
   (20 cases, seed 1).
 - A fixed JSON case set or regression suite. Those are separate checks.
 - Picking three favorable seeds while leaving out failing ones.

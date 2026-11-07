@@ -16,6 +16,7 @@ Submit a focused change with reproducible code verification and fuzzing results.
   - [Validate and submit](#validate-and-submit)
     - [Check the definition](#check-the-definition)
     - [Build, test and verify](#build-test-and-verify)
+    - [Run the contributor gate](#run-the-contributor-gate)
     - [Open a pull request](#open-a-pull-request)
 - [Prepare the change](#prepare-the-change)
 - [Coding style](#coding-style)
@@ -63,6 +64,7 @@ the host's Docker, so use it only on a machine where you accept that.
 | `tools/coreutils_fuzzer/` | Differential runner, generators and comparison logic |
 | `src/benchmarks/` | Definitions, paths, discovery and selection |
 | `src/tools/` | Local validation, builds, proof commands and executable test helpers (imported as `tools`) |
+| `tools/task.mk` | `build`, `test`, `verify`, `lint` and `final-check` targets that every task Makefile includes |
 | `_build/` | Generated binaries and reports, created by build/check commands |
 
 Read [bench rules](bench/AGENTS.md) and [Dafny style](DAFNYSTYLE.md) before editing Dafny.
@@ -79,13 +81,11 @@ read the [implementation notes](docs/implementation-notes.md) and the
 Create the scaffold **before** creating its directory or scope document:
 
 ```sh
-python3 -m tools.scaffold --kind coreutils --id base32
+make scaffold KIND=coreutils ID=base32
 ```
 
-The command uses this tool's repository as its default root, even from another
-working directory. Pass `--root <checkout>` to use another checkout and its
-templates. It copies the common templates and the selected kind's templates;
-`--kind algorithm --id algorithm-123` creates `bench/algorithm/123`.
+The command copies the common templates and the selected kind's templates;
+`make scaffold KIND=algorithm ID=algorithm-123` creates `bench/algorithm/123`.
 Expected duration: less than a second for the current templates.
 
 Expected output, exit 0:
@@ -245,129 +245,96 @@ or empty fixed case set is an error, not an inapplicable test stage.
 ### Validate and submit
 
 Run the commands in this section in the development container from this
-repository's root. The contributor gate additionally builds, executes and proves
-benchmark tasks.
+repository's root. For an algorithm task, use `algorithm-<number>` and
+`bench/algorithm/<number>` instead, and skip `make build-coreutils`: algorithm
+tasks have no GNU reference.
 
 #### Check the definition
 
 ```sh
-# Expected duration: Seconds for local metadata and path checks; no native toolchain needed.
-# Success criteria: Exit 0 and base32: valid.
-python3 -m tools.contribution validate base32
+make -C bench/utils/base32 lint
 ```
-
-Expected output for a completed utility, exit 0:
 
 ```text
 base32: valid
 ```
 
-Expected output for an untouched scaffold, exit 1:
+The command exits 0 for a completed utility. An untouched scaffold exits 1 with
+`base32: source details are incomplete`, which is the expected unfinished state.
 
-```text
-base32: source details are incomplete
-```
-
-This validates YAML/schema, completed source metadata, required files and paths.
-The untouched scaffold must fail with `source details are incomplete`; that is
-an expected unfinished state. This command does not analyze the Dafny entry
-contract, prove the specification or generate a public task profile. Review the
-specification, its includes and the intended editable/support boundary yourself;
-keep tests and reference answers out of candidate-visible resources. The
-integration repository owns analysis and public-profile release checks.
+It validates YAML/schema, completed source metadata, required files and paths. It
+does not analyze the Dafny entry contract, prove the specification or generate a
+public task profile. Review the specification, its includes and the intended
+editable/support boundary yourself, and keep tests and reference answers out of
+candidate-visible resources. The integration repository owns analysis and
+public-profile release checks.
 
 #### Build, test and verify
 
+Run the stages one by one while you develop. They are separate checks: a build is
+not verification, and matching a finite test set is not proof of the specification.
+
 ```sh
-# Expected duration: Unknown; first GNU bootstrap/build depends on downloads and CPU.
-# Success criteria: Exit 0 and _build/coreutils/src/base32 is executable.
 make build-coreutils
+make -C bench/utils/base32 build
+make -C bench/utils/base32 test
+make -C bench/utils/base32 verify
 ```
 
-Expected output, exit 0 (paths and build steps vary):
+Each command exits 0. Paths, case names and counts vary:
 
 ```text
 ...
 make[1]: Leaving directory '/workspace/dafnyutils/_build/coreutils'
-```
-
-This builds the pinned original utilities. It may need network access for build inputs.
-
-```sh
-# Expected duration: Unknown; requires a complete Base32 implementation and .NET.
-# Success criteria: Exit 0 and _build/bench/base32_bench.dll exists.
-make -C bench/utils/base32 build
-```
-
-Expected output, exit 0:
-
-```text
+...
 Dafny program verifier did not attempt verification
-make: Leaving directory '/workspace/dafnyutils/bench/utils/base32'
-```
-
-```sh
-# Expected duration: Unknown; depends on the new case population and Docker setup.
-# Success criteria: Exit 0 with real, non-skipped runtime cases passing.
-make -C bench/utils/base32 test
-```
-
-Expected output shape, exit 0 (names and counts depend on your cases):
-
-```text
-Base32Tests.<case>: PASSED
 ...
 <count> passed, <count> deselected in <seconds>s
-make: Leaving directory '/workspace/dafnyutils/bench/utils/base32'
-```
-
-```sh
-# Expected duration: Unknown; depends on the conditions to prove and solver time.
-# Success criteria: Exit 0 and zero Dafny verification errors for the project and all files it includes.
-make -C bench/utils/base32 verify
-```
-
-Expected output, exit 0:
-
-```text
+...
 Dafny program verifier finished with <count> verified, 0 errors
 ```
 
-These commands check compilation, executable behavior and proof separately.
-The local verifier selects all project `.dfy` files directly, verifies included
-files, disables standard libraries, fixes the Boogie random seed to 42 and
-supplies explicit core dependencies.
-It does not inherit the project's `no-verify = true` build setting.
-A build is not verification, and matching a finite test set is not proof of the
-specification. On a timeout, locate the expensive condition and add local proof
-guidance before considering a larger time limit.
+- `build-coreutils` builds the pinned GNU utilities that `test` compares against.
+  The first run bootstraps the sources and may need network access.
+- `build` compiles `_build/bench/base32_bench.dll` and needs .NET.
+- `test` runs the runtime cases of `Tests.py` against both executables. Real,
+  non-skipped cases must pass.
+- `verify` selects all project `.dfy` files directly, verifies included files,
+  disables standard libraries, fixes the Boogie random seed to 42 and supplies
+  explicit core dependencies. It does not inherit the project's `no-verify = true`
+  build setting. On a timeout, locate the expensive condition and add local proof
+  guidance before considering a larger time limit.
 
-The gate's `fuzzer` check runs both executables in a container on the host's Docker.
-If the host has no fuzz image, the first run builds it, which takes a few minutes.
+#### Run the contributor gate
 
 ```sh
-# Expected duration: Unknown; includes builds, runtime tests, 20 fuzz cases and proofs.
-# Success criteria: Exit 0 and base32: checks passed; every required check completes.
-python3 -m tools.contribution check base32
+make -C bench/utils/base32 final-check
 ```
-
-Expected final output after all required stages, exit 0:
 
 ```text
 ...
 base32: checks passed
 ```
 
-This is the local contribution gate. Required checks are `impl_layout`,
-`implementation_tests`, `fuzzer`, `proof_layout` and `dafny_verify`, defined in
-[checks.py](src/benchmarks/checks.py). The implementation report is
-`_build/contribution_checks/base32/implementation-tests.xml`; it must contain an
-executed, non-skipped case. The verification stage also runs the marked proof
-tests in `Tests.py`. Missing tools, unsupported fuzzing, skipped required work
-and timeouts are failures. Run this gate only after completing the utility;
-the untouched scaffold is not a passing example.
-The local gate does not perform native entry-contract analysis or produce
-candidate profiles; maintainers run the integration release checks separately.
+The command exits 0 only after every required check completes. Run it after the
+utility is complete; the untouched scaffold is not a passing example.
+
+The gate runs the stages above itself, so you need not run them first. It also runs
+the marked proof tests in `Tests.py` and 20 generated cases with seed 1 in a
+container on the host's Docker. If the host has no fuzz image, the first run builds
+it, which takes a few minutes.
+
+- Required checks are `impl_layout`, `implementation_tests`, `fuzzer`,
+  `proof_layout` and `dafny_verify`, defined in [checks.py](src/benchmarks/checks.py).
+- The implementation report is `_build/contribution_checks/base32/implementation-tests.xml`.
+  It must contain an executed, non-skipped case.
+- Missing tools, unsupported fuzzing, skipped required work and timeouts are
+  failures.
+- The gate uses the default `_build/` directory. Unset `BUILD_DIR` or set it to
+  `_build`; custom build paths are rejected so task, reference and native helper
+  artifacts cannot come from different builds.
+- The gate does not perform native entry-contract analysis or produce candidate
+  profiles; maintainers run the integration release checks separately.
 
 #### Open a pull request
 
@@ -517,12 +484,11 @@ The short automatic gate currently runs 20 fuzz cases with seed 1; it does not s
 Paste the actual output directly into the PR; example output in a guide is not
 run evidence. Never include credentials or restricted evaluator payloads.
 
-Algorithm tasks require build/layout checks, runtime cases and Dafny verification.
-Their `cases.json` files remain benchmark data; local test helpers and the
-integration evaluator run those cases with the declared output contract. Fuzzing is required only when the task
-declares a fuzzer capability. Use `python3 -m tools.contribution check algorithm-<number>`
-for the contributor gate. `make -C bench/algorithm/<number> test` runs
-the runtime cases. For documentation-only changes, record link/content checks
+Algorithm tasks require build/layout checks, runtime cases and Dafny verification,
+run with the [same commands](#validate-and-submit). Their `cases.json` files remain
+benchmark data; local test helpers and the integration evaluator run those cases
+with the declared output contract. Fuzzing is required only when the task declares
+a fuzzer capability. For documentation-only changes, record link/content checks
 and explain why runtime verification and fuzzing were not run.
 
 ## Open the pull request

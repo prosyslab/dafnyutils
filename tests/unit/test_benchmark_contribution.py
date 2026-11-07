@@ -176,6 +176,7 @@ def test_affected_selection_includes_all_tasks_for_shared_benchmark_helpers(
         "src/tools/contribution/checks.py",
         "src/tools/execution.py",
         "src/dafny_cli.py",
+        "tools/task.mk",
     ),
 )
 def test_affected_selection_includes_all_tasks_for_shared_execution(

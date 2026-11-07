@@ -56,7 +56,7 @@ smoke_test() {
     make test
 }
 
-# The fuzzer and `python3 -m tools.contribution check` start containers on the host Docker.
+# The fuzzer and the `final-check` task target start containers on the host Docker.
 warn_if_docker_unreachable() {
     docker info > /dev/null 2>&1 && return
     printf '%s\n' \

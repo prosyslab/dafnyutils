@@ -1,21 +1,13 @@
 PROJECT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-REPO_ROOT := $(abspath $(PROJECT_DIR)/../../..)
 LOCAL_TASK := $(notdir $(PROJECT_DIR))
+include $(PROJECT_DIR)/../../../tools/task.mk
+
 BUILD_DIR ?= _build
 ROOT_BUILD_DIR := $(if $(filter /%,$(BUILD_DIR)),$(BUILD_DIR),$(REPO_ROOT)/$(BUILD_DIR))
 COREUTILS_BUILD_DIR := $(ROOT_BUILD_DIR)/coreutils
 TOUCH_TIME_PARSER := $(ROOT_BUILD_DIR)/bench/touch_time_parser
 
-.PHONY: build verify test build-time-parser
-
-build:
-	python3 -m tools.contribution.make_tasks build --root "$(REPO_ROOT)" --task "$(LOCAL_TASK)"
-
-verify:
-	python3 -m tools.contribution.verify --project "$(PROJECT_DIR)" --library "$(PROJECT_DIR)/../../core"
-
-test:
-	python3 -m tools.contribution.make_tasks test --root "$(REPO_ROOT)" --task "$(LOCAL_TASK)"
+.PHONY: build-time-parser
 
 build-time-parser:
 	$(MAKE) -C "$(REPO_ROOT)" build-coreutils BUILD_DIR="$(BUILD_DIR)"
