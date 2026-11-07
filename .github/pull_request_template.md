@@ -19,7 +19,7 @@ fuzzing campaign in section 2 completes without errors on the tested commit.
 
 Leave out options that cannot be implemented with the current API in
 `bench/core/IO.dfy`. List each option and explain what API support is missing.
-Keep this list in the utility's scope document too. Do not change shared IO
+Keep this list in the scope section of the utility's `<utility>.md` too. Do not change shared IO
 contracts yourself; describe the missing operation here. Write `None` if no
 options were left out for this reason.
 

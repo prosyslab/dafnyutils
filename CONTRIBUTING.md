@@ -68,7 +68,8 @@ the host's Docker, so use it only on a machine where you accept that.
 | `_build/` | Generated binaries and reports, created by build/check commands |
 
 Read [bench rules](bench/AGENTS.md) and [Dafny style](DAFNYSTYLE.md) before editing Dafny.
-Keep the scope in the utility's Markdown file, as described in
+The utility's `<utility>.md` is generated from the GNU manual. Add a scope section
+to it only if the contribution leaves something out, as described in
 [Prepare the change](#prepare-the-change).
 
 ### Build one contribution
@@ -78,7 +79,7 @@ Keep the scope in the utility's Markdown file, as described in
 Choose an `open_for_contribution` row in [TODOLIST.csv](TODOLIST.csv), then
 read the [implementation notes](docs/implementation-notes.md) and the
 [core API guide](docs/core-api.md). This walkthrough uses `base32`.
-Create the scaffold **before** creating its directory or scope document:
+Create the scaffold **before** creating its directory:
 
 ```sh
 make scaffold KIND=coreutils ID=base32
@@ -98,6 +99,23 @@ scaffold is incomplete; replace TODO content and source status before validation
 If the directory already exists, inspect it and continue that contribution; the
 tool refuses to overwrite it. Do not delete someone else's work to rerun this command.
 
+The scaffold writes a placeholder `base32.md`. Replace it with the description
+generated from the GNU manual:
+
+```sh
+python3 -m benchmarks.extract_nl_specs --utilities base32
+```
+
+Expected output, exit 0:
+
+```text
+[ok] wrote <repository>/bench/utils/base32/base32.md
+```
+
+The file holds the manual's `base32 invocation` section. Do not edit that text by
+hand; rerun the command instead. The command keeps the scope section described
+below.
+
 #### Define the observable behavior
 
 Specify the utility in as much detail as the system modeled by
@@ -111,9 +129,8 @@ invalid options.
 Settle open questions from the pinned GNU source, the upstream GNU tests, the
 exact `IO.dfy` declarations and `IOContract.dfy` predicates, and
 [Trust limits and API changes](docs/core-api.md#trust-limits-and-api-changes).
-Record each scope decision and its evidence in the scope document.
-
-Fill the generated `bench/utils/base32/base32.md` before implementation:
+Report each scope decision and its evidence in the PR's **Change and scope**
+section. Answer these questions before implementation:
 
 | Question | Example answer for base32 |
 | --- | --- |
@@ -142,9 +159,22 @@ error occurred" or "the exit status is nonzero".
 
 Check the current API in `bench/core/IO.dfy` before choosing the options to implement.
 If an option cannot be implemented with this API, leave it out of the contribution.
-List each such option in the utility's scope document and in the PR's
+List each such option in the scope section of `base32.md` and in the PR's
 **Options left out due to IO.dfy** section. Explain what API support is missing.
 Write `None` in that PR section if no options were left out for this reason.
+
+Add a scope section at the end of `base32.md` only when the contribution does not
+implement everything, whatever the reason. List each omitted option or behavior,
+why it is omitted and the evidence:
+
+```markdown
+## Benchmark scope
+
+- `<option>`: not implemented. <why it is omitted, with the evidence>
+```
+
+Use exactly this heading and write the section after the generated text. A
+contribution that implements everything has no scope section.
 
 Do not extend shared IO contracts or runtime adapters to add a left-out option;
 maintainers own them. Report the missing operation in the PR instead. Do not
@@ -175,7 +205,7 @@ Complete these generated files:
 
 | File | What to put there |
 | --- | --- |
-| `base32.md` | The scope you defined: input, option, environment, output and error behavior; scope decisions with evidence; options left out due to IO.dfy; examples, source revision, and license |
+| `base32.md` | Description generated from the GNU manual by `benchmarks.extract_nl_specs`; add the `## Benchmark scope` section only if something is left out |
 | `Spec/Base32Schema.dfy` | CLI schema/configuration, raw command types and decode behavior |
 | `Spec/Base32Spec.dfy` | Declarative observable relation and fixed help/version/error text |
 | `Impl/Base32Core.dfy` | Executable algorithms and the values they construct to satisfy the specification |
@@ -348,9 +378,11 @@ specification describes GNU behavior and uses only approved library contracts.
 
 Explain the problem, the intended behavior and the files affected. Keep specification, implementation, proof and evaluator changes distinct. Reuse model types and relations, and implement derived algorithms and proofs inside the item. Keep the approved inputs and native library assumptions unchanged.
 
-Put the utility's scope, supported options and model limitations in
-`bench/utils/<utility>/<utility>.md`. Include the source revision/license and
-trusted API assumptions so reviewers can assess the contract.
+`bench/utils/<utility>/<utility>.md` is generated from the GNU manual. If the
+contribution does not implement everything, add a `## Benchmark scope` section to it
+with the omitted options and behaviors, the reason for each and the evidence. Report
+the source revision/license and trusted API assumptions in the PR so reviewers can
+assess the contract.
 
 For an upstream scenario, record the GNU source revision and test path. Keep evaluator cases and oracle material out of candidate-visible resources. Preserve original mismatch bundles and store post-fix expectations separately.
 

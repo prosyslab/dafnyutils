@@ -39,7 +39,7 @@ This finds the source even when a utility has no dedicated test directory. For `
 coreutils/tests/misc/comm.pl
 ```
 
-Read [comm.pl](../coreutils/tests/misc/comm.pl), [Tests.py](../bench/utils/comm/Tests.py), and the [supported comm scope](../bench/utils/comm/comm.md) together. Check upstream case names against existing Python functions and parameter rows before adding anything. `comm.pl` covers more GNU behavior than this benchmark currently implements.
+Read [comm.pl](../coreutils/tests/misc/comm.pl), [Tests.py](../bench/utils/comm/Tests.py), and the [comm description](../bench/utils/comm/comm.md) together. Check upstream case names against existing Python functions and parameter rows before adding anything. `comm.pl` covers more GNU behavior than this benchmark currently implements.
 
 The current adapter already covers basic columns, delimiters, totals, several NUL modes and operand errors. Its NUL-mode parameter table does not contain the `-z -2` combination used below. If a later revision already covers it, extend or improve the existing test instead of duplicating it.
 
