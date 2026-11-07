@@ -12,6 +12,7 @@ module Pathchk {
   import Core = PathchkCore
   import Spec = PathchkSpec
   import Proof = PathchkProof
+  import opened CliExtern
 
   class PathchkBenchmarkItem extends BenchItem.BenchmarkItemTwostate<S.PathchkCmdRaw> {
     constructor() {}
@@ -33,13 +34,32 @@ module Pathchk {
     }
 
     method FormatParseError(err: CliTypes.ParseError) returns (msg: BenchWorld.Bytes) {
-      // TODO: implement and test command-line parse errors, including early exits.
-      assert false;
       msg := Spec.ParseErrorText(err);
     }
 
+    method PlanParseFailure(
+      err: CliTypes.ParseError, argv: seq<string>
+    ) returns (plan: CliTypes.CliPlan<S.PathchkCmdRaw>)
+      decreases *
+    {
+      if 0 < err.tokenIndex < |argv| {
+        var schema := S.Schema();
+        var cfg := S.ParserConfig();
+        var result := Cli.Parse(argv[..err.tokenIndex], schema, cfg);
+        match result {
+          case ParseSuccess(parsed) =>
+            var raw := S.Decode(parsed);
+            if raw.mode == S.ModeHelp || raw.mode == S.ModeVersion {
+              return CliTypes.CliRun(raw);
+            }
+          case ParseFailure(_) =>
+        }
+      }
+      return CliTypes.CliEarlyExit(1, [], Spec.ParseErrorText(err));
+    }
+
     method RunCore(raw: S.PathchkCmdRaw, io: BenchIO.IO) returns (exit: int)
-      modifies io.stdinRegion, io.stdoutRegion, io.stderrRegion
+      modifies io.stdoutRegion, io.stderrRegion
       ensures Spec.Spec(raw, io, exit)
     {
       exit := Core.RunCore(raw, io);

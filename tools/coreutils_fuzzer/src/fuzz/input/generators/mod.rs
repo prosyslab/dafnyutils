@@ -27,6 +27,7 @@ pub(crate) mod mkfifo;
 pub(crate) mod mv;
 pub(crate) mod nl;
 pub(crate) mod paste;
+pub(crate) mod pathchk;
 pub(crate) mod printenv;
 pub(crate) mod printf;
 pub(crate) mod pwd;
