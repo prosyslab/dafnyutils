@@ -51,7 +51,7 @@ link only when it refers to an existing regular file.
 However, when copying to a dangling symbolic link, `cp`
 refuses by default, and fails with a diagnostic, since the operation
 is inherently dangerous. This behavior is contrary to historical
-practice and to POSIX@.
+practice and to POSIX.
 Set `POSIXLY_CORRECT` to make `cp` attempt to create
 the target of a dangling destination symlink, in spite of the possible risk.
 Also, when an option like

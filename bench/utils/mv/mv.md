@@ -53,7 +53,7 @@ when it might be a symlink to a directory.
 Otherwise, `mv` may do something very surprising, since
 its behavior depends on the underlying rename system call.
 On a system with a modern Linux-based kernel, it fails with
-`errno=ENOTDIR`@.
+`errno=ENOTDIR`.
 However, on other systems (at least FreeBSD 6.1 and Solaris 10) it silently
 renames not the symlink but rather the directory referenced by the symlink.
 Trailing slashes.

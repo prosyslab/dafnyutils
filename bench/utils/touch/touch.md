@@ -69,7 +69,7 @@ time zones, `am` and `pm`, `yesterday`, etc. For
 example, `--date="2020-07-21 14:19:13.489392193 +0530"`
 specifies the instant of time that is 489,392,193 nanoseconds after
 July 21, 2020 at 2:19:13 PM in a time zone that is 5 hours and 30
-minutes east of UTC@. Date input formats.
+minutes east of UTC. Date input formats.
 File systems that do not support high-resolution timestamps
 silently ignore any excess precision here.
 

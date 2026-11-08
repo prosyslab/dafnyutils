@@ -42,7 +42,7 @@ Options must precede operands.
 Print all numbers using format.
 format must contain exactly one of the `printf`-style
 floating point conversion specifications `%a`, `%e`,
-`%f`, `%g`, `%A`, `%E`, `%F`, `%G`@.
+`%f`, `%g`, `%A`, `%E`, `%F`, `%G`.
 The `%` may be followed by zero or more flags taken from the set
 `-+#0 '`, then an optional width containing one or more digits,
 then an optional precision consisting of a `.` followed by zero

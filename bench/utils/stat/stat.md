@@ -146,7 +146,7 @@ printf flags. For example to pad to at least 3 wide while making larger
 numbers unambiguously octal, you can use `%#03a`.
 
 The `%N` format can be set with the environment variable
-`QUOTING_STYLE`@. If that environment variable is not set,
+`QUOTING_STYLE`. If that environment variable is not set,
 the default value is `shell-escape-always`. Valid quoting styles are:
 
 The `r`, `R`, `%t`, and `%T` formats operate on the st_rdev
@@ -160,7 +160,7 @@ precision preceded by a period to specify the number of digits to
 print after the decimal point. For example, `%.3X` outputs the
 access timestamp to millisecond precision. If a period is given but no
 precision, `stat` uses 9 digits, so `%.X` is equivalent to
-`%.9X`@. When discarding excess precision, timestamps are truncated
+`%.9X`. When discarding excess precision, timestamps are truncated
 toward minus infinity.
 
 ```text

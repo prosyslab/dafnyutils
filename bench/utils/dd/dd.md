@@ -51,24 +51,24 @@ it can be shorter than usual.
 whose syntax was inspired by the DD (data definition) statement of
 OS/360 JCL.
 
-- dd,if,=@var{file}
+- `if=file`
 Read from file instead of standard input.
 
-- dd,of,=@var{file}
+- `of=file`
 Write to file instead of standard output. Unless
 `conv=notrunc` is given, truncate file before writing it.
 
-- dd,ibs,=@var{bytes}
+- `ibs=bytes`
 Set the input block size to bytes.
 This makes `dd` read bytes per block.
 The default is 512 bytes.
 
-- dd,obs,=@var{bytes}
+- `obs=bytes`
 Set the output block size to bytes.
 This makes `dd` write bytes per block.
 The default is 512 bytes.
 
-- dd,bs,=@var{bytes}
+- `bs=bytes`
 Set both input and output block sizes to bytes.
 This makes `dd` read and write bytes per block,
 overriding any `ibs` and `obs` settings.
@@ -76,28 +76,28 @@ In addition, if no data-transforming `conv` operand is specified,
 input is copied to the output as soon as it's read,
 even if it is smaller than the block size.
 
-- dd,cbs,=@var{bytes}
+- `cbs=bytes`
 Set the conversion block size to bytes.
 When converting variable-length records to fixed-length ones
 (`conv=block`) or the reverse (`conv=unblock`),
 use bytes as the fixed record length.
 
-- dd,skip,=@var{n}
-- dd,iseek,=@var{n}
+- `skip=n`
+- `iseek=n`
 Skip n `ibs`-byte blocks in the input file before copying.
 If n ends in the letter `B`, interpret n
 as a byte count rather than a block count.
 (`B` and the `iseek=` spelling are GNU extensions to POSIX.)
 
-- dd,seek,=@var{n}
-- dd,oseek,=@var{n}
+- `seek=n`
+- `oseek=n`
 Skip n `obs`-byte blocks in the output file before
 truncating or copying.
 If n ends in the letter `B`, interpret n
 as a byte count rather than a block count.
 (`B` and the `oseek=` spelling are GNU extensions to POSIX.)
 
-- dd,count,=@var{n}
+- `count=n`
 Copy n `ibs`-byte blocks from the input file, instead
 of everything until the end of the file.
 If n ends in the letter `B`,
@@ -110,7 +110,7 @@ rather than input read operations.
 As an extension to POSIX, `count=0` copies zero blocks
 instead of copying all blocks.
 
-- dd,status,=@var{level}
+- `status=level`
 Specify the amount of information printed.
 If this operand is given multiple times, the last one takes precedence.
 The level value can be one of the following:
@@ -148,7 +148,7 @@ truncated records is output after the `records out` line if
 
 The `status=` operand is a GNU extension to POSIX.
 
-- dd,conv,=@var{conversion}[@comma{}@var{conversion}]@dots{}
+- `conv=conversion[,conversion]...`
 Convert the file as specified by the conversion argument(s).
 (No spaces around any comma(s).)
 
@@ -156,20 +156,20 @@ Conversions:
 
 - ascii
 Convert EBCDIC to ASCII,
-using the conversion table specified by POSIX@.
+using the conversion table specified by POSIX.
 This provides a 1:1 translation for all 256 bytes.
 This implies `conv=unblock`; input is converted to
 ASCII before trailing spaces are deleted.
 
 - ebcdic
-Convert ASCII to EBCDIC@.
+Convert ASCII to EBCDIC.
 This is the inverse of the `ascii` conversion.
 This implies `conv=block`; trailing spaces are added
-before being converted to EBCDIC@.
+before being converted to EBCDIC.
 
 - ibm
 This acts like `conv=ebcdic`, except it
-uses the alternate conversion table specified by POSIX@.
+uses the alternate conversion table specified by POSIX.
 This is not a 1:1 translation, but reflects common historical practice
 for `~`, `[`, and `]`.
 
@@ -271,11 +271,11 @@ may be a bit slower than `fdatasync` although the performance
 difference is typically insignificant for `dd`.
 This conversion is a GNU extension to POSIX.
 
-- dd,iflag,=@var{flag}[@comma{}@var{flag}]@dots{}
+- `iflag=flag[,flag]...`
 Access the input file using the flags specified by the flag
 argument(s). (No spaces around any comma(s).)
 
-- dd,oflag,=@var{flag}[@comma{}@var{flag}]@dots{}
+- `oflag=flag[,flag]...`
 Access the output file using the flags specified by the flag
 argument(s). (No spaces around any comma(s).)
 
@@ -370,11 +370,11 @@ Do not follow symbolic links.
 Fail if the file has multiple hard links.
 
 - binary
-Use binary I/O@. This flag has an effect only on nonstandard
+Use binary I/O. This flag has an effect only on nonstandard
 platforms that distinguish binary from text I/O.
 
 - text
-Use text I/O@. Like `binary`, this flag has no effect on
+Use text I/O. Like `binary`, this flag has no effect on
 standard platforms.
 
 - fullblock

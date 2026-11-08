@@ -41,7 +41,7 @@ GNU `tail` can output any amount of data (some other versions of
 reverse), since reversing a file is really a different job from printing
 the end of a file; BSD `tail` (which is the one with `-r`) can
 only reverse files that are at most as large as its buffer, which is
-typically 32 KiB@. A more reliable and versatile way to reverse files is
+typically 32 KiB. A more reliable and versatile way to reverse files is
 the GNU `tac` command.
 
 The program accepts the following options. Also see Common options.

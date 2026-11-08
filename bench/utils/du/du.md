@@ -93,7 +93,7 @@ This is useful when the list of file names is so long that it may exceed a
 command line length limitation.
 In such cases, running `du` via `xargs` is undesirable
 because it splits the list into pieces and makes `du` print
-with the @option{--total} (@option{-c}) option for each sublist rather than for the entire list.
+with the `--total` (`-c`) option for each sublist rather than for the entire list.
 One way to produce a list of ASCII NUL terminated file names is with GNU
 `find`, using its `-print0` predicate.
 If file is `-` then the ASCII NUL terminated file names are read from

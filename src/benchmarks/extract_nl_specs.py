@@ -65,7 +65,7 @@ def replace_texi_macro(match: re.Match[str]) -> str:
 
 
 def strip_texi_markup(line: str) -> str:
-    current = line.replace("@dots{}", "...")
+    current = line.replace("@dots{}", "...").replace("@comma{}", ",").replace("@.", ".")
     previous = None
     while previous != current:
         previous = current
@@ -77,6 +77,11 @@ def _render_option_item(line: str) -> str | None:
     if not line.startswith(("@optItem{", "@optItemx{")):
         return None
     inside = line.split("{", 1)[1].rsplit("}", 1)[0]
+    _, _, rest = inside.partition(",")
+    option, _, parameter = rest.partition(",")
+    if not option.strip().startswith("-"):
+        # An operand such as `dd if=FILE` has no leading dash and keeps its parameter.
+        return f"- `{strip_texi_markup(option.strip() + parameter.strip())}`"
     parts = [part.strip() for part in inside.split(",") if part.strip()]
     options = [part for part in parts if part.startswith("-")]
     return f"- {', '.join(f'`{opt}`' for opt in options)}" if options else f"- {inside}"
@@ -231,7 +236,7 @@ def _render_which_update() -> list[str]:
 
 def _render_files_zero_from_option(args: list[str]) -> list[str]:
     command = _arg(args, 0, "COMMAND")
-    sub_list_output = _arg(args, 2, "output")
+    sub_list_output = strip_texi_markup(_arg(args, 2, "output"))
     return [
         "- `--files0-from=file`",
         "Disallow processing files named on the command line, and instead process",
