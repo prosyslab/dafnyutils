@@ -213,9 +213,8 @@ data package.
   implementation and routine checks; `make test-final` runs unit and integration
   tiers sequentially. Task commands also run from this repository in the
   development container: `make -C bench/utils/<utility> build|test|verify` (or
-  `bench/algorithm/<number>`) runs one task's stages, and
-  `python3 -m tools.contribution validate|check <task>` runs the contributor
-  checks and gate.
+  `bench/algorithm/<number>`) runs one task's stages, `lint` checks the task
+  definition and `final-check` runs the contributor gate.
 - If no Dafny source file changes, exclude `tests/bench` from routine regression
   testing. This does not excuse skipping checks affected by changes to generated
   specifications, verifier invocation, toolchains, or evaluation code. Use focused
