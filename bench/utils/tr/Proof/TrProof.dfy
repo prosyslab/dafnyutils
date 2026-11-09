@@ -181,6 +181,61 @@ module TrProof {
     reveal Spec.WarningPartitionFrom();
   }
 
+  ghost predicate WarningPartitionStep(
+    text: string,
+    warnings: BW.Bytes,
+    inputCuts: seq<nat>,
+    outputCuts: seq<nat>,
+    i: nat
+  )
+  {
+    i + 1 < |inputCuts| &&
+    i + 1 < |outputCuts| &&
+    inputCuts[i] < inputCuts[i + 1] <= |text| &&
+    inputCuts[i + 1] == Spec.AtomNext(text, inputCuts[i]) &&
+    outputCuts[i] <= outputCuts[i + 1] <= |warnings| &&
+    warnings[outputCuts[i]..outputCuts[i + 1]] ==
+    Spec.WarningAtSpec(text, inputCuts[i])
+  }
+
+  // Folds explicit per-cut steps into the partition predicate, so the
+  // quantified conjunct is instantiated through WarningPartitionStep terms.
+  lemma FoldWarningPartition(
+    text: string,
+    start: nat,
+    warnings: BW.Bytes,
+    inputCuts: seq<nat>,
+    outputCuts: seq<nat>
+  )
+    requires |inputCuts| == |outputCuts|
+    requires 0 < |inputCuts|
+    requires start <= |text|
+    requires inputCuts[0] == start
+    requires outputCuts[0] == 0
+    requires inputCuts[|inputCuts| - 1] == |text|
+    requires outputCuts[|outputCuts| - 1] == |warnings|
+    requires forall i: nat ::
+               i + 1 < |inputCuts| ==>
+                 WarningPartitionStep(
+                   text, warnings, inputCuts, outputCuts, i)
+    ensures Spec.WarningPartitionFrom(
+              text, start, warnings, inputCuts, outputCuts)
+  {
+    reveal Spec.WarningPartitionFrom();
+    forall i
+      {:trigger inputCuts[i], inputCuts[i + 1]}
+      {:trigger warnings[outputCuts[i]..outputCuts[i + 1]]} |
+      0 <= i && i + 1 < |inputCuts|
+      ensures inputCuts[i] < inputCuts[i + 1] <= |text| &&
+              inputCuts[i + 1] == Spec.AtomNext(text, inputCuts[i]) &&
+              outputCuts[i] <= outputCuts[i + 1] <= |warnings| &&
+              warnings[outputCuts[i]..outputCuts[i + 1]] ==
+              Spec.WarningAtSpec(text, inputCuts[i])
+    {
+      assert WarningPartitionStep(text, warnings, inputCuts, outputCuts, i);
+    }
+  }
+
   lemma PrependWarningPartition(
     text: string,
     start: nat,
@@ -201,49 +256,38 @@ module TrProof {
               [0] + ShiftIndices(tailOutputCuts, |piece|))
   {
     hide *;
-    reveal Spec.WarningPartitionFrom();
+    reveal Spec.WarningPartitionFrom(), WarningPartitionStep();
     var inputCuts := [start] + tailInputCuts;
     var outputCuts := [0] + ShiftIndices(tailOutputCuts, |piece|);
     assert tailInputCuts[0] == next;
     assert tailOutputCuts[0] == 0;
     ShiftIndicesIndex(tailOutputCuts, |piece|, |tailOutputCuts| - 1);
-    assert forall i
-        {:trigger inputCuts[i], inputCuts[i + 1]}
-        {:trigger (piece + rest)[outputCuts[i]..outputCuts[i + 1]]} ::
-        0 <= i && i + 1 < |inputCuts| ==>
-          inputCuts[i] < inputCuts[i + 1] <= |text| &&
-          inputCuts[i + 1] == Spec.AtomNext(text, inputCuts[i]) &&
-          outputCuts[i] <= outputCuts[i + 1] <= |piece + rest| &&
-          (piece + rest)[outputCuts[i]..outputCuts[i + 1]] ==
-          Spec.WarningAtSpec(text, inputCuts[i]) by {
-      forall i {:trigger inputCuts[i]} |
-    0 <= i && i + 1 < |inputCuts|
-        ensures inputCuts[i] < inputCuts[i + 1] <= |text| &&
-                inputCuts[i + 1] == Spec.AtomNext(text, inputCuts[i]) &&
-                outputCuts[i] <= outputCuts[i + 1] <= |piece + rest| &&
-                (piece + rest)[outputCuts[i]..outputCuts[i + 1]] ==
-                Spec.WarningAtSpec(text, inputCuts[i])
-      {
-        if i == 0 {
-          ShiftIndicesIndex(tailOutputCuts, |piece|, 0);
-          assert outputCuts[1] == |piece|;
-          assert (piece + rest)[0..|piece|] == piece;
-        } else {
-          var j := i - 1;
-          ShiftIndicesIndex(tailOutputCuts, |piece|, j);
-          ShiftIndicesIndex(tailOutputCuts, |piece|, j + 1);
-          WarningPartitionFromElement(
-            text, next, rest, tailInputCuts, tailOutputCuts, j);
-          AppendShiftedSlice(
-            piece, rest, tailOutputCuts[j], tailOutputCuts[j + 1]);
-          assert outputCuts[i] == |piece| + tailOutputCuts[j];
-          assert outputCuts[i + 1] == |piece| + tailOutputCuts[j + 1];
-          assert inputCuts[i] == tailInputCuts[j];
-          assert (piece + rest)[outputCuts[i]..outputCuts[i + 1]] ==
-                 rest[tailOutputCuts[j]..tailOutputCuts[j + 1]];
-        }
+    forall i: nat | i + 1 < |inputCuts|
+      ensures WarningPartitionStep(
+                text, piece + rest, inputCuts, outputCuts, i)
+    {
+      if i == 0 {
+        ShiftIndicesIndex(tailOutputCuts, |piece|, 0);
+        assert outputCuts[1] == |piece|;
+        assert (piece + rest)[0..|piece|] == piece;
+      } else {
+        var j := i - 1;
+        ShiftIndicesIndex(tailOutputCuts, |piece|, j);
+        ShiftIndicesIndex(tailOutputCuts, |piece|, j + 1);
+        WarningPartitionFromElement(
+          text, next, rest, tailInputCuts, tailOutputCuts, j);
+        AppendShiftedSlice(
+          piece, rest, tailOutputCuts[j], tailOutputCuts[j + 1]);
+        assert outputCuts[i] == |piece| + tailOutputCuts[j];
+        assert outputCuts[i + 1] == |piece| + tailOutputCuts[j + 1];
+        assert inputCuts[i] == tailInputCuts[j];
+        assert (piece + rest)[outputCuts[i]..outputCuts[i + 1]] ==
+               rest[tailOutputCuts[j]..tailOutputCuts[j + 1]];
       }
     }
+    assert inputCuts[|inputCuts| - 1] == |text|;
+    assert outputCuts[|outputCuts| - 1] == |piece + rest|;
+    FoldWarningPartition(text, start, piece + rest, inputCuts, outputCuts);
   }
 
   lemma CoreWarningSatisfiesRelation(text: string, start: nat)
