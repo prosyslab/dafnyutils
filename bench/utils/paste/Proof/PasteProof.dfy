@@ -946,10 +946,44 @@ module PasteProof {
     ensures states[i] == Spec.StdinAfterReads(before, streams, Spec.StdinCount(cmd.inputs[..i]))
     decreases i
   {
-    if i > 0 {
-      StdinStatesDenote(cmd, streams, before, after, states, i - 1);
-      StdinCountStep(cmd.inputs, i - 1);
+    hide *;
+    if i == 0 {
+      reveal StdinStatesRelation();
+      assert cmd.inputs[..0] == [];
+      assert Spec.StdinCount(cmd.inputs[..0]) == 0 by {
+        reveal Spec.StdinCount();
+      }
+      assert Spec.StdinAfterReads(before, streams, 0) == before by {
+        reveal Spec.StdinAfterReads();
+      }
+    } else {
+      var k := i - 1;
+      var count := Spec.StdinCount(cmd.inputs[..k]);
+      StdinStatesDenote(cmd, streams, before, after, states, k);
+      StdinCountStep(cmd.inputs, k);
+      StdinStatesStep(cmd, streams, before, after, states, k);
+      if cmd.inputs[k].Stdin? {
+        assert Spec.StdinAfterReads(before, streams, count + 1) ==
+               C.ObservedReadStdinRemainingFields(
+                 Spec.StdinAfterReads(before, streams, count), streams) by {
+          reveal Spec.StdinAfterReads();
+        }
+      }
     }
+  }
+
+  lemma StdinStatesStep(cmd: Schema.PasteCmd,
+                        streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
+                        before: BW.Bytes, after: BW.Bytes, states: seq<BW.Bytes>, k: nat)
+    requires StdinStatesRelation(cmd, streams, before, after, states)
+    requires k < |cmd.inputs|
+    ensures |states| == |cmd.inputs| + 1
+    ensures states[k + 1] == (if cmd.inputs[k].Stdin?
+                              then C.ObservedReadStdinRemainingFields(states[k], streams)
+                              else states[k])
+  {
+    hide *;
+    reveal StdinStatesRelation();
   }
 
   lemma FragmentsDenote<T>(fragments: seq<seq<T>>, combined: seq<T>, cuts: seq<nat>, i: nat)
