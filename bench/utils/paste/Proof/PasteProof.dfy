@@ -15,26 +15,150 @@ module PasteProof {
   import Spec = PasteSpec
   import C = IOContract
 
+  ghost predicate FragmentsConcatenate<T>(
+    fragments: seq<seq<T>>,
+    combined: seq<T>,
+    cuts: seq<nat>
+  )
+  {
+    |cuts| == |fragments| + 1 &&
+    cuts[0] == 0 &&
+    cuts[|cuts| - 1] == |combined| &&
+    forall i: nat {:trigger cuts[i]} | i < |fragments| ::
+      cuts[i] <= cuts[i + 1] <= |combined| &&
+      cuts[i + 1] == cuts[i] + |fragments[i]| &&
+      combined[cuts[i]..cuts[i + 1]] == fragments[i]
+  }
+
+  ghost predicate LinePartitionRelation(
+    data: BW.Bytes,
+    recordDelimiter: BW.RawByte,
+    lines: seq<BW.Bytes>,
+    terminated: seq<bool>,
+    fragments: seq<BW.Bytes>,
+    cuts: seq<nat>
+  )
+  {
+    |lines| == |terminated| == |fragments| &&
+    FragmentsConcatenate(fragments, data, cuts) &&
+    (forall i: nat | i < |lines| ::
+       |fragments[i]| > 0 &&
+       fragments[i] ==
+       lines[i] + (if terminated[i] then [recordDelimiter] else []) &&
+       recordDelimiter !in lines[i] &&
+       (i + 1 < |lines| ==> terminated[i]))
+  }
+
+  ghost predicate StdinStatesRelation(
+    cmd: Schema.PasteCmd,
+    observations: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
+    before: BW.Bytes, after: BW.Bytes,
+    states: seq<BW.Bytes>
+  )
+  {
+    |states| == |cmd.inputs| + 1 && states[0] == before &&
+    states[|cmd.inputs|] == after &&
+    forall i: nat {:trigger states[i + 1]} | i < |cmd.inputs| ::
+      states[i + 1] == (if cmd.inputs[i].Stdin?
+                        then C.ObservedReadStdinRemainingFields(states[i], observations)
+                        else states[i])
+  }
+
+  ghost predicate StdinDataRelation(
+    cmd: Schema.PasteCmd, observations: seq<Spec.InputObservation>,
+    data: BW.Bytes, cuts: seq<nat>
+  )
+  {
+    |observations| == |cmd.inputs| && |cuts| == |cmd.inputs| + 1 &&
+    cuts[0] == 0 && cuts[|cmd.inputs|] == |data| &&
+    forall i: nat {:trigger cuts[i]} | i < |cmd.inputs| ::
+      cuts[i] <= cuts[i + 1] <= |data| &&
+      data[cuts[i]..cuts[i + 1]] == (if cmd.inputs[i].Stdin?
+                                     then C.ReadResultData(observations[i].result) else [])
+  }
+
+  datatype DelimiterAssembly =
+    DelimiterDone |
+    DelimiterFailure |
+    DelimiterStep(
+      index: nat,
+      nextIndex: nat,
+      delimiter: BW.Bytes,
+      rest: DelimiterAssembly)
+
+  ghost predicate DelimiterParseRelation(
+    text: BW.Bytes,
+    i: nat,
+    result: Spec.DelimiterResult,
+    assembly: DelimiterAssembly
+  )
+    decreases assembly
+  {
+    i <= |text| &&
+    match assembly
+    case DelimiterDone =>
+      i == |text| && result == Result.Ok([])
+    case DelimiterFailure =>
+      i < |text| &&
+      text[i] == '\\' &&
+      i + 1 == |text| &&
+      result == Result.Err(Spec.DelimiterBackslashError(text))
+    case DelimiterStep(index, nextIndex, delimiter, rest) =>
+      index == i &&
+      i < |text| &&
+      (if text[i] == '\\' then
+         nextIndex == i + 2 &&
+         i + 1 < |text| &&
+         delimiter == Spec.EscapedDelimiter(text[i + 1])
+       else
+         nextIndex == i + 1 &&
+         delimiter == [text[i]]) &&
+      exists restResult: Spec.DelimiterResult ::
+        DelimiterParseRelation(text, nextIndex, restResult, rest) &&
+        result ==
+        match restResult
+        case Err(stderr) => Result.Err(stderr)
+        case Ok(delims) => Result.Ok([delimiter] + delims)
+  }
+
+  datatype VisibleErrorAssembly =
+    VisibleErrorsDone |
+    VisibleErrorStep(
+      previous: BW.Bytes,
+      rest: VisibleErrorAssembly)
+
+  ghost predicate VisibleErrorPrefixRelation(
+    serial: bool,
+    observations: seq<Spec.InputObservation>,
+    i: nat,
+    output: BW.Bytes,
+    assembly: VisibleErrorAssembly
+  )
+    decreases assembly
+  {
+    i <= |observations| &&
+    match assembly
+    case VisibleErrorsDone =>
+      i == 0 && output == []
+    case VisibleErrorStep(previous, rest) =>
+      i > 0 &&
+      VisibleErrorPrefixRelation(
+        serial, observations, i - 1, previous, rest) &&
+      output ==
+      if serial then
+        previous + observations[i - 1].errorPiece
+      else if exists j: nat ::
+                j < i - 1 && observations[j].blocking then
+        previous
+      else if observations[i - 1].blocking then
+        observations[i - 1].errorPiece
+      else
+        previous + observations[i - 1].errorPiece
+  }
+
   ghost function ShiftCuts(cuts: seq<nat>, offset: nat): seq<nat>
   {
     seq(|cuts|, i requires 0 <= i < |cuts| => cuts[i] + offset)
-  }
-
-  ghost function PrefixStdinPositions(
-    inputs: seq<Schema.Input>,
-    i: nat
-  ): seq<nat>
-    requires i <= |inputs|
-    ensures |PrefixStdinPositions(inputs, i)| <= i
-    decreases i
-  {
-    if i == 0 then
-      []
-    else
-      var previous := PrefixStdinPositions(inputs, i - 1);
-      if inputs[i - 1] == Schema.Stdin
-      then previous + [i - 1]
-      else previous
   }
 
   ghost function ObservationAt(
@@ -85,14 +209,14 @@ module PasteProof {
     tail: seq<T>,
     tailCuts: seq<nat>
   )
-    requires Spec.FragmentsConcatenate(
+    requires FragmentsConcatenate(
                tailFragments, tail, tailCuts)
-    ensures Spec.FragmentsConcatenate(
+    ensures FragmentsConcatenate(
               [head] + tailFragments,
               head + tail,
               [0] + ShiftCuts(tailCuts, |head|))
   {
-    reveal Spec.FragmentsConcatenate();
+    reveal FragmentsConcatenate();
     forall i: nat {:trigger ([0] + ShiftCuts(
       tailCuts, |head|))[i]} | i < |[head] + tailFragments|
       ensures ([0] + ShiftCuts(tailCuts, |head|))[i] <=
@@ -146,7 +270,7 @@ module PasteProof {
       fragments: seq<BW.Bytes>,
       cuts: seq<nat>
     )
-    ensures Spec.LinePartitionRelation(
+    ensures LinePartitionRelation(
               data,
               recordDelimiter,
               Core.Lines(data, recordDelimiter),
@@ -161,8 +285,8 @@ module PasteProof {
       terminated := [];
       fragments := [];
       cuts := [0];
-      reveal Spec.LinePartitionRelation();
-             reveal Spec.FragmentsConcatenate();
+      reveal LinePartitionRelation();
+             reveal FragmentsConcatenate();
     case SomeLine(line, rest) =>
       if data == line + [recordDelimiter] + rest {
         var tailTerminated, tailFragments, tailCuts :=
@@ -172,7 +296,7 @@ module PasteProof {
         fragments := [head] + tailFragments;
         cuts := [0] + ShiftCuts(tailCuts, |head|);
         PrependFragment(head, tailFragments, rest, tailCuts);
-        reveal Spec.LinePartitionRelation();
+        reveal LinePartitionRelation();
         assert Core.Lines(data, recordDelimiter) ==
                [line] + Core.Lines(rest, recordDelimiter);
         assert forall i: nat :: i < |Core.Lines(data, recordDelimiter)| ==>
@@ -205,9 +329,143 @@ module PasteProof {
         terminated := [false];
         fragments := [line];
         cuts := [0, |line|];
-        reveal Spec.LinePartitionRelation();
-        reveal Spec.FragmentsConcatenate();
+        reveal LinePartitionRelation();
+        reveal FragmentsConcatenate();
       }
+  }
+
+  lemma LinePartitionDenote(data: BW.Bytes, delimiter: BW.RawByte,
+                            lines: seq<BW.Bytes>, terminated: seq<bool>,
+                            fragments: seq<BW.Bytes>, cuts: seq<nat>)
+    requires LinePartitionRelation(data, delimiter, lines, terminated, fragments, cuts)
+    ensures Spec.LinesRelation(data, delimiter, lines)
+  {
+    FragmentsDenote(fragments, data, cuts, |fragments|);
+    assert fragments[..|fragments|] == fragments;
+    assert data[..cuts[|fragments|]] == data;
+    if |lines| == 0 {
+      assert data == [];
+    } else {
+      var last := |lines| - 1;
+      assert data[cuts[last]..] == fragments[last];
+      assert |data| > 0;
+      assert data[|data| - 1] == fragments[last][|fragments[last]| - 1];
+      assert terminated[last] == (data[|data| - 1] == delimiter);
+      var joined := JoinedFragments(lines, [[delimiter]]);
+      JoinedFragmentsEq(lines, [[delimiter]]);
+      assert |joined| == |lines|;
+      assert joined[last] == lines[last];
+      assert fragments[..last] == joined[..last];
+      assert fragments == fragments[..last] + [fragments[last]];
+      assert joined == joined[..last] + [lines[last]];
+      ConcatSnoc(fragments[..last], fragments[last]);
+      ConcatSnoc(joined[..last], lines[last]);
+      assert Spec.Concat<BW.RawByte>(joined) == Spec.Join(lines, [[delimiter]]);
+    }
+  }
+
+  lemma JoinConstantHead(lines: seq<BW.Bytes>, delimiter: BW.RawByte)
+    requires |lines| > 0
+    ensures Spec.Join(lines, [[delimiter]]) == lines[0] +
+                                               (if |lines| > 1 then [delimiter] + Spec.Join(lines[1..], [[delimiter]]) else [])
+  {
+    var pieces := JoinedFragments(lines, [[delimiter]]);
+    JoinedFragmentsEq(lines, [[delimiter]]);
+    JoinedFragmentsEq(lines[1..], [[delimiter]]);
+    assert pieces[1..] == JoinedFragments(lines[1..], [[delimiter]]);
+    assert pieces[0] == lines[0] + (if |lines| > 1 then [delimiter] else []);
+  }
+
+  lemma ReadRecordCons(head: BW.RawByte, data: BW.Bytes, delimiter: BW.RawByte,
+                       line: BW.Bytes, rest: BW.Bytes)
+    requires head != delimiter
+    requires Core.ReadLine(data, delimiter) == Core.SomeLine(line, rest)
+    ensures Core.ReadLine([head] + data, delimiter) == Core.SomeLine([head] + line, rest)
+  {
+    hide *;
+    reveal Core.ReadLine();
+  }
+
+  lemma ReadRecord(line: BW.Bytes, delimiter: BW.RawByte, terminated: bool, rest: BW.Bytes)
+    requires delimiter !in line
+    requires terminated || (|line| > 0 && rest == [])
+    ensures Core.ReadLine(line + (if terminated then [delimiter] else []) + rest, delimiter) ==
+            Core.SomeLine(line, rest)
+    decreases |line|
+  {
+    hide *;
+    if |line| > 0 && (terminated || |line| > 1) {
+      var ending: BW.Bytes := if terminated then [delimiter] else [];
+      var tail: BW.Bytes := line[1..] + ending + rest;
+      ReadRecord(line[1..], delimiter, terminated, rest);
+      ReadRecordCons(line[0], tail, delimiter, line[1..], rest);
+      assert line == [line[0]] + line[1..];
+      assert line + ending + rest == [line[0]] + tail;
+      assert Core.ReadLine(line + ending + rest, delimiter) == Core.SomeLine(line, rest);
+    } else {
+      reveal Core.ReadLine();
+      if |line| == 0 {
+        assert terminated;
+        assert line + [delimiter] + rest == [delimiter] + rest;
+      } else {
+        assert |line| == 1 && !terminated && rest == [];
+        assert line == [line[0]];
+      }
+    }
+  }
+
+  lemma LinesRelationMatchesCore(data: BW.Bytes, delimiter: BW.RawByte,
+                                 lines: seq<BW.Bytes>)
+    requires Spec.LinesRelation(data, delimiter, lines)
+    ensures lines == Core.Lines(data, delimiter)
+    decreases |lines|
+  {
+    if |data| > 0 {
+      var ended := data[|data| - 1] == delimiter;
+      JoinConstantHead(lines, delimiter);
+      if |lines| == 1 {
+        assert data == lines[0] + (if ended then [delimiter] else []);
+        var empty: BW.Bytes := [];
+        if ended {
+          ReadRecord(lines[0], delimiter, true, empty);
+          assert data == lines[0] + [delimiter] + empty;
+        } else {
+          ReadRecord(lines[0], delimiter, false, empty);
+          assert data == lines[0] + empty + empty;
+        }
+        assert Core.ReadLine(data, delimiter) == Core.SomeLine(lines[0], []);
+        assert lines == [lines[0]];
+        assert Core.Lines([], delimiter) == [];
+      } else {
+        var rest := Spec.Join(lines[1..], [[delimiter]]) + (if ended then [delimiter] else []);
+        assert data == lines[0] + [delimiter] + rest;
+        assert |rest| > 0 by {
+          if |rest| == 0 {
+            assert data[|data| - 1] == delimiter;
+          }
+        }
+        assert rest[|rest| - 1] == data[|data| - 1];
+        assert Spec.LinesRelation(rest, delimiter, lines[1..]);
+        ReadRecord(lines[0], delimiter, true, rest);
+        LinesRelationMatchesCore(rest, delimiter, lines[1..]);
+      }
+    }
+  }
+
+  lemma LinesRelationEquivalent(data: BW.Bytes, delimiter: BW.RawByte, lines: seq<BW.Bytes>)
+    ensures Spec.LinesRelation(data, delimiter, lines) <==>
+            (exists terminated: seq<bool>, fragments: seq<BW.Bytes>, cuts: seq<nat> ::
+               LinePartitionRelation(data, delimiter, lines, terminated, fragments, cuts))
+  {
+    if Spec.LinesRelation(data, delimiter, lines) {
+      LinesRelationMatchesCore(data, delimiter, lines);
+      var terminated, fragments, cuts := BuildLinePartition(data, delimiter);
+    } else if exists terminated: seq<bool>, fragments: seq<BW.Bytes>, cuts: seq<nat> ::
+        LinePartitionRelation(data, delimiter, lines, terminated, fragments, cuts) {
+      var terminated: seq<bool>, fragments: seq<BW.Bytes>, cuts: seq<nat> :|
+        LinePartitionRelation(data, delimiter, lines, terminated, fragments, cuts);
+      LinePartitionDenote(data, delimiter, lines, terminated, fragments, cuts);
+    }
   }
 
   lemma EntryRefines(
@@ -221,7 +479,8 @@ module PasteProof {
   {
     var terminated, fragments, cuts :=
       BuildLinePartition(C.ReadResultData(result), recordDelimiter);
-    reveal Spec.EntryRelation();
+    LinesRelationEquivalent(C.ReadResultData(result), recordDelimiter,
+                            Core.EntryForRead(result, recordDelimiter).lines);
   }
 
   lemma PrefixStdinCharacterization(
@@ -232,8 +491,8 @@ module PasteProof {
   )
     requires states == seq(|cmd.inputs| + 1,
                        j requires 0 <= j <= |cmd.inputs| => Core.PrefixStdinCore(cmd, preStreams, preStdin, j))
-    ensures Spec.StdinStatesRelation(cmd, preStreams, preStdin,
-                                     Core.PrefixStdinCore(cmd, preStreams, preStdin, |cmd.inputs|), states)
+    ensures StdinStatesRelation(cmd, preStreams, preStdin,
+                                Core.PrefixStdinCore(cmd, preStreams, preStdin, |cmd.inputs|), states)
   {
     forall i: nat | i < |cmd.inputs|
       ensures states[i + 1] == (if cmd.inputs[i].Stdin?
@@ -295,6 +554,8 @@ module PasteProof {
               Spec.RecordDelimiter(cmd.zeroTerminated))
     decreases i
   {
+    hide *;
+    reveal Core.PrefixEntriesCore();
     if j + 1 < i {
       PrefixEntriesIndex(cmd, preFs, preStreams, preStdin, i - 1, j);
     }
@@ -309,6 +570,8 @@ module PasteProof {
               Observations(cmd, preFs, preStreams, preStdin)) ==
             Core.EntriesCore(cmd, preFs, preStreams, preStdin)
   {
+    hide *;
+    reveal Observations(), ObservationAt(), Spec.ObservationEntries(), Core.EntriesCore();
     var observations := Observations(cmd, preFs, preStreams, preStdin);
     var entries := Core.EntriesCore(cmd, preFs, preStreams, preStdin);
     assert |observations| == |entries| == |cmd.inputs|;
@@ -324,154 +587,6 @@ module PasteProof {
 
       }
     }
-  }
-
-  lemma PrefixPositionsLength(
-    inputs: seq<Schema.Input>,
-    i: nat
-  )
-    requires i <= |inputs|
-    ensures |PrefixStdinPositions(inputs, i)| ==
-            Core.CountStdinPrefix(inputs, i)
-    decreases i
-  {
-    if i > 0 {
-      PrefixPositionsLength(inputs, i - 1);
-    }
-  }
-
-  lemma PrefixPositionsIndex(
-    inputs: seq<Schema.Input>,
-    i: nat,
-    k: nat
-  )
-    requires i <= |inputs|
-    requires k < |PrefixStdinPositions(inputs, i)|
-    ensures PrefixStdinPositions(inputs, i)[k] < i
-    ensures inputs[PrefixStdinPositions(inputs, i)[k]] ==
-            Schema.Stdin
-    ensures k > 0 ==>
-              PrefixStdinPositions(inputs, i)[k - 1] <
-              PrefixStdinPositions(inputs, i)[k]
-    decreases i
-  {
-    if i > 0 {
-      var previous := PrefixStdinPositions(inputs, i - 1);
-      if inputs[i - 1] == Schema.Stdin {
-        if k < |previous| {
-          PrefixPositionsIndex(inputs, i - 1, k);
-        } else {
-          assert k == |previous|;
-          if k > 0 {
-            PrefixPositionsIndex(inputs, i - 1, k - 1);
-          }
-        }
-      } else {
-        PrefixPositionsIndex(inputs, i - 1, k);
-      }
-    }
-  }
-
-  lemma PrefixPositionsComplete(
-    inputs: seq<Schema.Input>,
-    i: nat,
-    j: nat
-  ) returns (k: nat)
-    requires j < i <= |inputs|
-    requires inputs[j] == Schema.Stdin
-    ensures k < |PrefixStdinPositions(inputs, i)|
-    ensures PrefixStdinPositions(inputs, i)[k] == j
-    decreases i
-  {
-    if j + 1 == i {
-      k := |PrefixStdinPositions(inputs, i - 1)|;
-      assert PrefixStdinPositions(inputs, i)[k] == j;
-    } else {
-      k := PrefixPositionsComplete(inputs, i - 1, j);
-      assert k < |PrefixStdinPositions(inputs, i - 1)|;
-      assert k < |PrefixStdinPositions(inputs, i)|;
-      assert PrefixStdinPositions(inputs, i)[k] == j;
-    }
-  }
-
-  lemma StdinPositionsRefines(inputs: seq<Schema.Input>)
-    ensures Spec.StdinPositionsRelation(
-              inputs, PrefixStdinPositions(inputs, |inputs|))
-  {
-    var positions := PrefixStdinPositions(inputs, |inputs|);
-    reveal Spec.StdinPositionsRelation();
-    assert forall k: nat :: k < |positions| ==>
-                              positions[k] < |inputs| &&
-                              inputs[positions[k]] == Schema.Stdin &&
-                              (k > 0 ==> positions[k - 1] < positions[k]) by {
-      forall k: nat | k < |positions|
-        ensures positions[k] < |inputs| &&
-                inputs[positions[k]] == Schema.Stdin &&
-                (k > 0 ==> positions[k - 1] < positions[k])
-      {
-        PrefixPositionsIndex(inputs, |inputs|, k);
-      }
-    }
-    assert forall i: nat :: i < |inputs| ==>
-                              inputs[i] == Schema.Stdin ==>
-                                exists k: nat :: k < |positions| && positions[k] == i by {
-      forall i: nat | i < |inputs|
-        ensures inputs[i] == Schema.Stdin ==>
-                  exists k: nat :: k < |positions| && positions[k] == i
-      {
-        if inputs[i] == Schema.Stdin {
-          var k := PrefixPositionsComplete(
-            inputs, |inputs|, i);
-          assert exists rank: nat ::
-              rank < |positions| && positions[rank] == i by {
-            ghost var rank := k;
-          }
-        }
-      }
-    }
-  }
-
-  lemma PrefixPositionsExtendToFull(
-    inputs: seq<Schema.Input>,
-    i: nat
-  )
-    requires i < |inputs|
-    requires inputs[i] == Schema.Stdin
-    ensures |PrefixStdinPositions(inputs, i)| <
-            |PrefixStdinPositions(inputs, |inputs|)|
-    ensures PrefixStdinPositions(inputs, |inputs|)[
-            |PrefixStdinPositions(inputs, i)|] == i
-    decreases |inputs| - i
-  {
-    var rank := |PrefixStdinPositions(inputs, i)|;
-    assert PrefixStdinPositions(inputs, i + 1)[rank] == i;
-    PositionPersists(inputs, i + 1, |inputs|, rank);
-  }
-
-  lemma PositionPersists(
-    inputs: seq<Schema.Input>,
-    start: nat,
-    end: nat,
-    k: nat
-  )
-    requires start <= end <= |inputs|
-    requires k < |PrefixStdinPositions(inputs, start)|
-    ensures k < |PrefixStdinPositions(inputs, end)|
-    ensures PrefixStdinPositions(inputs, end)[k] ==
-            PrefixStdinPositions(inputs, start)[k]
-    decreases end
-  {
-    if start < end {
-      PositionPersists(inputs, start, end - 1, k);
-    }
-  }
-
-  lemma CountStdinInputsEqPositions(inputs: seq<Schema.Input>)
-    ensures Core.CountStdinInputs(inputs) ==
-            |PrefixStdinPositions(inputs, |inputs|)|
-    decreases |inputs|
-  {
-    PrefixPositionsLength(inputs, |inputs|);
   }
 
   lemma SelectedLinesRefines(
@@ -526,124 +641,54 @@ module PasteProof {
     }
   }
 
-  lemma {:isolate_assertions} EntriesForOutputRefines(
-    cmd: Schema.PasteCmd,
-    preStdin: BW.Bytes,
-    rawEntries: seq<Spec.Entry>
-  )
-    requires |rawEntries| == |cmd.inputs|
-    ensures Spec.EntriesForOutputRelation(
-              cmd,
-              preStdin,
-              rawEntries,
-              Core.EntriesForOutputFromEntries(
-                cmd,
-                rawEntries,
-                if Spec.HasStdinInput(cmd.inputs) then preStdin else []))
+  lemma StdinCountMatchesCore(inputs: seq<Schema.Input>, i: nat)
+    requires i <= |inputs|
+    ensures Spec.StdinCount(inputs[..i]) == Core.CountStdinPrefix(inputs, i)
+    decreases i
   {
-    if cmd.serial {
-      reveal Spec.EntriesForOutputRelation();
-      assert Spec.EntriesForOutputRelation(
-          cmd,
-          preStdin,
-          rawEntries,
-          Core.EntriesForOutputFromEntries(
-            cmd,
-            rawEntries,
-            if Spec.HasStdinInput(cmd.inputs) then preStdin else []));
-    } else {
-      var positions :=
-        PrefixStdinPositions(cmd.inputs, |cmd.inputs|);
-      StdinPositionsRefines(cmd.inputs);
-      PrefixPositionsLength(cmd.inputs, |cmd.inputs|);
-      CountStdinInputsEqPositions(cmd.inputs);
-      var stdinData :=
-        if Spec.HasStdinInput(cmd.inputs) then preStdin else [];
-      var recordDelimiter := Spec.RecordDelimiter(cmd.zeroTerminated);
+    if i > 0 {
+      StdinCountMatchesCore(inputs, i - 1);
+      StdinCountStep(inputs, i - 1);
+    }
+  }
 
-      var terminated, fragments, cuts :=
-        BuildLinePartition(stdinData, recordDelimiter);
-      var stdinLines := Core.Lines(stdinData, recordDelimiter);
-      var outputEntries := Core.EntriesForOutputFromEntries(
-        cmd, rawEntries, stdinData);
-      assert |outputEntries| == |cmd.inputs|;
-      assert |outputEntries| == |cmd.inputs|;
-      assert |rawEntries| == |cmd.inputs|;
-      reveal Spec.EntriesForOutputRelation();
-      assert forall i: nat :: i < |cmd.inputs| ==>
-                                match cmd.inputs[i]
-                                case File(_) =>
-                                  outputEntries[i] ==
-                                  rawEntries[i]
-                                case Stdin =>
-                                  exists rank: nat, selected: seq<BW.Bytes> ::
-                                    rank < |positions| &&
-                                    positions[rank] == i &&
-                                    Spec.SelectedLinesRelation(
-                                      stdinLines, rank, |positions|, selected) &&
-                                    outputEntries[i] ==
-                                    Spec.Entry(selected, true) by {
-        forall i: nat | i < |cmd.inputs|
-          ensures
-            match cmd.inputs[i]
-            case File(_) =>
-              outputEntries[i] ==
-              rawEntries[i]
-            case Stdin =>
-              exists rank: nat, selected: seq<BW.Bytes> ::
-                rank < |positions| &&
-                positions[rank] == i &&
-                Spec.SelectedLinesRelation(
-                  stdinLines, rank, |positions|, selected) &&
-                outputEntries[i] ==
-                Spec.Entry(selected, true)
-        {
-          ParallelEntryAt(
-            cmd.inputs,
-            rawEntries,
-            stdinLines,
-            Core.CountStdinInputs(cmd.inputs),
-            0,
-            i);
-
-          match cmd.inputs[i]
-          case File(_) =>
-
-          case Stdin =>
-            var rank := Core.CountStdinPrefix(cmd.inputs, i);
-            PrefixPositionsLength(cmd.inputs, i);
-            PrefixPositionsExtendToFull(cmd.inputs, i);
-      assert rank < |positions|;
-      assert positions[rank] == i;
-      SelectedLinesRefines(stdinLines, rank, |positions|);
-      ghost var selected :=
-        Core.SelectStdinLines(stdinLines, rank, |positions|);
-        }
-      }
-      ghost var trace := Spec.EntriesForOutputWitness(
-        positions, stdinLines, terminated, fragments, cuts);
-      assert Spec.ParallelEntriesForOutputRelation(
-          cmd,
-          preStdin,
-          rawEntries,
-          outputEntries,
-          trace) by {
-        reveal Spec.ParallelEntriesForOutputRelation();
-      }
-      assert Spec.EntriesForOutputRelation(
-          cmd,
-          preStdin,
-          rawEntries,
-          outputEntries) by {
-        reveal Spec.EntriesForOutputRelation();
-        assert exists witnessValue: Spec.EntriesForOutputWitness ::
-            Spec.ParallelEntriesForOutputRelation(
-              cmd,
-              preStdin,
-              rawEntries,
-              outputEntries,
-              witnessValue) by {
-          ghost var witnessValue := trace;
+  lemma EntriesForOutputRefines(cmd: Schema.PasteCmd, preStdin: BW.Bytes,
+                                rawEntries: seq<Spec.Entry>)
+    requires |rawEntries| == |cmd.inputs|
+    ensures Spec.EntriesForOutputRelation(cmd, preStdin, rawEntries,
+                                          Core.EntriesForOutputFromEntries(cmd, rawEntries,
+                                                                           if Spec.HasStdinInput(cmd.inputs) then preStdin else []))
+  {
+    hide *;
+    reveal Spec.EntriesForOutputRelation(), Core.EntriesForOutputFromEntries(),
+           Core.CountStdinInputs(), Spec.StdinCount();
+    if !cmd.serial {
+      var data := if Spec.HasStdinInput(cmd.inputs) then preStdin else [];
+      var delimiter := Spec.RecordDelimiter(cmd.zeroTerminated);
+      var lines := Core.Lines(data, delimiter);
+      var terminated, fragments, cuts := BuildLinePartition(data, delimiter);
+      LinePartitionDenote(data, delimiter, lines, terminated, fragments, cuts);
+      var entries := Core.EntriesForOutputFromEntries(cmd, rawEntries, data);
+      StdinCountMatchesCore(cmd.inputs, |cmd.inputs|);
+      assert cmd.inputs[..|cmd.inputs|] == cmd.inputs;
+      assert Core.CountStdinInputs(cmd.inputs) == Spec.StdinCount(cmd.inputs);
+      forall i: nat | i < |cmd.inputs|
+        ensures if cmd.inputs[i].Stdin? then entries[i].readOk &&
+                                             Spec.SelectedLinesRelation(lines, Spec.StdinCount(cmd.inputs[..i]),
+                                                                        Spec.StdinCount(cmd.inputs), entries[i].lines)
+                else entries[i] == rawEntries[i]
+      {
+        ParallelEntryAt(cmd.inputs, rawEntries, lines, Core.CountStdinInputs(cmd.inputs), 0, i);
+        if cmd.inputs[i].Stdin? {
+          assert Schema.Stdin in cmd.inputs;
+          assert Spec.StdinCount(cmd.inputs) > 0;
+          StdinCountMatchesCore(cmd.inputs, i);
+          assert entries[i] == Spec.Entry(
+                                 Core.SelectStdinLines(lines, Core.CountStdinPrefix(cmd.inputs, i),
+                                                       Core.CountStdinInputs(cmd.inputs)), true);
+          assert entries[i].lines == Core.SelectStdinLines(lines,
+                                                           Spec.StdinCount(cmd.inputs[..i]), Spec.StdinCount(cmd.inputs));
+          SelectedLinesRefines(lines, Spec.StdinCount(cmd.inputs[..i]), Spec.StdinCount(cmd.inputs));
         }
       }
     }
@@ -676,9 +721,9 @@ module PasteProof {
     preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
     preStdin: BW.Bytes,
     i: nat
-  ) returns (assembly: Spec.VisibleErrorAssembly)
+  ) returns (assembly: VisibleErrorAssembly)
     requires i <= |cmd.inputs|
-    ensures Spec.VisibleErrorPrefixRelation(
+    ensures VisibleErrorPrefixRelation(
               cmd.serial,
               Observations(cmd, preFs, preStreams, preStdin),
               i,
@@ -688,16 +733,84 @@ module PasteProof {
     decreases i
   {
     if i == 0 {
-      assembly := Spec.VisibleErrorsDone;
+      assembly := VisibleErrorsDone;
     } else {
       var rest :=
         VisibleErrorsRefine(cmd, preFs, preStreams, preStdin, i - 1);
       PrefixHadBlockingRefines(cmd, preFs, preStreams, preStdin, i - 1);
-      assembly := Spec.VisibleErrorStep(
+      assembly := VisibleErrorStep(
         Core.PrefixVisibleErrorOutputCore(
           cmd, preFs, preStreams, preStdin, i - 1),
         rest);
     }
+  }
+
+  lemma ConcatSnoc<T>(parts: seq<seq<T>>, last: seq<T>)
+    ensures Spec.Concat<T>(parts + [last]) == Spec.Concat<T>(parts) + last
+    decreases |parts|
+  {
+    if |parts| > 0 {
+      ConcatSnoc<T>(parts[1..], last);
+      assert (parts + [last])[1..] == parts[1..] + [last];
+    }
+  }
+
+  lemma VisibleErrorsWithoutBlocking(serial: bool, observations: seq<Spec.InputObservation>, n: nat)
+    requires n <= |observations|
+    requires serial || (forall j: nat | j < n :: !observations[j].blocking)
+    ensures Spec.VisibleErrors(serial, observations[..n]) ==
+            Spec.Concat<BW.RawByte>(seq(n, k requires 0 <= k < n => observations[k].errorPiece))
+  {
+    hide *;
+    reveal Spec.VisibleErrors();
+    var prefix := observations[..n];
+    if !serial {
+      forall j: nat {:trigger prefix[j]} | j < |prefix|
+        ensures !prefix[j].blocking
+      {
+        assert prefix[j] == observations[j];
+      }
+    }
+    var pieces: seq<BW.Bytes> := seq(n, k requires 0 <= k < n => observations[k].errorPiece);
+    var projected: seq<BW.Bytes> := seq(|prefix|, k requires 0 <= k < |prefix| => prefix[k].errorPiece);
+    forall k | 0 <= k < n
+      ensures pieces[k] == projected[k]
+    {
+    }
+    assert pieces == projected;
+  }
+
+  lemma VisibleErrorsDenote(serial: bool, observations: seq<Spec.InputObservation>,
+                            i: nat, output: BW.Bytes,
+                            assembly: VisibleErrorAssembly)
+    requires i <= |observations|
+    requires VisibleErrorPrefixRelation(serial, observations, i, output, assembly)
+    ensures output == Spec.VisibleErrors(serial, observations[..i])
+    decreases assembly
+  {
+    reveal Spec.VisibleErrors();
+    match assembly
+    case VisibleErrorsDone =>
+    case VisibleErrorStep(previous, rest) =>
+      VisibleErrorsDenote(serial, observations, i - 1, previous, rest);
+      if !serial && (exists j: nat :: j < i - 1 && observations[j].blocking) {
+        var first := Spec.FirstBlocking(observations[..i - 1]);
+        var next := Spec.FirstBlocking(observations[..i]);
+        assert first == next;
+      } else if !serial && observations[i - 1].blocking {
+        assert Spec.FirstBlocking(observations[..i]) == i - 1;
+      } else {
+        var pieces: seq<BW.Bytes> := seq(i - 1, k requires 0 <= k < i - 1 => observations[k].errorPiece);
+        assert !serial ==> !(exists j: nat :: j < i && observations[j].blocking);
+        VisibleErrorsWithoutBlocking(serial, observations, i - 1);
+        VisibleErrorsWithoutBlocking(serial, observations, i);
+        assert (seq(i, k requires 0 <= k < i => observations[k].errorPiece)) ==
+               pieces + [observations[i - 1].errorPiece];
+        ConcatSnoc<BW.RawByte>(pieces, observations[i - 1].errorPiece);
+        assert previous == Spec.Concat<BW.RawByte>(pieces);
+        assert output == previous + observations[i - 1].errorPiece;
+        assert output == Spec.VisibleErrors(serial, observations[..i]);
+      }
   }
 
   lemma PrefixHadErrorRefines(
@@ -814,7 +927,62 @@ module PasteProof {
     }
   }
 
-  lemma InputTraceWitness(
+  lemma StdinCountStep(inputs: seq<Schema.Input>, i: nat)
+    requires i < |inputs|
+    ensures Spec.StdinCount(inputs[..i + 1]) == Spec.StdinCount(inputs[..i]) +
+                                                (if inputs[i].Stdin? then 1 else 0)
+  {
+    hide *;
+    reveal Spec.StdinCount();
+    assert inputs[..i + 1] == inputs[..i] + [inputs[i]];
+    assert multiset(inputs[..i + 1]) == multiset(inputs[..i]) + multiset{inputs[i]};
+  }
+
+  lemma StdinStatesDenote(cmd: Schema.PasteCmd,
+                          streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
+                          before: BW.Bytes, after: BW.Bytes, states: seq<BW.Bytes>, i: nat)
+    requires StdinStatesRelation(cmd, streams, before, after, states)
+    requires i <= |cmd.inputs|
+    ensures states[i] == Spec.StdinAfterReads(before, streams, Spec.StdinCount(cmd.inputs[..i]))
+    decreases i
+  {
+    if i > 0 {
+      StdinStatesDenote(cmd, streams, before, after, states, i - 1);
+      StdinCountStep(cmd.inputs, i - 1);
+    }
+  }
+
+  lemma FragmentsDenote<T>(fragments: seq<seq<T>>, combined: seq<T>, cuts: seq<nat>, i: nat)
+    requires FragmentsConcatenate(fragments, combined, cuts)
+    requires i <= |fragments|
+    ensures combined[..cuts[i]] == Spec.Concat<T>(fragments[..i])
+    decreases i
+  {
+    if i > 0 {
+      FragmentsDenote<T>(fragments, combined, cuts, i - 1);
+      assert fragments[..i] == fragments[..i - 1] + [fragments[i - 1]];
+      ConcatSnoc<T>(fragments[..i - 1], fragments[i - 1]);
+      assert combined[..cuts[i]] == combined[..cuts[i - 1]] + combined[cuts[i - 1]..cuts[i]];
+    }
+  }
+
+  lemma StdinDataDenote(cmd: Schema.PasteCmd, observations: seq<Spec.InputObservation>,
+                        data: BW.Bytes, cuts: seq<nat>)
+    requires StdinDataRelation(cmd, observations, data, cuts)
+    ensures data == Spec.StdinData(cmd, observations)
+  {
+    reveal Spec.StdinData();
+    var pieces: seq<BW.Bytes> := seq(|observations|, i requires 0 <= i < |observations| =>
+      if cmd.inputs[i].Stdin? then C.ReadResultData(observations[i].result) else []);
+    assert FragmentsConcatenate(pieces, data, cuts);
+    FragmentsDenote<BW.RawByte>(pieces, data, cuts, |pieces|);
+    assert data[..cuts[|pieces|]] == data;
+    assert pieces[..|pieces|] == pieces;
+    assert data == Spec.Concat<BW.RawByte>(pieces);
+    assert Spec.StdinData(cmd, observations) == Spec.Concat<BW.RawByte>(pieces);
+  }
+
+  lemma InputRefinement(
     cmd: Schema.PasteCmd, fs: BW.FileSystem,
     streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
     before: BW.Bytes, after: BW.Bytes, entries: seq<Spec.Entry>,
@@ -824,26 +992,38 @@ module PasteProof {
   )
     requires |observations| == |cmd.inputs|
     requires |states| == |cmd.inputs| + 1
-    requires Spec.StdinStatesRelation(cmd, streams, before, after, states)
-    requires Spec.StdinDataRelation(cmd, observations, data, cuts)
+    requires StdinStatesRelation(cmd, streams, before, after, states)
+    requires StdinDataRelation(cmd, observations, data, cuts)
     requires forall i: nat | i < |observations| ::
                Spec.InputObservationRelation(cmd, fs, streams, states[i], i, observations[i])
     requires Spec.EntriesForOutputRelation(cmd, data, Spec.ObservationEntries(observations), entries)
-    requires Spec.VisibleErrorRelation(cmd.serial, observations, errors)
+    requires errors == Spec.VisibleErrors(cmd.serial, observations)
     requires failed == (exists i: nat :: i < |observations| && observations[i].failed)
     requires blocking == (exists i: nat :: i < |observations| && observations[i].blocking)
-    ensures Spec.InputTraceRelation(cmd, fs, streams, before, after, entries, errors, failed, blocking)
+    ensures Spec.InputRelation(cmd, fs, streams, before, after, entries, errors, failed, blocking)
   {
     hide *;
-    reveal Spec.InputTraceRelation(), Spec.StdinStatesRelation();
+    reveal StdinStatesRelation();
+    assert cmd.inputs[..|cmd.inputs|] == cmd.inputs;
+    StdinStatesDenote(cmd, streams, before, after, states, |cmd.inputs|);
+    assert after == states[|cmd.inputs|];
+    assert after == Spec.StdinAfterReads(before, streams, Spec.StdinCount(cmd.inputs));
+    forall i: nat | i < |observations|
+      ensures Spec.InputObservationRelation(cmd, fs, streams,
+                                            Spec.StdinAfterReads(before, streams, Spec.StdinCount(cmd.inputs[..i])), i, observations[i])
+    {
+      StdinStatesDenote(cmd, streams, before, after, states, i);
+    }
+    StdinDataDenote(cmd, observations, data, cuts);
+    reveal Spec.InputRelation();
   }
 
-  lemma {:isolate_assertions} InputTraceRefines(
+  lemma {:isolate_assertions} InputRefines(
     cmd: Schema.PasteCmd,
     preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
     preStdin: BW.Bytes
   )
-    ensures Spec.InputTraceRelation(
+    ensures Spec.InputRelation(
               cmd,
               preFs, preStreams,
               preStdin,
@@ -858,12 +1038,14 @@ module PasteProof {
                 cmd, preFs, preStreams, preStdin, |cmd.inputs|))
   {
     var observations := Observations(cmd, preFs, preStreams, preStdin);
+    assert |observations| == |cmd.inputs|;
+    assert observations[..|cmd.inputs|] == observations;
     var states := seq(|cmd.inputs| + 1,
     j requires 0 <= j <= |cmd.inputs| => Core.PrefixStdinCore(cmd, preStreams, preStdin, j));
     PrefixStdinCharacterization(cmd, preStreams, preStdin, states);
     var stdinData := Core.StdinDataForOutputCore(cmd, preStreams, preStdin);
     var cuts := BuildStdinDataCuts(cmd, preFs, preStreams, preStdin, |cmd.inputs|);
-    assert Spec.StdinDataRelation(cmd, observations, stdinData, cuts);
+    assert StdinDataRelation(cmd, observations, stdinData, cuts);
     assert forall i: nat :: i < |observations| ==>
                               Spec.InputObservationRelation(
                                 cmd, preFs, preStreams, states[i], i, observations[i]) by {
@@ -880,44 +1062,45 @@ module PasteProof {
     if !Spec.HasStdinInput(cmd.inputs) {
       NoStdinData(cmd, preStreams, preStdin, |cmd.inputs|);
     }
+    assert !Spec.HasStdinInput(cmd.inputs) ==> stdinData == [];
     EntriesForOutputRefines(cmd, stdinData, rawEntries);
+    var entries := Core.EntriesForOutputCore(cmd, preFs, preStreams, preStdin);
+    assert entries == Core.EntriesForOutputFromEntries(cmd, rawEntries,
+                                                       if Spec.HasStdinInput(cmd.inputs) then stdinData else []);
+    assert Spec.EntriesForOutputRelation(cmd, stdinData, Spec.ObservationEntries(observations), entries);
     var visibleAssembly :=
       VisibleErrorsRefine(
         cmd, preFs, preStreams, preStdin, |cmd.inputs|);
+    VisibleErrorsDenote(cmd.serial, observations, |cmd.inputs|,
+                        Core.PrefixVisibleErrorOutputCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
+                        visibleAssembly);
+    assert Core.PrefixVisibleErrorOutputCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|) ==
+           Spec.VisibleErrors(cmd.serial, observations);
     PrefixHadErrorRefines(
       cmd, preFs, preStreams, preStdin, |cmd.inputs|);
     PrefixHadBlockingRefines(
       cmd, preFs, preStreams, preStdin, |cmd.inputs|);
-    reveal Spec.VisibleErrorRelation();
-    assert Spec.VisibleErrorRelation(
-        cmd.serial,
-        observations,
-        Core.PrefixVisibleErrorOutputCore(
-          cmd, preFs, preStreams, preStdin, |cmd.inputs|)) by {
-      ghost var assembly := visibleAssembly;
-    }
-    InputTraceWitness(cmd, preFs, preStreams, preStdin,
-                      Core.PrefixStdinCore(cmd, preStreams, preStdin, |cmd.inputs|),
-                      Core.EntriesForOutputCore(cmd, preFs, preStreams, preStdin),
-                      Core.PrefixVisibleErrorOutputCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
-                      Core.PrefixHadErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
-                      Core.PrefixHadBlockingErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
-                      observations, states, stdinData, cuts);
+    hide *;
+    InputRefinement(cmd, preFs, preStreams, preStdin,
+                    Core.PrefixStdinCore(cmd, preStreams, preStdin, |cmd.inputs|),
+                    Core.EntriesForOutputCore(cmd, preFs, preStreams, preStdin),
+                    Core.PrefixVisibleErrorOutputCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
+                    Core.PrefixHadErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
+                    Core.PrefixHadBlockingErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
+                    observations, states, stdinData, cuts);
   }
 
   lemma EscapeDelimiterRefines(ch: BW.RawByte)
-    ensures Spec.EscapedDelimiterRelation(
-              ch, Core.EscapeDelimiter(ch))
+    ensures Core.EscapeDelimiter(ch) == Spec.EscapedDelimiter(ch)
   {
-    reveal Spec.EscapedDelimiterRelation();
   }
 
   lemma BuildDelimiterParse(
     text: BW.Bytes,
     i: nat
-  ) returns (assembly: Spec.DelimiterAssembly)
+  ) returns (assembly: DelimiterAssembly)
     requires i <= |text|
-    ensures Spec.DelimiterParseRelation(
+    ensures DelimiterParseRelation(
               text,
               i,
               Core.CollapseDelimitersFrom(text, i),
@@ -925,9 +1108,9 @@ module PasteProof {
     decreases |text| - i
   {
     if i == |text| {
-      assembly := Spec.DelimiterDone;
+      assembly := DelimiterDone;
     } else if text[i] == '\\' && i + 1 == |text| {
-      assembly := Spec.DelimiterFailure;
+      assembly := DelimiterFailure;
     } else {
       var nextIndex :=
         if text[i] == '\\' then i + 2 else i + 1;
@@ -940,29 +1123,102 @@ module PasteProof {
       }
       var rest := BuildDelimiterParse(text, nextIndex);
       assembly :=
-        Spec.DelimiterStep(i, nextIndex, delimiter, rest);
+        DelimiterStep(i, nextIndex, delimiter, rest);
     }
   }
 
-  lemma DelimiterPlanRefines(text: string)
-    ensures Spec.DelimiterPlanRelation(
+  lemma DelimiterParseDenote(text: BW.Bytes, i: nat, result: Spec.DelimiterResult,
+                             assembly: DelimiterAssembly) returns (cuts: seq<nat>)
+    requires DelimiterParseRelation(text, i, result, assembly)
+    ensures Spec.DelimiterCuts(text, i, cuts)
+    ensures result == Spec.DelimiterValue(text, cuts)
+    decreases assembly
+  {
+    hide *;
+    reveal DelimiterParseRelation(), Spec.DelimiterCuts(), Spec.DelimiterValue();
+    match assembly
+    case DelimiterDone =>
+      cuts := [i];
+      var empty: seq<BW.Bytes> := [];
+      assert Spec.DelimiterValue(text, cuts).Ok?;
+      assert |Spec.DelimiterValue(text, cuts).v| == 0;
+      assert Spec.DelimiterValue(text, cuts).v == empty;
+      assert result == Result.Ok(empty);
+      assert result == Spec.DelimiterValue(text, cuts);
+    case DelimiterFailure =>
+      cuts := [i, |text|];
+      assert result == Spec.DelimiterValue(text, cuts);
+    case DelimiterStep(index, nextIndex, delimiter, rest) =>
+      var restResult: Spec.DelimiterResult :|
+        DelimiterParseRelation(text, nextIndex, restResult, rest) &&
+        result == (match restResult
+                   case Err(stderr) => Result.Err(stderr)
+                   case Ok(delims) => Result.Ok([delimiter] + delims));
+      var tail := DelimiterParseDenote(text, nextIndex, restResult, rest);
+      cuts := [i] + tail;
+      assert Spec.DelimiterCuts(text, nextIndex, tail);
+      assert forall k {:trigger cuts[k]} | 0 <= k < |cuts| - 1 ::
+          cuts[k] < cuts[k + 1] <= |text| &&
+          cuts[k + 1] == cuts[k] +
+          (if text[cuts[k]] == '\\' && cuts[k] + 1 < |text| then 2 else 1) by {
+        forall k {:trigger cuts[k]} | 0 <= k < |cuts| - 1
+          ensures cuts[k] < cuts[k + 1] <= |text|
+          ensures cuts[k + 1] == cuts[k] +
+                                 (if text[cuts[k]] == '\\' && cuts[k] + 1 < |text| then 2 else 1)
+        {
+          if k > 0 {
+            assert cuts[k] == tail[k - 1] && cuts[k + 1] == tail[k];
+            assert tail[k - 1] < tail[k] <= |text|;
+          }
+        }
+      }
+      assert Spec.DelimiterCuts(text, i, cuts);
+      assert (exists k | 0 <= k < |cuts| - 1 ::
+                text[cuts[k]] == '\\' && cuts[k] + 1 == |text|) == restResult.Err? by {
+        if exists k | 0 <= k < |cuts| - 1 ::
+            text[cuts[k]] == '\\' && cuts[k] + 1 == |text| {
+          var k :| 0 <= k < |cuts| - 1 && text[cuts[k]] == '\\' && cuts[k] + 1 == |text|;
+          assert k > 0;
+          assert tail[k - 1] == cuts[k];
+        } else if restResult.Err? {
+          var k :| 0 <= k < |tail| - 1 && text[tail[k]] == '\\' && tail[k] + 1 == |text|;
+          assert cuts[k + 1] == tail[k];
+        }
+      }
+      if restResult.Ok? {
+        var values: seq<BW.Bytes> := seq(|cuts| - 1, k requires 0 <= k < |cuts| - 1 =>
+          if text[cuts[k]] == '\\' then Spec.EscapedDelimiter(text[cuts[k] + 1])
+          else [text[cuts[k]]]);
+        assert |values| == 1 + |restResult.v|;
+        forall k | 0 <= k < |values|
+          ensures values[k] == ([delimiter] + restResult.v)[k]
+        {
+          if k > 0 {
+            assert cuts[k] == tail[k - 1];
+          }
+        }
+        assert values == [delimiter] + restResult.v;
+        assert result == Result.Ok(values);
+        assert Spec.DelimiterValue(text, cuts) == Result.Ok(values);
+      } else {
+        assert restResult.e == Spec.DelimiterBackslashError(text);
+        assert result == Spec.DelimiterValue(text, cuts);
+      }
+  }
+
+  lemma DelimiterResultRefines(text: string)
+    ensures Spec.DelimiterResultRelation(
               text, Core.CollapseDelimiters(text))
   {
     if |text| == 0 {
-      reveal Spec.DelimiterPlanRelation();
+      reveal Spec.DelimiterResultRelation();
     } else {
       var assembly := BuildDelimiterParse(Utf8.Encode(text), 0);
+      var cuts := DelimiterParseDenote(Utf8.Encode(text), 0,
+                                       Core.CollapseDelimiters(text), assembly);
       assert Core.CollapseDelimiters(text) ==
              Core.CollapseDelimitersFrom(Utf8.Encode(text), 0);
-      reveal Spec.DelimiterPlanRelation();
-      assert exists a: Spec.DelimiterAssembly ::
-          Spec.DelimiterParseRelation(
-            Utf8.Encode(text),
-            0,
-            Core.CollapseDelimiters(text),
-            a) by {
-        ghost var a := assembly;
-      }
+      reveal Spec.DelimiterResultRelation();
     }
   }
 
@@ -996,220 +1252,99 @@ module PasteProof {
     }
   }
 
-  lemma BuildParallelColumns(
-    entries: seq<Spec.Entry>,
-    delims: seq<BW.Bytes>,
-    row: nat,
-    i: nat,
-    before: BW.Bytes
-  ) returns (assembly: Spec.ColumnAssembly)
+  ghost function JoinedFragments(fields: seq<BW.Bytes>, delims: seq<BW.Bytes>): seq<BW.Bytes>
     requires |delims| > 0
-    requires |entries| > 0
-    requires i <= |entries|
-    ensures Spec.ParallelColumnsRelation(
-              entries, delims, row, i, before,
-              before + Core.RenderParallelRow(
-                entries, delims, row, i, |entries| - 1), assembly)
+  {
+    seq(|fields|, i requires 0 <= i < |fields| =>
+      fields[i] + (if i + 1 < |fields| then Spec.DelimAt(delims, i) else []))
+  }
+
+  lemma JoinedFragmentsEq(fields: seq<BW.Bytes>, delims: seq<BW.Bytes>)
+    requires |delims| > 0
+    ensures Spec.Join(fields, delims) == Spec.Concat<BW.RawByte>(JoinedFragments(fields, delims))
+  {
+    reveal Spec.Join(), JoinedFragments();
+  }
+
+  lemma ParallelColumnsRefine(entries: seq<Spec.Entry>, delims: seq<BW.Bytes>, row: nat, i: nat)
+    requires |delims| > 0 && |entries| > 0 && i <= |entries|
+    ensures Core.RenderParallelRow(entries, delims, row, i, |entries| - 1) ==
+            Spec.Concat<BW.RawByte>(JoinedFragments(seq(|entries|, k requires 0 <= k < |entries| =>
+                                                      if row < |entries[k].lines| then entries[k].lines[row] else []), delims)[i..])
     decreases |entries| - i
   {
-    if i == |entries| {
-      assembly := Spec.ColumnsDone;
-    } else {
-
-
-      var fragment :=
-        (if row < |entries[i].lines| then entries[i].lines[row] else []) +
-        (if i + 1 < |entries| then Spec.DelimAt(delims, i) else []);
-      var after := before + fragment;
-      var rest := BuildParallelColumns(
-        entries, delims, row, i + 1, after);
-      assert before + Core.RenderParallelRow(
-          entries, delims, row, i, |entries| - 1) ==
-             after + Core.RenderParallelRow(
-               entries, delims, row, i + 1, |entries| - 1);
-      assembly := Spec.ColumnStep(
-        |before|, |before| + |fragment|, after, rest);
+    if i < |entries| {
+      ParallelColumnsRefine(entries, delims, row, i + 1);
+      var fields := seq(|entries|, k requires 0 <= k < |entries| =>
+        if row < |entries[k].lines| then entries[k].lines[row] else []);
+      var pieces := JoinedFragments(fields, delims);
+      assert pieces[i..][1..] == pieces[i + 1..];
     }
   }
 
-  lemma BuildParallelRecords(
-    entries: seq<Spec.Entry>,
-    delims: seq<BW.Bytes>,
-    recordDelimiter: BW.RawByte,
-    row: nat,
-    limit: nat,
-    before: BW.Bytes
-  ) returns (assembly: Spec.RecordAssembly)
-    requires |delims| > 0
-    requires row <= limit
-    requires limit == Spec.MaxLineCount(entries)
-    ensures Spec.ParallelRecordsRelation(
-              entries, delims, recordDelimiter, row, limit, before,
-              before + Core.RenderParallelRows(
-                entries, delims, recordDelimiter, row, limit), assembly)
-    decreases limit - row
+  lemma ParallelRecordsRefine(entries: seq<Spec.Entry>, delims: seq<BW.Bytes>,
+                              delimiter: BW.RawByte, row: nat)
+    requires |delims| > 0 && row <= Spec.MaxLineCount(entries)
+    ensures Core.RenderParallelRows(entries, delims, delimiter, row, Spec.MaxLineCount(entries)) ==
+            Spec.Concat<BW.RawByte>(Spec.ParallelRecords(entries, delims, delimiter)[row..])
+    decreases Spec.MaxLineCount(entries) - row
   {
-    if row == limit {
-      assembly := Spec.RecordsDone;
-    } else {
+    if row < Spec.MaxLineCount(entries) {
       assert |entries| > 0;
-      var columns := BuildParallelColumns(
-        entries, delims, row, 0, []);
-      var record := Core.RenderParallelRow(
-        entries, delims, row, 0, |entries| - 1);
-      assert [] + record == record;
-      var after := before + record + [recordDelimiter];
-      var rest := BuildParallelRecords(
-        entries, delims, recordDelimiter, row + 1, limit, after);
-      assert before + Core.RenderParallelRows(
-          entries, delims, recordDelimiter, row, limit) ==
-             after + Core.RenderParallelRows(
-               entries, delims, recordDelimiter, row + 1, limit);
-      assembly := Spec.RecordStep(
-        |before|, |before| + |record| + 1,
-        record, after, columns, rest);
+      ParallelColumnsRefine(entries, delims, row, 0);
+      var fields := seq(|entries|, k requires 0 <= k < |entries| =>
+        if row < |entries[k].lines| then entries[k].lines[row] else []);
+      JoinedFragmentsEq(fields, delims);
+      assert JoinedFragments(fields, delims)[0..] == JoinedFragments(fields, delims);
+      ParallelRecordsRefine(entries, delims, delimiter, row + 1);
+      assert Spec.ParallelRecords(entries, delims, delimiter)[row..][1..] ==
+             Spec.ParallelRecords(entries, delims, delimiter)[row + 1..];
     }
   }
 
-  lemma BuildSerialColumns(
-    lines: seq<BW.Bytes>,
-    delims: seq<BW.Bytes>,
-    i: nat,
-    before: BW.Bytes
-  ) returns (assembly: Spec.ColumnAssembly)
-    requires |delims| > 0
-    requires i <= |lines|
-    ensures Spec.SerialColumnsRelation(
-              lines, delims, i, before,
-              before + Core.JoinLines(lines, delims, i), assembly)
+  lemma SerialColumnsRefine(lines: seq<BW.Bytes>, delims: seq<BW.Bytes>, i: nat)
+    requires |delims| > 0 && i <= |lines|
+    ensures Core.JoinLines(lines, delims, i) == Spec.Concat<BW.RawByte>(JoinedFragments(lines, delims)[i..])
     decreases |lines| - i
   {
-    if i == |lines| {
-      assembly := Spec.ColumnsDone;
-    } else {
-
-      var fragment := lines[i] +
-      (if i + 1 < |lines| then Spec.DelimAt(delims, i) else []);
-      var after := before + fragment;
-      var rest := BuildSerialColumns(
-        lines, delims, i + 1, after);
-      assert before + Core.JoinLines(lines, delims, i) ==
-             after + Core.JoinLines(lines, delims, i + 1);
-      assembly := Spec.ColumnStep(
-        |before|, |before| + |fragment|, after, rest);
+    if i < |lines| {
+      SerialColumnsRefine(lines, delims, i + 1);
+      assert JoinedFragments(lines, delims)[i..][1..] == JoinedFragments(lines, delims)[i + 1..];
     }
   }
 
-  lemma BuildSerialRecords(
-    entries: seq<Spec.Entry>,
-    delims: seq<BW.Bytes>,
-    recordDelimiter: BW.RawByte,
-    i: nat,
-    before: BW.Bytes
-  ) returns (assembly: Spec.RecordAssembly)
-    requires |delims| > 0
-    requires i <= |entries|
-    ensures Spec.SerialRecordsRelation(
-              entries, delims, recordDelimiter, i, before,
-              before + Core.RenderSerial(
-                entries[i..], delims, recordDelimiter), assembly)
+  lemma SerialRecordsRefine(entries: seq<Spec.Entry>, delims: seq<BW.Bytes>,
+                            delimiter: BW.RawByte, i: nat)
+    requires |delims| > 0 && i <= |entries|
+    ensures Core.RenderSerial(entries[i..], delims, delimiter) ==
+            Spec.Concat<BW.RawByte>(Spec.SerialRecords(entries, delims, delimiter)[i..])
     decreases |entries| - i
   {
-    if i == |entries| {
-      assembly := Spec.RecordsDone;
-    } else {
-
+    if i < |entries| {
       if entries[i].readOk {
-        var columns := BuildSerialColumns(
-          entries[i].lines, delims, 0, []);
-        var record := Core.JoinLines(
-          entries[i].lines, delims, 0);
-        assert [] + record == record;
-        var after := before + record + [recordDelimiter];
-        var rest := BuildSerialRecords(
-          entries, delims, recordDelimiter, i + 1, after);
-        assert before + Core.RenderSerial(
-            entries[i..], delims, recordDelimiter) ==
-               after + Core.RenderSerial(
-                 entries[i + 1..], delims, recordDelimiter);
-        assembly := Spec.RecordStep(
-          |before|, |before| + |record| + 1,
-          record, after, columns, rest);
-      } else {
-        var rest := BuildSerialRecords(
-          entries, delims, recordDelimiter, i + 1, before);
-        assert Core.RenderSerial(
-            entries[i..], delims, recordDelimiter) ==
-               Core.RenderSerial(
-                 entries[i + 1..], delims, recordDelimiter);
-        assembly := Spec.RecordStep(
-          |before|, |before|, [], before,
-          Spec.ColumnsDone, rest);
+        SerialColumnsRefine(entries[i].lines, delims, 0);
+        JoinedFragmentsEq(entries[i].lines, delims);
+        assert JoinedFragments(entries[i].lines, delims)[0..] ==
+               JoinedFragments(entries[i].lines, delims);
       }
+      SerialRecordsRefine(entries, delims, delimiter, i + 1);
+      assert entries[i..][1..] == entries[i + 1..];
+      assert Spec.SerialRecords(entries, delims, delimiter)[i..][1..] ==
+             Spec.SerialRecords(entries, delims, delimiter)[i + 1..];
     }
   }
 
-  lemma OutputRefines(
-    serial: bool,
-    delims: seq<BW.Bytes>,
-    recordDelimiter: BW.RawByte,
-    entries: seq<Spec.Entry>
-  )
+  lemma OutputRefines(serial: bool, delims: seq<BW.Bytes>, delimiter: BW.RawByte,
+                      entries: seq<Spec.Entry>)
     requires |delims| > 0
-    ensures Spec.OutputRelation(
-              serial,
-              delims,
-              recordDelimiter,
-              entries,
-              Core.RenderOutput(
-                serial, delims, recordDelimiter, entries))
+    ensures Core.RenderOutput(serial, delims, delimiter, entries) ==
+            Spec.Output(serial, delims, delimiter, entries)
   {
     if serial {
-      var records := BuildSerialRecords(
-        entries, delims, recordDelimiter, 0, []);
+      SerialRecordsRefine(entries, delims, delimiter, 0);
       assert entries[0..] == entries;
-      assert [] + Core.RenderSerial(
-          entries, delims, recordDelimiter) ==
-             Core.RenderSerial(entries, delims, recordDelimiter);
-      assert exists r: Spec.RecordAssembly ::
-          Spec.SerialRecordsRelation(
-            entries,
-            delims,
-            recordDelimiter,
-            0,
-            [],
-            Core.RenderSerial(entries, delims, recordDelimiter),
-            r) by {
-        ghost var r := records;
-      }
     } else {
-
-      var records := BuildParallelRecords(
-        entries,
-        delims,
-        recordDelimiter,
-        0,
-        Spec.MaxLineCount(entries),
-        []);
-      assert [] + Core.RenderParallelRows(
-          entries,
-          delims,
-          recordDelimiter,
-          0,
-          Spec.MaxLineCount(entries)) ==
-             Core.RenderParallel(entries, delims, recordDelimiter);
-      assert exists r: Spec.RecordAssembly ::
-          Spec.ParallelRecordsRelation(
-            entries,
-            delims,
-            recordDelimiter,
-            0,
-            Spec.MaxLineCount(entries),
-            [],
-            Core.RenderParallel(entries, delims, recordDelimiter),
-            r) by {
-        ghost var r := records;
-      }
+      ParallelRecordsRefine(entries, delims, delimiter, 0);
     }
   }
 
@@ -1217,25 +1352,25 @@ module PasteProof {
     raw: Schema.PasteCmdRaw,
     io: BenchIO.IO,
     exit: int
-  , new plannedStdout: BenchWorld.Bytes, new plannedStderr: BenchWorld.Bytes)
-    requires Core.PreparedSummary(raw, io, exit, plannedStdout, plannedStderr)
-    ensures Spec.PreparedSpec(raw, io, exit, plannedStdout, plannedStderr)
+  , new resultStdout: BenchWorld.Bytes, new resultStderr: BenchWorld.Bytes)
+    requires Core.PreparedSummary(raw, io, exit, resultStdout, resultStderr)
+    ensures Spec.PreparedSpec(raw, io, exit, resultStdout, resultStderr)
   {
     var cmd := Schema.Command(raw);
     assert cmd == Schema.Command(raw);
     if cmd.mode == Schema.ModeHelp {
     } else if cmd.mode == Schema.ModeVersion {
     } else {
-      DelimiterPlanRefines(cmd.delimiterText);
+      DelimiterResultRefines(cmd.delimiterText);
       CollapseDelimitersNonEmpty(cmd.delimiterText);
-      ghost var plan := Core.CollapseDelimiters(cmd.delimiterText);
-      assert Spec.DelimiterPlanRelation(
-          cmd.delimiterText, plan);
+      ghost var result := Core.CollapseDelimiters(cmd.delimiterText);
+      assert Spec.DelimiterResultRelation(
+          cmd.delimiterText, result);
       match Core.CollapseDelimiters(cmd.delimiterText)
       case Err(stderr) =>
       case Ok(delims) =>
         assert |delims| > 0;
-        InputTraceRefines(
+        InputRefines(
           cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()));
 
         OutputRefines(
@@ -1254,7 +1389,7 @@ module PasteProof {
     var out: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes, normalExit: int :|
       Core.PreparedSummary(raw, io, normalExit,
                            old(io.stdout()) + out, old(io.stderr()) + diagnostics) &&
-      Spec.Emission(raw, io, out, diagnostics, normalExit, exit);
+      Spec.Emission(io, out, diagnostics, normalExit, exit);
     PreparedSummaryImpliesPreparedSpec(raw, io, normalExit,
                                        old(io.stdout()) + out, old(io.stderr()) + diagnostics);
   }

@@ -6,48 +6,6 @@ include "TrSchema.dfy"
 
 module TrSpec {
 
-  const MissingSet2MessageSpecText0: BenchWorld.Bytes := "tr: missing operand after "
-
-  const MissingSet2MessageSpecText1: BenchWorld.Bytes := "\nTwo strings must be given when both deleting and squeezing repeats.\n"
-
-  const MissingSet2MessageSpecText2: BenchWorld.Bytes := "\nTwo strings must be given when translating.\n"
-
-  const MissingSet2MessageSpecText3: BenchWorld.Bytes := "Try 'tr --help' for more information.\n"
-
-  const ExtraOperandMessageSpecText0: BenchWorld.Bytes := "tr: extra operand "
-
-  const ExtraOperandMessageSpecText1: BenchWorld.Bytes := "\nOnly one string may be given when deleting without squeezing repeats.\n"
-
-  const ExtraOperandMessageSpecText2: BenchWorld.Bytes := "\n"
-
-  const ExtraOperandMessageSpecText3: BenchWorld.Bytes := "Try 'tr --help' for more information.\n"
-
-  const UnsupportedSetMessageSpecText0: BenchWorld.Bytes := "tr: range-endpoints of '"
-
-  const UnsupportedSetMessageSpecText1: BenchWorld.Bytes := "-"
-
-  const UnsupportedSetMessageSpecText2: BenchWorld.Bytes := "' are in reverse collating sequence order\n"
-
-  const UnsupportedSetMessageSpecText3: BenchWorld.Bytes := "tr: unsupported set syntax '"
-
-  const UnsupportedSetMessageSpecText4: BenchWorld.Bytes := "' in this benchmark\n"
-
-  const AmbiguousOctalWarningSpecText0: BenchWorld.Bytes := "tr: warning: the ambiguous octal escape \\"
-
-  const AmbiguousOctalWarningSpecText1: BenchWorld.Bytes := " is being\n\tinterpreted as the 2-byte sequence \\0"
-
-  const AmbiguousOctalWarningSpecText2: BenchWorld.Bytes := ", "
-
-  const AmbiguousOctalWarningSpecText3: BenchWorld.Bytes := "\n"
-
-  const ReadErrorTextText0: BenchWorld.Bytes := "tr: read error: "
-
-  const ReadErrorTextText1: BenchWorld.Bytes := "\n"
-
-  const WriteErrorTextText0: BenchWorld.Bytes := "tr: write error: "
-
-  const WriteErrorTextText1: BenchWorld.Bytes := "\n"
-
   import StreamWorld = BenchWorld
   import StreamContract = IOContract
 
@@ -168,34 +126,34 @@ module TrSpec {
 
   function MissingSet2MessageSpec(operand: string, deleteAndSqueeze: bool): BenchWorld.Bytes
   {
-    MissingSet2MessageSpecText0 + SE.SpecLocaleQuoteBytes(Utf8.Encode(operand)) +
+    "tr: missing operand after " + SE.SpecLocaleQuoteBytes(Utf8.Encode(operand)) +
     (if deleteAndSqueeze then
-       MissingSet2MessageSpecText1
+       "\nTwo strings must be given when both deleting and squeezing repeats.\n"
      else
-       MissingSet2MessageSpecText2) +
-    MissingSet2MessageSpecText3
+       "\nTwo strings must be given when translating.\n") +
+    "Try 'tr --help' for more information.\n"
   }
 
   function ExtraOperandMessageSpec(operand: string, explainDeleteLimit: bool): BenchWorld.Bytes
   {
-    ExtraOperandMessageSpecText0 + SE.SpecLocaleQuoteBytes(Utf8.Encode(operand)) +
+    "tr: extra operand " + SE.SpecLocaleQuoteBytes(Utf8.Encode(operand)) +
     (if explainDeleteLimit then
-       ExtraOperandMessageSpecText1
+       "\nOnly one string may be given when deleting without squeezing repeats.\n"
      else
-       ExtraOperandMessageSpecText2) +
-    ExtraOperandMessageSpecText3
+       "\n") +
+    "Try 'tr --help' for more information.\n"
   }
 
   function UnsupportedSetMessageSpec(operand: string): BenchWorld.Bytes
   {
     match FirstReverseRangeFrom(operand, 0)
     case FoundReverseRange(first, last) =>
-      UnsupportedSetMessageSpecText0 + DisplayRangeByte(first) + UnsupportedSetMessageSpecText1 +
+      "tr: range-endpoints of '" + DisplayRangeByte(first) + "-" +
       DisplayRangeByte(last) +
-      UnsupportedSetMessageSpecText2
+      "' are in reverse collating sequence order\n"
     case NoReverseRange =>
-      UnsupportedSetMessageSpecText3 + Utf8.Encode(operand) +
-      UnsupportedSetMessageSpecText4
+      "tr: unsupported set syntax '" + Utf8.Encode(operand) +
+      "' in this benchmark\n"
   }
 
   function EmptySet2MessageSpec(): BenchWorld.Bytes
@@ -291,11 +249,11 @@ module TrSpec {
   function AmbiguousOctalWarningSpec(text: string, i: nat): BenchWorld.Bytes
     requires i + 3 < |text|
   {
-    AmbiguousOctalWarningSpecText0 +
+    "tr: warning: the ambiguous octal escape \\" +
     Utf8.Encode(text[i + 1..i + 4]) +
-    AmbiguousOctalWarningSpecText1 +
-    Utf8.Encode(text[i + 1..i + 3]) + AmbiguousOctalWarningSpecText2 +
-    Utf8.EncodeChar(text[i + 3]) + AmbiguousOctalWarningSpecText3
+    " is being\n\tinterpreted as the 2-byte sequence \\0" +
+    Utf8.Encode(text[i + 1..i + 3]) + ", " +
+    Utf8.EncodeChar(text[i + 3]) + "\n"
   }
 
   function TrailingBackslashWarningSpec(): BenchWorld.Bytes
@@ -358,28 +316,7 @@ module TrSpec {
     text: string, lo: nat, hi: nat, bytes: BenchWorld.Bytes
   )
   {
-    lo < |text| &&
-    if text[lo] != '\\' then
-      hi == lo + 1 && bytes == Utf8.EncodeChar(text[lo])
-    else if lo + 1 == |text| then
-      hi == lo + 1 && bytes == ['\\']
-    else if IsOctal(text[lo + 1]) then
-      if lo + 2 < |text| && IsOctal(text[lo + 2]) then
-        if lo + 3 < |text| && IsOctal(text[lo + 3]) &&
-           OctalValue(text[lo + 1]) < 4 then
-          hi == lo + 4 &&
-          bytes == [((OctalValue(text[lo + 1]) * 64 +
-                      OctalValue(text[lo + 2]) * 8 +
-                      OctalValue(text[lo + 3])) as char)]
-        else
-          hi == lo + 3 &&
-          bytes == [((OctalValue(text[lo + 1]) * 8 +
-                      OctalValue(text[lo + 2])) as char)]
-      else
-        hi == lo + 2 &&
-        bytes == [(OctalValue(text[lo + 1]) as char)]
-    else
-      hi == lo + 2 && bytes == EscapeBytes(text[lo + 1])
+    lo < |text| && hi == AtomNext(text, lo) && bytes == AtomBytes(text, lo)
   }
 
   opaque ghost predicate SetUnitRelation(
@@ -391,18 +328,14 @@ module TrSpec {
   {
     lo < |text| &&
     !StartsUnsupportedConstruct(text[lo..]) &&
-    exists atomEnd: nat, atomBytes: BenchWorld.Bytes ::
-      SetAtomRelation(text, lo, atomEnd, atomBytes) &&
-      if atomEnd < |text| && text[atomEnd] == '-' &&
-         atomEnd + 1 < |text| then
-        exists endEnd: nat, endBytes: BenchWorld.Bytes
-          {:trigger SetAtomRelation(text, atomEnd + 1, endEnd, endBytes)} ::
-          SetAtomRelation(text, atomEnd + 1, endEnd, endBytes) &&
-          |atomBytes| == 1 && |endBytes| == 1 &&
-          hi == endEnd &&
-          RangeExpansion(atomBytes[0], endBytes[0], bytes)
-      else
-        hi == atomEnd && bytes == atomBytes
+    var atomEnd := AtomNext(text, lo);
+    var atomBytes := AtomBytes(text, lo);
+    if atomEnd + 1 < |text| && text[atomEnd] == '-' then
+      var endEnd := AtomNext(text, atomEnd + 1);
+      var endBytes := AtomBytes(text, atomEnd + 1);
+      |atomBytes| == 1 && |endBytes| == 1 && hi == endEnd &&
+      RangeExpansion(atomBytes[0], endBytes[0], bytes)
+    else hi == atomEnd && bytes == atomBytes
   }
 
   ghost predicate SetPartitionFrom(
@@ -600,12 +533,6 @@ module TrSpec {
       CommandDecodedRelation(raw, decoded, cmd)
   }
 
-  predicate StrictlyIncreasing(indices: seq<nat>)
-  {
-    forall i, j :: 0 <= i < j < |indices| ==>
-                     indices[i] < indices[j]
-  }
-
   ghost predicate TranslationRelation(
     set1: BenchWorld.Bytes,
     set2: BenchWorld.Bytes,
@@ -624,94 +551,94 @@ module TrSpec {
         outputByte == set2[if i < |set2| then i else |set2| - 1]
   }
 
-  ghost predicate DeleteTranslateRelation(
-    cmd: TrCmd,
-    input: BenchWorld.Bytes,
-    transformed: BenchWorld.Bytes
-  )
+  // Ordered image of a finite set of source positions. This is a mathematical
+  // sequence operation; no execution state or choice of serialization remains.
+  opaque ghost function Least(indices: set<nat>): (least: nat)
+    requires indices != {}
+    ensures least in indices
+    ensures forall j: nat | j in indices :: least <= j
+    decreases |indices|
   {
-    exists kept: seq<nat> ::
-      StrictlyIncreasing(kept) &&
-      (forall k :: 0 <= k < |kept| ==> kept[k] < |input|) &&
-      (forall i :: 0 <= i < |input| ==>
-                     (i in kept) ==
-                     (!cmd.deleteSet || input[i] !in cmd.set1)) &&
-      |transformed| == |kept| &&
-      (forall k :: 0 <= k < |kept| ==>
-                     (if cmd.deleteSet || |cmd.set2| == 0 then
-                        transformed[k] == input[kept[k]]
-                      else
-                        TranslationRelation(
-                          cmd.set1,
-                          cmd.set2,
-                          input[kept[k]],
-                          transformed[k]
-                        )))
+    var i :| i in indices;
+    if indices == {i} then
+      assert forall j: nat | j in indices :: j == i;
+      i
+    else
+      var rest := Least(indices - {i});
+      var least := if i < rest then i else rest;
+      assert forall j: nat | j in indices :: least <= j by {
+        forall j: nat | j in indices
+          ensures least <= j
+        {
+          if j != i {
+            assert j in indices - {i};
+          }
+        }
+      }
+      least
   }
 
-  ghost predicate SqueezeStateRelation(
-    input: BenchWorld.Bytes,
-    squeezeSet: BenchWorld.Bytes,
-    hasPrevious: bool,
-    previous: char,
-    output: BenchWorld.Bytes
-  )
+  opaque ghost function Select(input: BenchWorld.Bytes, indices: set<nat>): BenchWorld.Bytes
+    requires forall i | i in indices :: i < |input|
+    decreases |indices|
   {
-    exists emitted: seq<nat> ::
-      StrictlyIncreasing(emitted) &&
-      (forall k :: 0 <= k < |emitted| ==> emitted[k] < |input|) &&
-      (forall i :: 0 <= i < |input| ==>
-                     (i in emitted) ==
-                     SqueezeEmittedAt(
-                       input, squeezeSet, hasPrevious, previous, i
-                     )) &&
-      |output| == |emitted| &&
-      (forall k :: 0 <= k < |emitted| ==>
-                     output[k] == input[emitted[k]])
+    if indices == {} then []
+    else
+      var i := Least(indices);
+      [input[i]] + Select(input, indices - {i})
   }
 
-  predicate SqueezeEmittedAt(
-    input: BenchWorld.Bytes,
-    squeezeSet: BenchWorld.Bytes,
-    hasPrevious: bool,
-    previous: char,
-    i: nat
-  )
-    requires i < |input|
+  lemma LastMatchExists(bytes: BenchWorld.Bytes, ch: char)
+    requires ch in bytes
+    ensures exists i: nat :: i < |bytes| && bytes[i] == ch &&
+                             (forall j :: i < j < |bytes| ==> bytes[j] != ch)
+    decreases |bytes|
   {
-    input[i] !in squeezeSet ||
-    (if i == 0 then
-       !hasPrevious || input[i] != previous
-     else
-       input[i] != input[i - 1])
+    if bytes[|bytes| - 1] != ch {
+      LastMatchExists(bytes[..|bytes| - 1], ch);
+    }
   }
 
-  ghost predicate SqueezeRelation(
-    input: BenchWorld.Bytes,
-    squeezeSet: BenchWorld.Bytes,
-    output: BenchWorld.Bytes
-  )
+  opaque ghost function TranslateByte(set1: BenchWorld.Bytes, set2: BenchWorld.Bytes,
+                                      ch: BenchWorld.RawByte): BenchWorld.RawByte
+    ensures |set2| == 0 ==> TranslateByte(set1, set2, ch) == ch
+    ensures TranslationRelation(set1, set2, ch, TranslateByte(set1, set2, ch)) ||
+            (|set2| == 0 && TranslateByte(set1, set2, ch) == ch)
   {
-    SqueezeStateRelation(input, squeezeSet, false, '\0', output)
+    if ch !in set1 || |set2| == 0 then ch
+    else
+      LastMatchExists(set1, ch);
+      var i: nat :| i < |set1| && set1[i] == ch &&
+                    (forall j :: i < j < |set1| ==> set1[j] != ch);
+      set2[if i < |set2| then i else |set2| - 1]
   }
 
-  ghost predicate OutputRelation(
-    cmd: TrCmd,
-    input: BenchWorld.Bytes,
-    output: BenchWorld.Bytes
-  )
+  opaque ghost function DeleteTranslate(cmd: TrCmd, input: BenchWorld.Bytes): BenchWorld.Bytes
   {
-    exists transformed: BenchWorld.Bytes ::
-      DeleteTranslateRelation(cmd, input, transformed) &&
-      if cmd.squeeze then
-        SqueezeRelation(transformed, cmd.squeezeSet, output)
-      else
-        output == transformed
+    var kept := Select(input, set i: nat | i < |input| &&
+                                           (!cmd.deleteSet || input[i] !in cmd.set1) :: i);
+    if cmd.deleteSet then kept
+    else seq(|kept|, i requires 0 <= i < |kept| =>
+           TranslateByte(cmd.set1, cmd.set2, kept[i]))
   }
+
+  opaque ghost function Squeezed(input: BenchWorld.Bytes,
+                                 squeezeSet: BenchWorld.Bytes): BenchWorld.Bytes
+  {
+    Select(input, set i: nat | i < |input| &&
+                               (i == 0 || input[i] !in squeezeSet || input[i] != input[i - 1]) :: i)
+  }
+
+  ghost function Transform(cmd: TrCmd, input: BenchWorld.Bytes): BenchWorld.Bytes
+  {
+    var translated := DeleteTranslate(cmd, input);
+    if cmd.squeeze then Squeezed(translated, cmd.squeezeSet) else translated
+  }
+
 
   function ReadErrorText(reason: string): BenchWorld.Bytes
   {
-    ReadErrorTextText0 + Utf8.Encode(reason) + ReadErrorTextText1
+    "tr: read error: " + Utf8.Encode(reason) + "\n"
   }
 
   ghost function ReadError(err: int): BenchWorld.Bytes
@@ -722,7 +649,7 @@ module TrSpec {
 
   function WriteErrorText(reason: string): StreamWorld.Bytes
   {
-    WriteErrorTextText0 + Utf8.Encode(reason) + WriteErrorTextText1
+    "tr: write error: " + Utf8.Encode(reason) + "\n"
   }
 
   function WriteErrorAfterReadFailure(): StreamWorld.Bytes
@@ -763,7 +690,7 @@ module TrSpec {
                             output, diagnostics, normalExit, exit,
                             committed, outErr, errCommitted, errErr)
   }
-  twostate predicate PreparedSpec(raw: TrSchema.TrCmdRaw, io: BenchIO.IO, exit: int, plannedStdout: StreamWorld.Bytes, plannedStderr: StreamWorld.Bytes)
+  twostate predicate PreparedSpec(raw: TrSchema.TrCmdRaw, io: BenchIO.IO, exit: int, resultStdout: StreamWorld.Bytes, resultStderr: StreamWorld.Bytes)
     reads io.Footprint()
   {
     exists cmd: TrCmd ::
@@ -771,44 +698,42 @@ module TrSpec {
       match cmd.mode
       case ModeHelp =>
         io.stdin() == old(io.stdin()) &&
-        plannedStdout == old(io.stdout()) + HelpTextSpec() &&
-        plannedStderr == old(io.stderr()) &&
+        resultStdout == old(io.stdout()) + HelpTextSpec() &&
+        resultStderr == old(io.stderr()) &&
         exit == 0
       case ModeVersion =>
         io.stdin() == old(io.stdin()) &&
-        plannedStdout == old(io.stdout()) + VersionTextSpec() &&
-        plannedStderr == old(io.stderr()) &&
+        resultStdout == old(io.stdout()) + VersionTextSpec() &&
+        resultStderr == old(io.stderr()) &&
         exit == 0
       case ModeMissingOperand(message) =>
         io.stdin() == old(io.stdin()) &&
-        plannedStdout == old(io.stdout()) &&
-        plannedStderr == old(io.stderr()) + message &&
+        resultStdout == old(io.stdout()) &&
+        resultStderr == old(io.stderr()) + message &&
         exit == 1
       case ModeExtraOperand(operand) =>
         io.stdin() == old(io.stdin()) &&
-        plannedStdout == old(io.stdout()) &&
-        plannedStderr == old(io.stderr()) +
+        resultStdout == old(io.stdout()) &&
+        resultStderr == old(io.stderr()) +
         ExtraOperandMessageSpec(operand, |raw.operands| == 2) &&
         exit == 1
       case ModeUnsupportedSet(operand) =>
         io.stdin() == old(io.stdin()) &&
-        plannedStdout == old(io.stdout()) &&
-        plannedStderr == old(io.stderr()) + cmd.warnings +
+        resultStdout == old(io.stdout()) &&
+        resultStderr == old(io.stderr()) + cmd.warnings +
         UnsupportedSetMessageSpec(operand) &&
         exit == 1
       case ModeEmptySet2 =>
         io.stdin() == old(io.stdin()) &&
-        plannedStdout == old(io.stdout()) &&
-        plannedStderr == old(io.stderr()) + EmptySet2MessageSpec() &&
+        resultStdout == old(io.stdout()) &&
+        resultStderr == old(io.stderr()) + EmptySet2MessageSpec() &&
         exit == 1
       case ModeRun =>
         var read := IOContract.ObservedReadStdinResultFields(old(io.stdin()), old(io.trustedStreams()));
         var input := IOContract.ReadResultData(read);
         io.stdin() == IOContract.ObservedReadStdinRemainingFields(old(io.stdin()), old(io.trustedStreams())) &&
-        (exists output: BenchWorld.Bytes ::
-           OutputRelation(cmd, input, output) &&
-           plannedStdout == old(io.stdout()) + output) &&
-        plannedStderr == old(io.stderr()) + cmd.warnings +
+        resultStdout == old(io.stdout()) + Transform(cmd, input) &&
+        resultStderr == old(io.stderr()) + cmd.warnings +
         (if read.Ok? then [] else ReadError(IOContract.ResultErrno(read))) &&
         exit == (if read.Ok? then 0 else 1)
   }

@@ -6,20 +6,6 @@ include "../../../core/StringEscaping.dfy"
 
 module PasteSpec {
 
-  const ErrorMessageText0: BenchWorld.Bytes := "paste: "
-
-  const ErrorMessageText1: BenchWorld.Bytes := ": "
-
-  const ErrorMessageText2: BenchWorld.Bytes := "\n"
-
-  const DelimiterBackslashErrorText0: BenchWorld.Bytes := "paste: delimiter list ends with an unescaped backslash: "
-
-  const DelimiterBackslashErrorText1: BenchWorld.Bytes := "\n"
-
-  const StreamWriteErrorMessageText0: BenchWorld.Bytes := "paste: write error: "
-
-  const StreamWriteErrorMessageText1: BenchWorld.Bytes := "\n"
-
   import StreamContract = IOContract
   import StreamUtf8 = Utf8Semantics
 
@@ -32,7 +18,7 @@ module PasteSpec {
   import SE = StringEscaping
 
   datatype Entry = Entry(lines: seq<BenchWorld.Bytes>, readOk: bool)
-  type DelimPlan = Result.Result<seq<BenchWorld.Bytes>, BenchWorld.Bytes>
+  type DelimiterResult = Result.Result<seq<BenchWorld.Bytes>, BenchWorld.Bytes>
   datatype InputObservation = InputObservation(
     result: BenchWorld.IOResult<BenchWorld.Bytes>,
     entry: Entry,
@@ -88,16 +74,10 @@ module PasteSpec {
     case TimeParseFailure(message, _, _) => message
   }
 
-  function NeedsErrorQuoting(path: string): bool
-  {
-    var bytes := Utf8.Encode(path);
-    |bytes| == 0 || SE.SpecHasShellQuoteTrigger(bytes)
-  }
-
   function ErrorMessage(path: BenchWorld.Path, err: BenchWorld.IOError): BenchWorld.Bytes
   {
-    ErrorMessageText0 + SE.SpecQuoteFBytes(Utf8.Encode(path)) +
-    ErrorMessageText1 + Utf8.Encode(ErrnoText(err)) + ErrorMessageText2
+    "paste: " + SE.SpecQuoteFBytes(Utf8.Encode(path)) +
+    ": " + Utf8.Encode(ErrnoText(err)) + "\n"
   }
 
   function DelimiterBackslashError(text: BenchWorld.Bytes): BenchWorld.Bytes
@@ -107,7 +87,7 @@ module PasteSpec {
                           (text[i] == ':' || text[i] == '"' || !SE.SpecCPrintableByte(text[i]))
       then SE.SpecDoubleQuote(text)
       else text;
-    DelimiterBackslashErrorText0 + rendered + DelimiterBackslashErrorText1
+    "paste: delimiter list ends with an unescaped backslash: " + rendered + "\n"
   }
 
   function RecordDelimiter(zeroTerminated: bool): BenchWorld.RawByte
@@ -115,38 +95,15 @@ module PasteSpec {
     if zeroTerminated then '\0' else '\n'
   }
 
-  ghost predicate FragmentsConcatenate<T>(
-    fragments: seq<seq<T>>,
-    combined: seq<T>,
-    cuts: seq<nat>
-  )
+  ghost predicate LinesRelation(data: BenchWorld.Bytes, recordDelimiter: BenchWorld.RawByte,
+                                lines: seq<BenchWorld.Bytes>)
   {
-    |cuts| == |fragments| + 1 &&
-    cuts[0] == 0 &&
-    cuts[|cuts| - 1] == |combined| &&
-    forall i: nat {:trigger cuts[i]} | i < |fragments| ::
-      cuts[i] <= cuts[i + 1] <= |combined| &&
-      cuts[i + 1] == cuts[i] + |fragments[i]| &&
-      combined[cuts[i]..cuts[i + 1]] == fragments[i]
-  }
-
-  ghost predicate LinePartitionRelation(
-    data: BenchWorld.Bytes,
-    recordDelimiter: BenchWorld.RawByte,
-    lines: seq<BenchWorld.Bytes>,
-    terminated: seq<bool>,
-    fragments: seq<BenchWorld.Bytes>,
-    cuts: seq<nat>
-  )
-  {
-    |lines| == |terminated| == |fragments| &&
-    FragmentsConcatenate(fragments, data, cuts) &&
-    (forall i: nat | i < |lines| ::
-       |fragments[i]| > 0 &&
-       fragments[i] ==
-       lines[i] + (if terminated[i] then [recordDelimiter] else []) &&
-       recordDelimiter !in lines[i] &&
-       (i + 1 < |lines| ==> terminated[i]))
+    if |data| == 0 then lines == []
+    else
+      |lines| > 0 &&
+      (forall i: nat | i < |lines| :: recordDelimiter !in lines[i]) &&
+      data == Join(lines, [[recordDelimiter]]) +
+      (if data[|data| - 1] == recordDelimiter then [recordDelimiter] else [])
   }
 
   ghost predicate ReadResultRelation(
@@ -178,11 +135,7 @@ module PasteSpec {
   )
   {
     entry.readOk == (result.Ok? || !BlockingReadFailure(result.e)) &&
-    exists terminated: seq<bool>,
-      fragments: seq<BenchWorld.Bytes>,
-      cuts: seq<nat> ::
-      LinePartitionRelation(
-        IOContract.ReadResultData(result), recordDelimiter, entry.lines, terminated, fragments, cuts)
+    LinesRelation(IOContract.ReadResultData(result), recordDelimiter, entry.lines)
   }
 
   ghost predicate InputObservationRelation(
@@ -249,61 +202,6 @@ module PasteSpec {
     PasteSchema.Stdin in inputs
   }
 
-  ghost predicate StdinPositionsRelation(
-    inputs: seq<PasteSchema.Input>,
-    positions: seq<nat>
-  )
-  {
-    (forall k: nat | k < |positions| ::
-       positions[k] < |inputs| &&
-       inputs[positions[k]] == PasteSchema.Stdin &&
-       (k > 0 ==> positions[k - 1] < positions[k])) &&
-    (forall i: nat | i < |inputs| ::
-       inputs[i] == PasteSchema.Stdin ==> i in positions)
-  }
-
-  datatype EntriesForOutputWitness = EntriesForOutputWitness(
-    positions: seq<nat>,
-    stdinLines: seq<BenchWorld.Bytes>,
-    terminated: seq<bool>,
-    fragments: seq<BenchWorld.Bytes>,
-    cuts: seq<nat>
-  )
-
-  ghost predicate ParallelEntriesForOutputRelation(
-    cmd: PasteSchema.PasteCmd,
-    preStdin: BenchWorld.Bytes,
-    rawEntries: seq<Entry>,
-    entries: seq<Entry>,
-    trace: EntriesForOutputWitness
-  )
-  {
-    |rawEntries| == |cmd.inputs| &&
-    |entries| == |cmd.inputs| &&
-    StdinPositionsRelation(cmd.inputs, trace.positions) &&
-    LinePartitionRelation(
-      if HasStdinInput(cmd.inputs) then preStdin else [],
-      RecordDelimiter(cmd.zeroTerminated),
-      trace.stdinLines,
-      trace.terminated,
-      trace.fragments,
-      trace.cuts) &&
-    forall i: nat | i < |cmd.inputs| ::
-      match cmd.inputs[i]
-      case File(_) =>
-        entries[i] == rawEntries[i]
-      case Stdin =>
-        exists rank: nat, selected: seq<BenchWorld.Bytes> ::
-          rank < |trace.positions| &&
-          trace.positions[rank] == i &&
-          SelectedLinesRelation(
-            trace.stdinLines,
-            rank,
-            |trace.positions|,
-            selected) &&
-          entries[i] == Entry(selected, true)
-  }
-
   ghost predicate EntriesForOutputRelation(
     cmd: PasteSchema.PasteCmd,
     preStdin: BenchWorld.Bytes,
@@ -311,61 +209,55 @@ module PasteSpec {
     entries: seq<Entry>
   )
   {
-    if cmd.serial then
-      entries == rawEntries
+    if cmd.serial then entries == rawEntries
     else
-      exists trace: EntriesForOutputWitness ::
-        ParallelEntriesForOutputRelation(
-          cmd, preStdin, rawEntries, entries, trace)
+      |rawEntries| == |cmd.inputs| && |entries| == |cmd.inputs| &&
+      exists stdinLines: seq<BenchWorld.Bytes>
+        {:trigger LinesRelation(if HasStdinInput(cmd.inputs) then preStdin else [],
+                                RecordDelimiter(cmd.zeroTerminated), stdinLines)} ::
+        LinesRelation(if HasStdinInput(cmd.inputs) then preStdin else [],
+                      RecordDelimiter(cmd.zeroTerminated), stdinLines) &&
+        forall i: nat | i < |cmd.inputs| ::
+          if cmd.inputs[i].Stdin? then
+            entries[i].readOk && SelectedLinesRelation(stdinLines,
+                                                       StdinCount(cmd.inputs[..i]), StdinCount(cmd.inputs), entries[i].lines)
+          else entries[i] == rawEntries[i]
   }
 
-  datatype VisibleErrorAssembly =
-    VisibleErrorsDone |
-    VisibleErrorStep(
-      previous: BenchWorld.Bytes,
-      rest: VisibleErrorAssembly)
-
-  ghost predicate VisibleErrorPrefixRelation(
-    serial: bool,
-    observations: seq<InputObservation>,
-    i: nat,
-    output: BenchWorld.Bytes,
-    assembly: VisibleErrorAssembly
-  )
-    decreases assembly
+  lemma FirstBlockingExists(observations: seq<InputObservation>)
+    requires exists i: nat :: i < |observations| && observations[i].blocking
+    ensures exists i: nat ::
+              i < |observations| && observations[i].blocking &&
+              (forall j: nat | j < i :: !observations[j].blocking)
+    decreases |observations|
   {
-    i <= |observations| &&
-    match assembly
-    case VisibleErrorsDone =>
-      i == 0 && output == []
-    case VisibleErrorStep(previous, rest) =>
-      i > 0 &&
-      VisibleErrorPrefixRelation(
-        serial, observations, i - 1, previous, rest) &&
-      output ==
-      if serial then
-        previous + observations[i - 1].errorPiece
-      else if exists j: nat ::
-                j < i - 1 && observations[j].blocking then
-        previous
-      else if observations[i - 1].blocking then
-        observations[i - 1].errorPiece
-      else
-        previous + observations[i - 1].errorPiece
+    if exists i: nat :: i < |observations| - 1 && observations[i].blocking {
+      FirstBlockingExists(observations[..|observations| - 1]);
+    }
   }
 
-  ghost predicate VisibleErrorRelation(
-    serial: bool,
-    observations: seq<InputObservation>,
-    output: BenchWorld.Bytes
-  )
+  ghost function FirstBlocking(observations: seq<InputObservation>): (i: nat)
+    requires exists i: nat :: i < |observations| && observations[i].blocking
+    ensures i < |observations| && observations[i].blocking
+    ensures forall j: nat | j < i :: !observations[j].blocking
   {
-    exists assembly: VisibleErrorAssembly ::
-      VisibleErrorPrefixRelation(
-        serial, observations, |observations|, output, assembly)
+    FirstBlockingExists(observations);
+    var i: nat :| i < |observations| && observations[i].blocking &&
+                  (forall j: nat | j < i :: !observations[j].blocking);
+    i
   }
 
-  ghost predicate InputTraceRelation(
+  ghost function VisibleErrors(serial: bool,
+                               observations: seq<InputObservation>): BenchWorld.Bytes
+  {
+    if !serial && (exists i: nat :: i < |observations| && observations[i].blocking) then
+      observations[FirstBlocking(observations)].errorPiece
+    else
+      Concat<BenchWorld.RawByte>(seq(|observations|, i requires 0 <= i < |observations| =>
+                                   observations[i].errorPiece))
+  }
+
+  ghost predicate InputRelation(
     cmd: PasteSchema.PasteCmd,
     preFs: BenchWorld.FileSystem, preStreams: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
     preStdin: BenchWorld.Bytes,
@@ -376,59 +268,47 @@ module PasteSpec {
     hadBlockingError: bool
   )
   {
-    exists observations: seq<InputObservation>, states: seq<BenchWorld.Bytes>,
-      stdinData: BenchWorld.Bytes, cuts: seq<nat> ::
+    exists observations: seq<InputObservation> ::
       |observations| == |cmd.inputs| &&
-      StdinStatesRelation(cmd, preStreams, preStdin, postStdin, states) &&
-      StdinDataRelation(cmd, observations, stdinData, cuts) &&
+      postStdin == StdinAfterReads(preStdin, preStreams, StdinCount(cmd.inputs)) &&
       (forall i: nat | i < |observations| ::
-         InputObservationRelation(
-           cmd, preFs, preStreams, states[i], i, observations[i])) &&
-      EntriesForOutputRelation(
-        cmd, stdinData, ObservationEntries(observations), entries) &&
-      VisibleErrorRelation(cmd.serial, observations, errorOutput) &&
-      hadError ==
-      (exists i: nat ::
-         i < |observations| && observations[i].failed) &&
-      hadBlockingError ==
-      (exists i: nat ::
-         i < |observations| && observations[i].blocking)
+         InputObservationRelation(cmd, preFs, preStreams,
+                                  StdinAfterReads(preStdin, preStreams, StdinCount(cmd.inputs[..i])),
+                                  i, observations[i])) &&
+      EntriesForOutputRelation(cmd, StdinData(cmd, observations),
+                               ObservationEntries(observations), entries) &&
+      errorOutput == VisibleErrors(cmd.serial, observations) &&
+      hadError == (exists i: nat :: i < |observations| && observations[i].failed) &&
+      hadBlockingError == (exists i: nat :: i < |observations| && observations[i].blocking)
   }
 
-  ghost predicate StdinStatesRelation(
-    cmd: PasteSchema.PasteCmd,
-    observations: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
-    before: BenchWorld.Bytes, after: BenchWorld.Bytes,
-    states: seq<BenchWorld.Bytes>
-  )
+  function StdinCount(inputs: seq<PasteSchema.Input>): nat
   {
-    |states| == |cmd.inputs| + 1 && states[0] == before &&
-    states[|cmd.inputs|] == after &&
-    forall i: nat {:trigger states[i + 1]} | i < |cmd.inputs| ::
-      states[i + 1] == (if cmd.inputs[i].Stdin?
-                        then IOContract.ObservedReadStdinRemainingFields(states[i], observations)
-                        else states[i])
+    multiset(inputs)[PasteSchema.Stdin]
   }
 
-  ghost predicate StdinDataRelation(
-    cmd: PasteSchema.PasteCmd, observations: seq<InputObservation>,
-    data: BenchWorld.Bytes, cuts: seq<nat>
-  )
+  // Repeated consumption is observable when '-' occurs more than once. The
+  // count is semantic input; no per-operand execution trace is required.
+  ghost function StdinAfterReads(before: BenchWorld.Bytes,
+                                 observations: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
+                                 count: nat): BenchWorld.Bytes
+    decreases count
   {
-    |observations| == |cmd.inputs| && |cuts| == |cmd.inputs| + 1 &&
-    cuts[0] == 0 && cuts[|cmd.inputs|] == |data| &&
-    forall i: nat {:trigger cuts[i]} | i < |cmd.inputs| ::
-      cuts[i] <= cuts[i + 1] <= |data| &&
-      data[cuts[i]..cuts[i + 1]] == (if cmd.inputs[i].Stdin?
-                                     then IOContract.ReadResultData(observations[i].result) else [])
+    if count == 0 then before
+    else IOContract.ObservedReadStdinRemainingFields(
+           StdinAfterReads(before, observations, count - 1), observations)
   }
 
-  ghost predicate EscapedDelimiterRelation(
-    ch: BenchWorld.RawByte,
-    delimiter: BenchWorld.Bytes
-  )
+  ghost function StdinData(cmd: PasteSchema.PasteCmd,
+                           observations: seq<InputObservation>): BenchWorld.Bytes
+    requires |observations| == |cmd.inputs|
   {
-    delimiter ==
+    Concat<BenchWorld.RawByte>(seq(|observations|, i requires 0 <= i < |observations| =>
+                                 if cmd.inputs[i].Stdin? then IOContract.ReadResultData(observations[i].result) else []))
+  }
+
+  function EscapedDelimiter(ch: BenchWorld.RawByte): BenchWorld.Bytes
+  {
     if ch == '0' then []
     else if ch == 'n' then ['\n']
     else if ch == 't' then ['\t']
@@ -440,60 +320,40 @@ module PasteSpec {
     else [ch]
   }
 
-  datatype DelimiterAssembly =
-    DelimiterDone |
-    DelimiterFailure |
-    DelimiterStep(
-      index: nat,
-      nextIndex: nat,
-      delimiter: BenchWorld.Bytes,
-      rest: DelimiterAssembly)
-
-  ghost predicate DelimiterParseRelation(
-    text: BenchWorld.Bytes,
-    i: nat,
-    plan: DelimPlan,
-    assembly: DelimiterAssembly
-  )
-    decreases assembly
+  ghost predicate DelimiterCuts(text: BenchWorld.Bytes, start: nat, cuts: seq<nat>)
   {
-    i <= |text| &&
-    match assembly
-    case DelimiterDone =>
-      i == |text| && plan == Result.Ok([])
-    case DelimiterFailure =>
-      i < |text| &&
-      text[i] == '\\' &&
-      i + 1 == |text| &&
-      plan == Result.Err(DelimiterBackslashError(text))
-    case DelimiterStep(index, nextIndex, delimiter, rest) =>
-      index == i &&
-      i < |text| &&
-      (if text[i] == '\\' then
-         nextIndex == i + 2 &&
-         i + 1 < |text| &&
-         EscapedDelimiterRelation(text[i + 1], delimiter)
-       else
-         nextIndex == i + 1 &&
-         delimiter == [text[i]]) &&
-      exists restPlan: DelimPlan ::
-        DelimiterParseRelation(text, nextIndex, restPlan, rest) &&
-        plan ==
-        match restPlan
-        case Err(stderr) => Result.Err(stderr)
-        case Ok(delims) => Result.Ok([delimiter] + delims)
+    start <= |text| && |cuts| > 0 && cuts[0] == start &&
+    cuts[|cuts| - 1] == |text| &&
+    forall k {:trigger cuts[k]} | 0 <= k < |cuts| - 1 ::
+      cuts[k] < cuts[k + 1] <= |text| &&
+      cuts[k + 1] == cuts[k] +
+      (if text[cuts[k]] == '\\' && cuts[k] + 1 < |text| then 2 else 1)
   }
 
-  ghost predicate DelimiterPlanRelation(
+  ghost function DelimiterValue(text: BenchWorld.Bytes, cuts: seq<nat>): DelimiterResult
+    requires |cuts| > 0 && DelimiterCuts(text, cuts[0], cuts)
+  {
+    if exists k | 0 <= k < |cuts| - 1 ::
+         text[cuts[k]] == '\\' && cuts[k] + 1 == |text| then
+      Result.Err(DelimiterBackslashError(text))
+    else
+      var delimiters: seq<BenchWorld.Bytes> := seq(|cuts| - 1, k requires 0 <= k < |cuts| - 1 =>
+                                                 if text[cuts[k]] == '\\' then EscapedDelimiter(text[cuts[k] + 1])
+                                                 else [text[cuts[k]]]);
+      Result.Ok(delimiters)
+  }
+
+  ghost predicate DelimiterResultRelation(
     text: string,
-    plan: DelimPlan
+    result: DelimiterResult
   )
   {
     if |text| == 0 then
-      plan == Result.Ok([[]])
+      result == Result.Ok([[]])
     else
-      exists assembly: DelimiterAssembly ::
-        DelimiterParseRelation(Utf8.Encode(text), 0, plan, assembly)
+      exists cuts: seq<nat> ::
+        DelimiterCuts(Utf8.Encode(text), 0, cuts) &&
+        result == DelimiterValue(Utf8.Encode(text), cuts)
   }
 
   function Max(a: nat, b: nat): nat
@@ -516,229 +376,104 @@ module PasteSpec {
     delims[i % |delims|]
   }
 
-  datatype ColumnAssembly =
-    ColumnsDone |
-    ColumnStep(cut: nat, nextCut: nat, after: BenchWorld.Bytes, rest: ColumnAssembly)
-
-  datatype RecordAssembly =
-    RecordsDone |
-    RecordStep(cut: nat, nextCut: nat, record: BenchWorld.Bytes,
-               after: BenchWorld.Bytes, columns: ColumnAssembly, rest: RecordAssembly)
-
-  ghost predicate ParallelColumnsRelation(
-    entries: seq<Entry>,
-    delims: seq<BenchWorld.Bytes>,
-    row: nat,
-    i: nat,
-    before: BenchWorld.Bytes,
-    output: BenchWorld.Bytes,
-    assembly: ColumnAssembly
-  )
-    decreases assembly
+  // Canonical sequence concatenation, independent of a renderer's traversal.
+  ghost function Concat<T>(parts: seq<seq<T>>): seq<T>
+    decreases |parts|
   {
-    |delims| > 0 &&
-    match assembly
-    case ColumnsDone =>
-      i == |entries| && output == before
-    case ColumnStep(cut, nextCut, after, rest) =>
-      i < |entries| &&
-      var fragment :=
-        (if row < |entries[i].lines| then entries[i].lines[row] else []) +
-        (if i + 1 < |entries| then DelimAt(delims, i) else []);
-      cut == |before| &&
-      nextCut == cut + |fragment| &&
-      after == before + fragment &&
-      ParallelColumnsRelation(entries, delims, row, i + 1, after, output, rest)
+    if |parts| == 0 then [] else parts[0] + Concat(parts[1..])
   }
 
-  ghost predicate ParallelRowRelation(
-    entries: seq<Entry>,
-    delims: seq<BenchWorld.Bytes>,
-    row: nat,
-    output: BenchWorld.Bytes
-  )
+  ghost function Join(fields: seq<BenchWorld.Bytes>,
+                      delims: seq<BenchWorld.Bytes>): BenchWorld.Bytes
+    requires |delims| > 0
   {
-    |delims| > 0 &&
-    exists columns: ColumnAssembly ::
-      ParallelColumnsRelation(entries, delims, row, 0, [], output, columns)
+    Concat<BenchWorld.RawByte>(seq(|fields|, i requires 0 <= i < |fields| =>
+                                 fields[i] + (if i + 1 < |fields| then DelimAt(delims, i) else [])))
   }
 
-  ghost predicate ParallelRecordsRelation(
-    entries: seq<Entry>,
-    delims: seq<BenchWorld.Bytes>,
-    recordDelimiter: BenchWorld.RawByte,
-    row: nat,
-    limit: nat,
-    before: BenchWorld.Bytes,
-    output: BenchWorld.Bytes,
-    assembly: RecordAssembly
-  )
-    decreases assembly
+  ghost function ParallelRow(entries: seq<Entry>, delims: seq<BenchWorld.Bytes>,
+                             row: nat): BenchWorld.Bytes
+    requires |delims| > 0
   {
-    |delims| > 0 &&
-    match assembly
-    case RecordsDone =>
-      row == limit && output == before
-    case RecordStep(cut, nextCut, record, after, columns, rest) =>
-      row < limit &&
-      ParallelColumnsRelation(entries, delims, row, 0, [], record, columns) &&
-      cut == |before| &&
-      nextCut == cut + |record| + 1 &&
-      after == before + record + [recordDelimiter] &&
-      ParallelRecordsRelation(
-        entries, delims, recordDelimiter, row + 1, limit, after, output, rest)
+    Join(seq(|entries|, i requires 0 <= i < |entries| =>
+           if row < |entries[i].lines| then entries[i].lines[row] else []), delims)
   }
 
-  ghost predicate ParallelOutputRelation(
-    entries: seq<Entry>,
-    delims: seq<BenchWorld.Bytes>,
-    recordDelimiter: BenchWorld.RawByte,
-    output: BenchWorld.Bytes
-  )
+  ghost function ParallelRecords(entries: seq<Entry>, delims: seq<BenchWorld.Bytes>,
+                                 recordDelimiter: BenchWorld.RawByte): seq<BenchWorld.Bytes>
+    requires |delims| > 0
   {
-    |delims| > 0 &&
-    exists records: RecordAssembly ::
-      ParallelRecordsRelation(
-        entries, delims, recordDelimiter, 0, MaxLineCount(entries), [], output, records)
+    seq(MaxLineCount(entries), row requires 0 <= row < MaxLineCount(entries) =>
+      ParallelRow(entries, delims, row) + [recordDelimiter])
   }
 
-  ghost predicate SerialColumnsRelation(
-    lines: seq<BenchWorld.Bytes>,
-    delims: seq<BenchWorld.Bytes>,
-    i: nat,
-    before: BenchWorld.Bytes,
-    output: BenchWorld.Bytes,
-    assembly: ColumnAssembly
-  )
-    decreases assembly
+  ghost function SerialRecords(entries: seq<Entry>, delims: seq<BenchWorld.Bytes>,
+                               recordDelimiter: BenchWorld.RawByte): seq<BenchWorld.Bytes>
+    requires |delims| > 0
   {
-    |delims| > 0 &&
-    match assembly
-    case ColumnsDone =>
-      i == |lines| && output == before
-    case ColumnStep(cut, nextCut, after, rest) =>
-      i < |lines| &&
-      var fragment := lines[i] +
-                      (if i + 1 < |lines| then DelimAt(delims, i) else []);
-      cut == |before| &&
-      nextCut == cut + |fragment| &&
-      after == before + fragment &&
-      SerialColumnsRelation(lines, delims, i + 1, after, output, rest)
+    seq(|entries|, i requires 0 <= i < |entries| =>
+      if entries[i].readOk then
+        Join(entries[i].lines, delims) + [recordDelimiter]
+      else [])
   }
 
-  ghost predicate SerialRecordsRelation(
-    entries: seq<Entry>,
-    delims: seq<BenchWorld.Bytes>,
-    recordDelimiter: BenchWorld.RawByte,
-    i: nat,
-    before: BenchWorld.Bytes,
-    output: BenchWorld.Bytes,
-    assembly: RecordAssembly
-  )
-    decreases assembly
+  ghost function Output(serial: bool, delims: seq<BenchWorld.Bytes>,
+                        recordDelimiter: BenchWorld.RawByte,
+                        entries: seq<Entry>): BenchWorld.Bytes
+    requires |delims| > 0
   {
-    |delims| > 0 &&
-    match assembly
-    case RecordsDone =>
-      i == |entries| && output == before
-    case RecordStep(cut, nextCut, record, after, columns, rest) =>
-      i < |entries| &&
-      (if entries[i].readOk then
-         SerialColumnsRelation(entries[i].lines, delims, 0, [], record, columns) &&
-         cut == |before| &&
-         nextCut == cut + |record| + 1 &&
-         after == before + record + [recordDelimiter]
-       else
-         columns == ColumnsDone &&
-         record == [] &&
-         cut == |before| &&
-         nextCut == cut &&
-         after == before) &&
-      SerialRecordsRelation(
-        entries, delims, recordDelimiter, i + 1, after, output, rest)
+    Concat<BenchWorld.RawByte>(if serial then SerialRecords(entries, delims, recordDelimiter)
+                               else ParallelRecords(entries, delims, recordDelimiter))
   }
 
-  ghost predicate SerialOutputRelation(
-    entries: seq<Entry>,
-    delims: seq<BenchWorld.Bytes>,
-    recordDelimiter: BenchWorld.RawByte,
-    output: BenchWorld.Bytes
-  )
-  {
-    |delims| > 0 &&
-    exists records: RecordAssembly ::
-      SerialRecordsRelation(entries, delims, recordDelimiter, 0, [], output, records)
-  }
-
-  ghost predicate OutputRelation(
-    serial: bool,
-    delims: seq<BenchWorld.Bytes>,
-    recordDelimiter: BenchWorld.RawByte,
-    entries: seq<Entry>,
-    output: BenchWorld.Bytes
-  )
-  {
-    if serial then
-      SerialOutputRelation(entries, delims, recordDelimiter, output)
-    else
-      ParallelOutputRelation(entries, delims, recordDelimiter, output)
-  }
-
-  twostate predicate SpecCmd(cmd: PasteSchema.PasteCmd, io: BenchIO.IO, exit: int, plannedStdout: BenchWorld.Bytes, plannedStderr: BenchWorld.Bytes)
+  twostate predicate SpecCmd(cmd: PasteSchema.PasteCmd, io: BenchIO.IO, exit: int, resultStdout: BenchWorld.Bytes, resultStderr: BenchWorld.Bytes)
     reads io.Footprint() - {io.stdoutRegion, io.stderrRegion}
   {
     if cmd.mode == PasteSchema.ModeHelp then
       io.stdin() == old(io.stdin()) &&
-      plannedStdout == old(io.stdout()) + HelpText() &&
-      plannedStderr == old(io.stderr()) &&
+      resultStdout == old(io.stdout()) + HelpText() &&
+      resultStderr == old(io.stderr()) &&
       exit == 0
     else if cmd.mode == PasteSchema.ModeVersion then
       io.stdin() == old(io.stdin()) &&
-      plannedStdout == old(io.stdout()) + VersionText() &&
-      plannedStderr == old(io.stderr()) &&
+      resultStdout == old(io.stdout()) + VersionText() &&
+      resultStderr == old(io.stderr()) &&
       exit == 0
     else
-      exists plan: DelimPlan ::
-        DelimiterPlanRelation(cmd.delimiterText, plan) &&
-        match plan
+      exists result: DelimiterResult ::
+        DelimiterResultRelation(cmd.delimiterText, result) &&
+        match result
         case Err(stderr) =>
           io.stdin() == old(io.stdin()) &&
-          plannedStdout == old(io.stdout()) &&
-          plannedStderr == old(io.stderr()) + stderr &&
+          resultStdout == old(io.stdout()) &&
+          resultStderr == old(io.stderr()) + stderr &&
           exit == 1
         case Ok(delims) =>
+          |delims| > 0 &&
           exists entries: seq<Entry>,
             errorOutput: BenchWorld.Bytes,
             hadError: bool,
-            hadBlockingError: bool,
-            output: BenchWorld.Bytes ::
-            InputTraceRelation(
+            hadBlockingError: bool ::
+            InputRelation(
               cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()), io.stdin(), entries,
               errorOutput, hadError, hadBlockingError) &&
-            OutputRelation(
-              cmd.serial, delims, RecordDelimiter(cmd.zeroTerminated),
-              entries, output) &&
-            plannedStdout == old(io.stdout()) +
-            (if hadBlockingError && !cmd.serial then [] else output) &&
-            plannedStderr == old(io.stderr()) + errorOutput &&
+            resultStdout == old(io.stdout()) +
+            (if hadBlockingError && !cmd.serial then [] else
+             Output(cmd.serial, delims, RecordDelimiter(cmd.zeroTerminated), entries)) &&
+            resultStderr == old(io.stderr()) + errorOutput &&
             exit == (if hadError then 1 else 0)
   }
 
-  twostate predicate PreparedSpec(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO, exit: int, plannedStdout: BenchWorld.Bytes, plannedStderr: BenchWorld.Bytes)
+  twostate predicate PreparedSpec(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO, exit: int, resultStdout: BenchWorld.Bytes, resultStderr: BenchWorld.Bytes)
     reads io.Footprint() - {
             io.stdoutRegion, io.stderrRegion}
   {
-    SpecCmd(PasteSchema.Command(raw), io, exit, plannedStdout, plannedStderr)
-  }
-
-  function Emits(raw: PasteSchema.PasteCmdRaw): bool
-  {
-    true
+    SpecCmd(PasteSchema.Command(raw), io, exit, resultStdout, resultStderr)
   }
 
   function StreamWriteErrorMessage(message: string): BenchWorld.Bytes
   {
-    StreamUtf8.Encode(StreamWriteErrorMessageText0 + message + StreamWriteErrorMessageText1)
+    StreamUtf8.Encode("paste: write error: " + message + "\n")
   }
 
   ghost predicate EmitFields(
@@ -762,17 +497,13 @@ module PasteSpec {
     exit == (if stdoutResult.err != 0 || stderrResult.err != 0 then 1 else normalExit)
   }
 
-  twostate predicate Emission(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO,
+  twostate predicate Emission(io: BenchIO.IO,
                               out: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes,
                               normalExit: int, exit: int)
     reads io.Footprint()
   {
-    if Emits(raw) then
-      EmitFields(old(io.trustedStreams()), old(io.stdout()), old(io.stderr()),
-                 io.stdout(), io.stderr(), out, diagnostics, normalExit, exit)
-    else
-      io.stdout() == old(io.stdout()) && io.stderr() == old(io.stderr()) &&
-      exit == normalExit
+    EmitFields(old(io.trustedStreams()), old(io.stdout()), old(io.stderr()),
+               io.stdout(), io.stderr(), out, diagnostics, normalExit, exit)
   }
 
   twostate predicate Spec(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO, exit: int)
@@ -781,6 +512,6 @@ module PasteSpec {
     exists out: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes, normalExit: int ::
       PreparedSpec(raw, io, normalExit,
                    old(io.stdout()) + out, old(io.stderr()) + diagnostics) &&
-      Emission(raw, io, out, diagnostics, normalExit, exit)
+      Emission(io, out, diagnostics, normalExit, exit)
   }
 }

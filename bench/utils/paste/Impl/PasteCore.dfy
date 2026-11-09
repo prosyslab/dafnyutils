@@ -17,7 +17,7 @@ module PasteCore {
   import Spec = PasteSpec
 
   datatype LineRead = NoLine | SomeLine(line: BenchWorld.Bytes, rest: BenchWorld.Bytes)
-  type DelimPlan = Result.Result<seq<BenchWorld.Bytes>, BenchWorld.Bytes>
+  type DelimiterResult = Result.Result<seq<BenchWorld.Bytes>, BenchWorld.Bytes>
 
   ghost function PrefixStdinCore(cmd: PasteSchema.PasteCmd, preStreams: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult, preStdin: BenchWorld.Bytes, i: nat): BenchWorld.Bytes
     requires i <= |cmd.inputs|
@@ -403,7 +403,7 @@ module PasteCore {
       else [ch];
   }
 
-  function CollapseDelimitersFrom(text: BenchWorld.Bytes, i: nat): DelimPlan
+  function CollapseDelimitersFrom(text: BenchWorld.Bytes, i: nat): DelimiterResult
     requires i <= |text|
     decreases |text| - i
   {
@@ -442,7 +442,7 @@ module PasteCore {
     }
   }
 
-  function CollapseDelimiters(text: string): DelimPlan
+  function CollapseDelimiters(text: string): DelimiterResult
   {
     if |text| == 0 then
       Result.Ok([[]])
@@ -585,42 +585,42 @@ module PasteCore {
     RenderOutput(cmd.serial, delims, Spec.RecordDelimiter(cmd.zeroTerminated), EntriesForOutputCore(cmd, preFs, preStreams, preStdin))
   }
 
-  twostate predicate CoreSummaryCmd(cmd: PasteSchema.PasteCmd, io: BenchIO.IO, exit: int, plannedStdout: BenchWorld.Bytes, plannedStderr: BenchWorld.Bytes)
+  twostate predicate CoreSummaryCmd(cmd: PasteSchema.PasteCmd, io: BenchIO.IO, exit: int, resultStdout: BenchWorld.Bytes, resultStderr: BenchWorld.Bytes)
     reads io.Footprint() - {io.stdoutRegion, io.stderrRegion}
   {
     if cmd.mode == PasteSchema.ModeHelp then
       io.stdin() == old(io.stdin()) &&
-      plannedStdout == old(io.stdout()) + Spec.HelpText() &&
-      plannedStderr == old(io.stderr()) &&
+      resultStdout == old(io.stdout()) + Spec.HelpText() &&
+      resultStderr == old(io.stderr()) &&
       exit == 0
     else if cmd.mode == PasteSchema.ModeVersion then
       io.stdin() == old(io.stdin()) &&
-      plannedStdout == old(io.stdout()) + Spec.VersionText() &&
-      plannedStderr == old(io.stderr()) &&
+      resultStdout == old(io.stdout()) + Spec.VersionText() &&
+      resultStderr == old(io.stderr()) &&
       exit == 0
     else
       match CollapseDelimiters(cmd.delimiterText)
       case Err(stderr) =>
         io.stdin() == old(io.stdin()) &&
-        plannedStdout == old(io.stdout()) &&
-        plannedStderr == old(io.stderr()) + stderr &&
+        resultStdout == old(io.stdout()) &&
+        resultStderr == old(io.stderr()) + stderr &&
         exit == 1
       case Ok(delims) =>
         io.stdin() == PrefixStdinCore(cmd, old(io.trustedStreams()), old(io.stdin()), |cmd.inputs|) &&
-        plannedStdout == old(io.stdout()) +
+        resultStdout == old(io.stdout()) +
         (if PrefixHadBlockingErrorCore(cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()), |cmd.inputs|) && !cmd.serial then
            []
          else
            RunOutputCore(cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()), delims)) &&
-        plannedStderr == old(io.stderr()) + PrefixVisibleErrorOutputCore(cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()), |cmd.inputs|) &&
+        resultStderr == old(io.stderr()) + PrefixVisibleErrorOutputCore(cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()), |cmd.inputs|) &&
         exit == (if PrefixHadErrorCore(cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()), |cmd.inputs|) then 1 else 0)
   }
 
-  twostate predicate PreparedSummary(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO, exit: int, plannedStdout: BenchWorld.Bytes, plannedStderr: BenchWorld.Bytes)
+  twostate predicate PreparedSummary(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO, exit: int, resultStdout: BenchWorld.Bytes, resultStderr: BenchWorld.Bytes)
     reads io.Footprint() - {
             io.stdoutRegion, io.stderrRegion}
   {
-    CoreSummaryCmd(PasteSchema.Command(raw), io, exit, plannedStdout, plannedStderr)
+    CoreSummaryCmd(PasteSchema.Command(raw), io, exit, resultStdout, resultStderr)
   }
 
   lemma StdinDataPrefixCoreStep(cmd: PasteSchema.PasteCmd,
@@ -728,33 +728,33 @@ module PasteCore {
     out := RenderOutput(cmd.serial, delims, recordDelimiter, outputEntries);
   }
 
-  method Prepare(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO) returns (exit: int, plannedOut: BenchWorld.Bytes, plannedErr: BenchWorld.Bytes)
+  method Prepare(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO) returns (exit: int, resultOut: BenchWorld.Bytes, resultErr: BenchWorld.Bytes)
     modifies io.stdinRegion
-    ensures PreparedSummary(raw, io, exit, old(io.stdout()) + plannedOut, old(io.stderr()) + plannedErr)
+    ensures PreparedSummary(raw, io, exit, old(io.stdout()) + resultOut, old(io.stderr()) + resultErr)
     decreases *
   {
-    plannedOut := [];
-    plannedErr := [];
+    resultOut := [];
+    resultErr := [];
     ghost var initialStdout := io.stdout();
     ghost var initialStderr := io.stderr();
 
     ghost var preFs := io.fs();
     ghost var preStreams := io.trustedStreams();
     ghost var preStdin := io.stdin();
-    ghost var preStdout := (initialStdout + plannedOut);
-    ghost var preStderr := (initialStderr + plannedErr);
+    ghost var preStdout := (initialStdout + resultOut);
+    ghost var preStderr := (initialStderr + resultErr);
     var cmd := PasteSchema.Command(raw);
     hide PasteSchema.Command();
     hide PrefixStdinCore();
 
     if cmd.mode == PasteSchema.ModeHelp {
       var help := Spec.HelpText();
-      plannedOut := plannedOut + help;
+      resultOut := resultOut + help;
       exit := 0;
       assert io.stdin() == preStdin;
-      assert (initialStderr + plannedErr) == preStderr;
-      assert (initialStdout + plannedOut) == preStdout + Spec.HelpText();
-      assert PreparedSummary(raw, io, exit, old(io.stdout()) + plannedOut, old(io.stderr()) + plannedErr) by {
+      assert (initialStderr + resultErr) == preStderr;
+      assert (initialStdout + resultOut) == preStdout + Spec.HelpText();
+      assert PreparedSummary(raw, io, exit, old(io.stdout()) + resultOut, old(io.stderr()) + resultErr) by {
         hide *;
         reveal PreparedSummary(), CoreSummaryCmd();
       }
@@ -763,26 +763,26 @@ module PasteCore {
 
     if cmd.mode == PasteSchema.ModeVersion {
       var version := Spec.VersionText();
-      plannedOut := plannedOut + version;
+      resultOut := resultOut + version;
       exit := 0;
       assert io.stdin() == preStdin;
-      assert (initialStderr + plannedErr) == preStderr;
-      assert (initialStdout + plannedOut) == preStdout + Spec.VersionText();
-      assert PreparedSummary(raw, io, exit, old(io.stdout()) + plannedOut, old(io.stderr()) + plannedErr) by {
+      assert (initialStderr + resultErr) == preStderr;
+      assert (initialStdout + resultOut) == preStdout + Spec.VersionText();
+      assert PreparedSummary(raw, io, exit, old(io.stdout()) + resultOut, old(io.stderr()) + resultErr) by {
         hide *;
         reveal PreparedSummary(), CoreSummaryCmd();
       }
       return;
     }
 
-    var delimPlan := CollapseDelimiters(cmd.delimiterText);
-    match delimPlan
+    var delimiterResult := CollapseDelimiters(cmd.delimiterText);
+    match delimiterResult
     case Err(stderr) =>
-      plannedErr := plannedErr + stderr;
+      resultErr := resultErr + stderr;
       exit := 1;
       assert io.stdin() == preStdin;
-      assert (initialStdout + plannedOut) == preStdout;
-      assert (initialStderr + plannedErr) == preStderr + stderr;
+      assert (initialStdout + resultOut) == preStdout;
+      assert (initialStderr + resultErr) == preStderr + stderr;
       return;
     case Ok(delims) =>
       var entries: seq<Spec.Entry> := [];
@@ -804,8 +804,8 @@ module PasteCore {
       while i < |cmd.inputs|
         invariant 0 <= i <= |cmd.inputs|
         invariant io.stdin() == PrefixStdinCore(cmd, preStreams, preStdin, i)
-        invariant (initialStdout + plannedOut) == preStdout
-        invariant (initialStderr + plannedErr) == preStderr
+        invariant (initialStdout + resultOut) == preStdout
+        invariant (initialStderr + resultErr) == preStderr
         invariant |entries| == i
         invariant entries == PrefixEntriesCore(cmd, preFs, preStreams, preStdin, i)
         invariant err == PrefixVisibleErrorOutputCore(cmd, preFs, preStreams, preStdin, i)
@@ -859,28 +859,31 @@ module PasteCore {
         hadError := hadError || inputHadError;
         hadBlockingError := hadBlockingError || inputHadBlockingError;
         i := i + 1;
+        assert io.stdin() == PrefixStdinCore(cmd, preStreams, preStdin, i) by {
+          hide *;
+        }
       }
 
       var out := RunOutputFromEntriesMethod(cmd, delims, entries, stdinData);
       if (cmd.serial || !hadBlockingError) && |out| > 0 {
-        plannedOut := plannedOut + out;
+        resultOut := resultOut + out;
       } else {
         if hadBlockingError && !cmd.serial {
-          assert (initialStdout + plannedOut) == preStdout;
+          assert (initialStdout + resultOut) == preStdout;
           assert (if PrefixHadBlockingErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|) && !cmd.serial then
                     []
                   else
                     RunOutputCore(cmd, preFs, preStreams, preStdin, delims)) == [];
         } else {
           assert out == [];
-          assert (initialStdout + plannedOut) == preStdout + out;
+          assert (initialStdout + resultOut) == preStdout + out;
         }
       }
       if |err| > 0 {
-        plannedErr := plannedErr + err;
+        resultErr := resultErr + err;
       } else {
         assert err == [];
-        assert (initialStderr + plannedErr) == preStderr + err;
+        assert (initialStderr + resultErr) == preStderr + err;
       }
       exit := if hadError then 1 else 0;
       assert entries == EntriesCore(cmd, preFs, preStreams, preStdin);
@@ -891,17 +894,17 @@ module PasteCore {
       assert hadError == PrefixHadErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|);
       assert hadBlockingError == PrefixHadBlockingErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|);
       assert io.stdin() == PrefixStdinCore(cmd, preStreams, preStdin, |cmd.inputs|);
-      assert (initialStdout + plannedOut) == preStdout +
-                                             (if PrefixHadBlockingErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|) && !cmd.serial then
-                                                []
-                                              else
-                                                RunOutputCore(cmd, preFs, preStreams, preStdin, delims)) by {
+      assert (initialStdout + resultOut) == preStdout +
+                                            (if PrefixHadBlockingErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|) && !cmd.serial then
+                                               []
+                                             else
+                                               RunOutputCore(cmd, preFs, preStreams, preStdin, delims)) by {
         hide *;
       }
-      assert (initialStderr + plannedErr) == preStderr + PrefixVisibleErrorOutputCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|) by {
+      assert (initialStderr + resultErr) == preStderr + PrefixVisibleErrorOutputCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|) by {
         hide *;
       }
-      assert PreparedSummary(raw, io, exit, old(io.stdout()) + plannedOut, old(io.stderr()) + plannedErr) by {
+      assert PreparedSummary(raw, io, exit, old(io.stdout()) + resultOut, old(io.stderr()) + resultErr) by {
         hide *;
         reveal PreparedSummary(), CoreSummaryCmd();
       }
@@ -913,7 +916,7 @@ module PasteCore {
     exists out: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes, normalExit: int ::
       PreparedSummary(raw, io, normalExit,
                       old(io.stdout()) + out, old(io.stderr()) + diagnostics) &&
-      Spec.Emission(raw, io, out, diagnostics, normalExit, exit)
+      Spec.Emission(io, out, diagnostics, normalExit, exit)
   }
 
   method Flush(io: BenchIO.IO, out: BenchWorld.Bytes,
@@ -945,12 +948,8 @@ module PasteCore {
     var normalExit, out, diagnostics := Prepare(raw, io);
 
     assert PreparedSummary(raw, io, normalExit, old(io.stdout()) + out, old(io.stderr()) + diagnostics);
-    if Spec.Emits(raw) {
-      exit := Flush(io, out, diagnostics, normalExit);
-    } else {
-      exit := normalExit;
-    }
+    exit := Flush(io, out, diagnostics, normalExit);
     assert PreparedSummary(raw, io, normalExit, old(io.stdout()) + out, old(io.stderr()) + diagnostics);
-    assert Spec.Emission(raw, io, out, diagnostics, normalExit, exit);
+    assert Spec.Emission(io, out, diagnostics, normalExit, exit);
   }
 }

@@ -46,10 +46,10 @@ module Tr {
       msg := TrSchema.FormatParseError(err);
     }
 
-    method PlanParseFailure(err: CliTypes.ParseError, argv: seq<string>) returns (plan: CliTypes.CliPlan<TrSchema.TrCmdRaw>)
+    method PlanParseFailure(err: CliTypes.ParseError, argv: seq<string>) returns (result: CliTypes.CliPlan<TrSchema.TrCmdRaw>)
       decreases *
     {
-      plan := TrSchema.PlanParseFailure(err, argv);
+      result := TrSchema.PlanParseFailure(err, argv);
     }
 
     method RunCore(raw: TrSchema.TrCmdRaw, io: BenchIO.IO) returns (exit: int)

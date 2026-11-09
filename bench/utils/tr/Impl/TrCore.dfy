@@ -368,49 +368,49 @@ module TrCore {
     }
   }
 
-  twostate predicate PreparedSummary(raw: TrSchema.TrCmdRaw, io: BenchIO.IO, exit: int, plannedStdout: StreamWorld.Bytes, plannedStderr: StreamWorld.Bytes)
+  twostate predicate PreparedSummary(raw: TrSchema.TrCmdRaw, io: BenchIO.IO, exit: int, resultStdout: StreamWorld.Bytes, resultStderr: StreamWorld.Bytes)
     reads io.Footprint()
   {
     var cmd := Command(raw);
     match cmd.mode
     case ModeHelp =>
       io.stdin() == old(io.stdin()) &&
-      plannedStdout == old(io.stdout()) + Spec.HelpTextSpec() &&
-      plannedStderr == old(io.stderr()) &&
+      resultStdout == old(io.stdout()) + Spec.HelpTextSpec() &&
+      resultStderr == old(io.stderr()) &&
       exit == 0
     case ModeVersion =>
       io.stdin() == old(io.stdin()) &&
-      plannedStdout == old(io.stdout()) + Spec.VersionTextSpec() &&
-      plannedStderr == old(io.stderr()) &&
+      resultStdout == old(io.stdout()) + Spec.VersionTextSpec() &&
+      resultStderr == old(io.stderr()) &&
       exit == 0
     case ModeMissingOperand(message) =>
       io.stdin() == old(io.stdin()) &&
-      plannedStdout == old(io.stdout()) &&
-      plannedStderr == old(io.stderr()) + message &&
+      resultStdout == old(io.stdout()) &&
+      resultStderr == old(io.stderr()) + message &&
       exit == 1
     case ModeExtraOperand(operand) =>
       io.stdin() == old(io.stdin()) &&
-      plannedStdout == old(io.stdout()) &&
-      plannedStderr == old(io.stderr()) +
+      resultStdout == old(io.stdout()) &&
+      resultStderr == old(io.stderr()) +
       Spec.ExtraOperandMessageSpec(operand, |raw.operands| == 2) &&
       exit == 1
     case ModeUnsupportedSet(operand) =>
       io.stdin() == old(io.stdin()) &&
-      plannedStdout == old(io.stdout()) &&
-      plannedStderr == old(io.stderr()) + cmd.warnings +
+      resultStdout == old(io.stdout()) &&
+      resultStderr == old(io.stderr()) + cmd.warnings +
       Spec.UnsupportedSetMessageSpec(operand) &&
       exit == 1
     case ModeEmptySet2 =>
       io.stdin() == old(io.stdin()) &&
-      plannedStdout == old(io.stdout()) &&
-      plannedStderr == old(io.stderr()) + Spec.EmptySet2MessageSpec() &&
+      resultStdout == old(io.stdout()) &&
+      resultStderr == old(io.stderr()) + Spec.EmptySet2MessageSpec() &&
       exit == 1
     case ModeRun =>
       var read := IOContract.ObservedReadStdinResultFields(old(io.stdin()), old(io.trustedStreams()));
       var input := IOContract.ReadResultData(read);
       io.stdin() == IOContract.ObservedReadStdinRemainingFields(old(io.stdin()), old(io.trustedStreams())) &&
-      plannedStdout == old(io.stdout()) + RenderData(cmd, input) &&
-      plannedStderr == old(io.stderr()) + cmd.warnings +
+      resultStdout == old(io.stdout()) + RenderData(cmd, input) &&
+      resultStderr == old(io.stderr()) + cmd.warnings +
       (if read.Ok? then [] else Spec.ReadError(IOContract.ResultErrno(read))) &&
       exit == (if read.Ok? then 0 else 1)
   }
@@ -424,68 +424,68 @@ module TrCore {
                           io.trustedStreams(), output, diagnostics, normalExit, exit)
   }
 
-  method Prepare(raw: TrSchema.TrCmdRaw, io: BenchIO.IO) returns (exit: int, plannedStdout: StreamWorld.Bytes, plannedStderr: StreamWorld.Bytes)
+  method Prepare(raw: TrSchema.TrCmdRaw, io: BenchIO.IO) returns (exit: int, resultStdout: StreamWorld.Bytes, resultStderr: StreamWorld.Bytes)
     modifies io.stdinRegion
-    ensures PreparedSummary(raw, io, exit, old(io.stdout()) + plannedStdout, old(io.stderr()) + plannedStderr)
+    ensures PreparedSummary(raw, io, exit, old(io.stdout()) + resultStdout, old(io.stderr()) + resultStderr)
     decreases *
   {
     hide *;
     reveal PreparedSummary();
     ghost var emissionBeforeOut := io.stdout();
     ghost var emissionBeforeErr := io.stderr();
-    plannedStdout := [];
-    plannedStderr := [];
+    resultStdout := [];
+    resultStderr := [];
     ghost var preStdin := io.stdin();
     var cmd := Command(raw);
 
     match cmd.mode {
       case ModeHelp =>
-        plannedStdout := plannedStdout + (Spec.HelpTextSpec());
+        resultStdout := resultStdout + (Spec.HelpTextSpec());
         exit := 0;
-        assert PreparedSummary(raw, io, exit, emissionBeforeOut + plannedStdout, emissionBeforeErr + plannedStderr);
+        assert PreparedSummary(raw, io, exit, emissionBeforeOut + resultStdout, emissionBeforeErr + resultStderr);
         return;
       case ModeVersion =>
-        plannedStdout := plannedStdout + (Spec.VersionTextSpec());
+        resultStdout := resultStdout + (Spec.VersionTextSpec());
         exit := 0;
-        assert PreparedSummary(raw, io, exit, emissionBeforeOut + plannedStdout, emissionBeforeErr + plannedStderr);
+        assert PreparedSummary(raw, io, exit, emissionBeforeOut + resultStdout, emissionBeforeErr + resultStderr);
         return;
       case ModeMissingOperand(message) =>
-        plannedStderr := plannedStderr + (message);
+        resultStderr := resultStderr + (message);
         exit := 1;
-        assert PreparedSummary(raw, io, exit, emissionBeforeOut + plannedStdout, emissionBeforeErr + plannedStderr);
+        assert PreparedSummary(raw, io, exit, emissionBeforeOut + resultStdout, emissionBeforeErr + resultStderr);
         return;
       case ModeExtraOperand(operand) =>
-        plannedStderr := plannedStderr + (Spec.ExtraOperandMessageSpec(operand, |raw.operands| == 2));
+        resultStderr := resultStderr + (Spec.ExtraOperandMessageSpec(operand, |raw.operands| == 2));
         exit := 1;
-        assert PreparedSummary(raw, io, exit, emissionBeforeOut + plannedStdout, emissionBeforeErr + plannedStderr);
+        assert PreparedSummary(raw, io, exit, emissionBeforeOut + resultStdout, emissionBeforeErr + resultStderr);
         return;
       case ModeUnsupportedSet(operand) =>
-        plannedStderr := plannedStderr + (cmd.warnings);
-        plannedStderr := plannedStderr + (Spec.UnsupportedSetMessageSpec(operand));
+        resultStderr := resultStderr + (cmd.warnings);
+        resultStderr := resultStderr + (Spec.UnsupportedSetMessageSpec(operand));
         exit := 1;
-        assert PreparedSummary(raw, io, exit, emissionBeforeOut + plannedStdout, emissionBeforeErr + plannedStderr);
+        assert PreparedSummary(raw, io, exit, emissionBeforeOut + resultStdout, emissionBeforeErr + resultStderr);
         return;
       case ModeEmptySet2 =>
-        plannedStderr := plannedStderr + (Spec.EmptySet2MessageSpec());
+        resultStderr := resultStderr + (Spec.EmptySet2MessageSpec());
         exit := 1;
-        assert PreparedSummary(raw, io, exit, emissionBeforeOut + plannedStdout, emissionBeforeErr + plannedStderr);
+        assert PreparedSummary(raw, io, exit, emissionBeforeOut + resultStdout, emissionBeforeErr + resultStderr);
         return;
       case ModeRun =>
-        plannedStderr := plannedStderr + (cmd.warnings);
+        resultStderr := resultStderr + (cmd.warnings);
         var read := io.ReadStdin();
         var data := IOContract.ReadResultData(read);
         var out := RenderData(cmd, data);
-        plannedStdout := plannedStdout + (out);
+        resultStdout := resultStdout + (out);
         if read.Err? {
           var reason := io.GetCLocaleErrnoText(IOContract.ResultErrno(read));
-          plannedStderr := plannedStderr + (Spec.ReadErrorText(reason));
+          resultStderr := resultStderr + (Spec.ReadErrorText(reason));
           assert Spec.ReadErrorText(reason) == Spec.ReadError(IOContract.ResultErrno(read)) by {
             reveal Spec.ReadError();
           }
         }
         exit := if read.Ok? then 0 else 1;
     }
-    assert PreparedSummary(raw, io, exit, emissionBeforeOut + plannedStdout, emissionBeforeErr + plannedStderr);
+    assert PreparedSummary(raw, io, exit, emissionBeforeOut + resultStdout, emissionBeforeErr + resultStderr);
   }
 
 

@@ -231,3 +231,46 @@ exit assignment to `exit := 0` makes verification fail.
 - Logical input consumption
   is modeled; GNU's kernel read-ahead and a shared descriptor's final offset are
   not checked by the current stdout/stderr/filesystem comparator.
+
+## tr/paste denotational refactor validation
+
+The refactor replaces output assembly witnesses with exact byte functions and
+uses record reconstruction and stdin occurrence counts for paste's input
+assignment. `LinesRelationEquivalent` connects the reconstruction equation to the
+former partition relation. Core still implements execution; its entry points
+retain `ensures Spec(...)`. Output-function determinacy is distinct from a theorem
+about the entire IO-dependent `Spec` or CLI termination.
+
+Validation on 2026-11-09 used revision
+`4001ff9fbfa907464f2bb1d274a0bdd252208684` plus this working-tree change, in the
+development container `dafnyutils-spec-refactor`, from `/workspace/dafnyutils`.
+The tools were Dafny `4.11.1+0776df27c2449bad68e9a28e687bb6c70bf4b401`,
+.NET SDK `8.0.133`, Python `3.12.3`, and the pinned GNU coreutils
+`9.10.13-2cf49` reference. Final proof runs used `DOTNET_PROCESSOR_COUNT=16`;
+the supported target's 30-second assertion limit and complete source scope were
+preserved.
+
+| Command | Result |
+| --- | --- |
+| `make -C bench/utils/tr lint build test` | Exit 0; definition valid, build successful, 53 passed and 1 skipped |
+| `make -C bench/utils/paste lint build test` | Exit 0; definition valid, build successful, 67 passed and 1 skipped |
+| Fuzzing and contributor `final-check` | Not run; this maintenance change preserves the execution algorithms and does not change fuzzer or release policy |
+| `make -C bench/utils/tr verify` | Exit 0; 6,194 verified, 0 errors, no timeouts |
+| `make -C bench/utils/paste verify` | Exit 0; 3,645 verified, 0 errors, no timeouts |
+| `dafny format`, then `dafny format --check` on changed Dafny files | Both exit 0 |
+| `git diff --check` | Exit 0 |
+
+The two skips are the existing deferred-feature inventories. Each runtime test
+command deselects five `dafny_verify` cases; the full verification targets above
+check every local Dafny source, including the entry, implementation and proof
+modules. Shared `bench/core` sources remain library contracts under the existing
+native trust boundary, and the existing `decreases *` entry points do not prove
+CLI termination. Repository-wide development tests were not run because no
+Python or Rust code changed.
+
+Commands, versions, failed proof approaches and final logs are retained in
+`/workspace/tmp/tr-paste-spec/validation.txt` and its sibling logs inside
+`dafnyutils-spec-refactor`; they remain available while that container exists.
+The final logs are `tr-formatted-runtime.log`, `paste-formatted-runtime.log`,
+`tr-formatted-verify.log`, `paste-formatted-verify.log`, `format.log` and
+`format-check.log`. No commit was created.

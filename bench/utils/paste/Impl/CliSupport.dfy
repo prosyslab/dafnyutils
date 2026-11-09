@@ -343,14 +343,14 @@ module BenchItem {
     method ParseConfig() returns (cfg: ParseConfig)
     method Decode(parsed: ParsedArgs) returns (raw: CmdRaw)
     method FormatParseError(err: ParseError) returns (msg: Bytes)
-    method PlanParsed(parsed: ParsedArgs) returns (plan: CliPlan<CmdRaw>)
+    method PlanParsed(parsed: ParsedArgs) returns (result: CliPlan<CmdRaw>)
       decreases *
     {
       var raw := Decode(parsed);
-      plan := CliRun(raw);
+      result := CliRun(raw);
     }
 
-    method PlanArgv(argv: seq<string>) returns (plan: CliPlan<CmdRaw>)
+    method PlanArgv(argv: seq<string>) returns (result: CliPlan<CmdRaw>)
       decreases *
     {
       var schema := Schema();
@@ -359,9 +359,9 @@ module BenchItem {
 
       match parseRes {
         case ParseFailure(err) =>
-          plan := PlanParseFailure(err, argv);
+          result := PlanParseFailure(err, argv);
         case ParseSuccess(parsed) =>
-          plan := PlanParsed(parsed);
+          result := PlanParsed(parsed);
       }
     }
 
@@ -369,11 +369,11 @@ module BenchItem {
       modifies io.Footprint()
       decreases *
 
-    method PlanParseFailure(err: ParseError, argv: seq<string>) returns (plan: CliPlan<CmdRaw>)
+    method PlanParseFailure(err: ParseError, argv: seq<string>) returns (result: CliPlan<CmdRaw>)
       decreases *
     {
       var msg := FormatParseError(err);
-      plan := CliEarlyExit(1, [], msg);
+      result := CliEarlyExit(1, [], msg);
     }
   }
 
@@ -381,9 +381,9 @@ module BenchItem {
     modifies io.Footprint()
     decreases *
   {
-    var plan := item.PlanArgv(argv);
+    var result := item.PlanArgv(argv);
 
-    match plan {
+    match result {
       case CliRun(raw) =>
         exit := item.RunCore(raw, io);
       case CliEarlyExit(code, stdout, stderr) =>

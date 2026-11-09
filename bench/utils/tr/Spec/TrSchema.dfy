@@ -113,10 +113,10 @@ module TrSchema {
   method PlanParseFailure(
     e: CliTypes.ParseError,
     argv: seq<string>
-  ) returns (plan: CliTypes.CliPlan<TrCmdRaw>)
+  ) returns (result: CliTypes.CliPlan<TrCmdRaw>)
     decreases *
   {
     var msg := FormatParseError(e);
-    plan := CliTypes.CliEarlyExit(1, [], msg);
+    result := CliTypes.CliEarlyExit(1, [], msg);
   }
 }

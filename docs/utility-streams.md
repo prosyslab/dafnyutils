@@ -293,12 +293,24 @@ partial records available and produce a failing status.
 
 [`EntriesForOutputRelation`](../bench/utils/paste/Spec/PasteSpec.dfy) specifies how
 records are assigned to operands, including the stdin distribution.
-`ParallelOutputRelation` and `SerialOutputRelation` use inductive column and
-record assembly witnesses to describe fields, cyclic delimiters, and terminators.
+`Output` is the canonical concatenation of the parallel or serial records:
+fields, cyclic delimiters, missing fields, and record terminators determine the
+exact bytes. `Join` supplies the common cyclic-delimiter rule. `LinesRelation`
+fixes records by reconstructing the original bytes, with the trailing terminator
+determined by the input. Stdin record assignment uses the preceding and total
+`StdinCount`, without a position list. Delimiter decoding uses a partition into
+literal and escape tokens;
+`DelimiterValue` fixes either the decoded list or the trailing-backslash error.
+`VisibleErrors` selects the first blocking diagnostic in parallel mode, or
+concatenates diagnostics in operand order. `InputRelation` describes remaining
+stdin by the number of stdin operands and combines their observed read data.
 [`EntriesForOutputRefines` and `OutputRefines`](../bench/utils/paste/Proof/PasteProof.dfy)
-establish those assignments and construct the assembly witnesses for the recursive
-renderers. The input-trace proof also preserves the distinction between blocking
-and nonblocking failures and the corresponding visible diagnostics.
+establish the record assignments and exact output equality. Assembly witnesses
+for delimiters and diagnostics remain in the proof module. `LinesRelationEquivalent`
+proves equivalence with the former line-partition contract. Rendering proofs
+connect Core directly to the canonical concatenations. `InputRefinement` relates
+the implementation's stdin states and data partitions to the input relation,
+preserving partial reads and failures.
 
 ## tail
 
@@ -364,14 +376,16 @@ read diagnostic.
 ### Proof idea
 
 [`TranslationRelation`](../bench/utils/tr/Spec/TrSpec.dfy) specifies the last matching
-set position and its clamped replacement index. `DeleteTranslateRelation` uses
-strictly increasing kept indices containing exactly the undeleted positions.
-`SqueezeRelation` similarly selects exactly the bytes that begin a relevant run
-or lie outside the squeeze set. `OutputRelation` existentially connects the two
-stages. [`CoreTranslationSatisfiesRelation` and `CoreOutputSatisfiesRelation`](../bench/utils/tr/Proof/TrProof.dfy)
-establish these properties from the candidate scan and retained-index witnesses.
+set position and its clamped replacement index. `Transform` fixes the exact
+output: `Select` takes the ordered image of undeleted source positions,
+`TranslateByte` fixes each replacement, and `Squeezed` retains the starts of
+repeated runs and bytes outside the squeeze set. `PreparedSpec` equates stdout
+directly to this function's result. The retained-index and squeeze relations live
+in [`TrProof`](../bench/utils/tr/Proof/TrProof.dfy); `SelectInOrder`,
+`DeleteTranslateCanonical`, and `SqueezeCanonical` connect their witnesses to the
+sequence functions. `CoreOutputRefines` proves exact byte equality.
 Separate set-decoding and command proofs account for validation, expansion, and
-warnings before the output relation is applied.
+warnings before the transformation is applied.
 
 ## tsort
 

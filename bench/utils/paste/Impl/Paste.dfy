@@ -46,10 +46,10 @@ module Paste {
       msg := PasteSchema.FormatParseError(err);
     }
 
-    method PlanParseFailure(err: CliTypes.ParseError, argv: seq<string>) returns (plan: CliTypes.CliPlan<PasteSchema.PasteCmdRaw>)
+    method PlanParseFailure(err: CliTypes.ParseError, argv: seq<string>) returns (result: CliTypes.CliPlan<PasteSchema.PasteCmdRaw>)
       decreases *
     {
-      plan := PasteSchema.PlanParseFailure(err, argv);
+      result := PasteSchema.PlanParseFailure(err, argv);
     }
 
     method RunCore(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO) returns (exit: int)

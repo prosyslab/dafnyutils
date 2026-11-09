@@ -162,10 +162,10 @@ module PasteSchema {
   method PlanParseFailure(
     e: CliTypes.ParseError,
     argv: seq<string>
-  ) returns (plan: CliTypes.CliPlan<PasteCmdRaw>)
+  ) returns (result: CliTypes.CliPlan<PasteCmdRaw>)
     decreases *
   {
     var msg := FormatParseError(e);
-    plan := CliTypes.CliEarlyExit(1, [], msg);
+    result := CliTypes.CliEarlyExit(1, [], msg);
   }
 }
