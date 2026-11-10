@@ -58,13 +58,22 @@ module PathchkSpec {
     "Written by Paul Eggert, David MacKenzie, and Jim Meyering.\n"
   }
 
-  function InvalidShortText(token: string, index: nat): BenchWorld.Bytes
-    requires index < |token|
-    decreases |token| - index
+  function ShortOptionError(err: CliTypes.ParseError): bool
   {
-    if token[index] in "pP" && index + 1 < |token| then
-      InvalidShortText(token, index + 1)
-    else [Utf8.EncodeChar(token[index])[0]]
+    err.kind == CliTypes.UnknownOption && |err.rawToken| > 1 && err.rawToken[0] == '-' &&
+    !(|err.rawToken| > 2 && err.rawToken[..2] == "--")
+  }
+
+  ghost predicate ShortOptionPosition(token: string, index: nat)
+  {
+    1 <= index < |token| &&
+    (forall i: nat | 1 <= i < index :: token[i] in "pP") &&
+    (token[index] !in "pP" || index + 1 == |token|)
+  }
+
+  function UnknownShortText(byte: BenchWorld.RawByte): BenchWorld.Bytes
+  {
+    "pathchk: invalid option -- '" + [byte] + "'\n" + TryHelpText()
   }
 
   function LongOptionName(token: string): string
@@ -77,18 +86,20 @@ module PathchkSpec {
     else token
   }
 
-  function ParseErrorText(err: CliTypes.ParseError): BenchWorld.Bytes
+  ghost predicate ParseErrorText(err: CliTypes.ParseError, msg: BenchWorld.Bytes)
   {
-    ParseErrorMessage(err, Utf8.Encode(err.rawToken))
+    if ShortOptionError(err) then
+      exists index: nat :: ShortOptionPosition(err.rawToken, index) &&
+                           msg == UnknownShortText(Utf8.EncodeChar(err.rawToken[index])[0])
+    else msg == ParseErrorMessage(err, Utf8.Encode(err.rawToken))
   }
 
   function ParseErrorMessage(err: CliTypes.ParseError, token: BenchWorld.Bytes): BenchWorld.Bytes
+    requires !ShortOptionError(err)
   {
     if err.kind == CliTypes.UnknownOption then
       if |err.rawToken| > 2 && err.rawToken[..2] == "--" then
         "pathchk: unrecognized option '" + token + "'\n" + TryHelpText()
-      else if |err.rawToken| > 1 && err.rawToken[0] == '-' then
-        "pathchk: invalid option -- '" + InvalidShortText(err.rawToken, 1) + "'\n" + TryHelpText()
       else "pathchk: invalid option\n" + TryHelpText()
     else if err.kind == CliTypes.UnexpectedValue then
       "pathchk: option '" + Utf8.Encode(LongOptionName(err.rawToken)) +
