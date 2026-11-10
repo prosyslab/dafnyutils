@@ -8,12 +8,34 @@ include "../../../core/StringEscaping.dfy"
 module PathchkCore {
   import BenchIO
   import BenchWorld
+  import CliTypes
   import Schema = PathchkSchema
   import Spec = PathchkSpec
   import C = IOContract
   import Utf8 = Utf8Semantics
   import Quote = StringEscaping
   import Proof = PathchkProof
+
+  method FormatParseError(err: CliTypes.ParseError) returns (msg: BenchWorld.Bytes)
+    ensures Spec.ParseErrorText(err, msg)
+  {
+    if Spec.ShortOptionError(err) {
+      var token := err.rawToken;
+      var index: nat := 1;
+      while index + 1 < |token| && token[index] in "pP"
+        invariant 1 <= index < |token|
+        invariant forall i: nat | 1 <= i < index :: token[i] in "pP"
+        decreases |token| - index
+      {
+        index := index + 1;
+      }
+      assert Spec.ShortOptionPosition(token, index);
+      msg := Spec.UnknownShortText(Utf8.EncodeChar(token[index])[0]);
+    } else {
+      var token := Encode(err.rawToken);
+      msg := Spec.ParseErrorMessage(err, token);
+    }
+  }
 
   method Decimal(n: nat) returns (text: BenchWorld.Bytes)
     ensures Spec.DecimalText(n, text)

@@ -32,10 +32,9 @@ module Pathchk {
     }
 
     method FormatParseError(err: CliTypes.ParseError) returns (msg: BenchWorld.Bytes)
-      ensures msg == Spec.ParseErrorText(err)
+      ensures Spec.ParseErrorText(err, msg)
     {
-      var token := Core.Encode(err.rawToken);
-      msg := Spec.ParseErrorMessage(err, token);
+      msg := Core.FormatParseError(err);
     }
 
     method PlanParseFailure(

@@ -288,6 +288,7 @@ def test_long_name_diagnostics_match_coreutils(path_arg: str) -> None:
 @pytest.mark.parametrize(
     "args",
     [
+        pytest.param(["-" + "p" * (LINUX_ARG_BYTES - 2) + "x"], id="unknown-short-option"),
         pytest.param(["--" + "x" * (LINUX_ARG_BYTES - 2)], id="unknown-long-option"),
         pytest.param(
             ["-" + "p" * (LINUX_ARG_BYTES - 1), "--" + "x" * (LINUX_ARG_BYTES - 2)],
