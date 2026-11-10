@@ -78,9 +78,14 @@ fn name(_context: &ValueContext<'_>, rng: &mut StdRng) -> String {
         .chars()
         .collect();
     if rng.random_bool(0.5) {
-        chars.extend(" @'\"\\\n\té".chars());
+        chars.extend(" @'\"\\\n\té한😀".chars());
     }
-    (0..rng.random_range(0..=32))
+    let length = if rng.random_bool(0.5) {
+        rng.random_range(0..=32)
+    } else {
+        rng.random_range(33..=512)
+    };
+    (0..length)
         .map(|_| chars[rng.random_range(0..chars.len())])
         .collect()
 }
