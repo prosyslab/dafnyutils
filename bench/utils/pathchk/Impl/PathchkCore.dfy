@@ -1,8 +1,9 @@
 include "../../../core/IO.dfy"
 include "../Spec/PathchkSchema.dfy"
 include "../Spec/PathchkSpec.dfy"
-include "../../wc/Impl/WcCore.dfy"
-include "../../wc/Proof/WcProof.dfy"
+include "../Proof/PathchkProof.dfy"
+include "../../../core/Utf8.dfy"
+include "../../../core/StringEscaping.dfy"
 
 module PathchkCore {
   import BenchIO
@@ -11,41 +12,112 @@ module PathchkCore {
   import Spec = PathchkSpec
   import C = IOContract
   import Utf8 = Utf8Semantics
-  import Numbers = WcSpec
-  import NumberCore = WcCore
-  import NumberProof = WcProof
-
-  ghost opaque predicate PreparedSummary(
-    raw: Schema.PathchkCmdRaw, exit: int,
-    plannedStdout: BenchWorld.Bytes, plannedStderr: BenchWorld.Bytes
-  )
-  { Spec.PreparedSpec(raw, exit, plannedStdout, plannedStderr) }
-
-  twostate predicate CoreSummary(raw: Schema.PathchkCmdRaw, io: BenchIO.IO, exit: int)
-    reads io.stdoutRegion, io.stderrRegion, io.trustedStreamsRegion
-  {
-    Spec.AllowedInput(raw) ==>
-      exists output: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes, normalExit: int ::
-        PreparedSummary(raw, normalExit, output, diagnostics) &&
-        Spec.EmissionFields(old(io.stdout()), old(io.stderr()), io.stdout(), io.stderr(),
-                            io.trustedStreams(), output, diagnostics, normalExit, exit)
-  }
+  import Quote = StringEscaping
+  import Proof = PathchkProof
 
   method Decimal(n: nat) returns (text: BenchWorld.Bytes)
-    ensures Numbers.DecimalText(n, text)
+    ensures Spec.DecimalText(n, text)
+    decreases n
   {
-    text := NumberCore.Digits(n);
-    ghost var expected, digits, values := NumberProof.DecimalTextForCore(n);
+    var prefix: BenchWorld.Bytes := [];
+    if n >= 10 {
+      prefix := Decimal(n / 10);
+    }
+    text := prefix + [('0' as int + n % 10) as char];
+    Proof.DecimalStep(n, prefix);
   }
 
-  lemma ComponentUnique(data: BenchWorld.Bytes, start: nat, end: nat, first: nat, last: nat)
-    requires Spec.Component(data, start, end) && Spec.Component(data, first, last)
-    requires start <= first < end
-    ensures first == start && last == end
+  method Encode(text: string) returns (encoded: BenchWorld.Bytes)
+    ensures encoded == Utf8.Encode(text)
   {
-    if first > start { assert data[first - 1] != '/'; }
-    if last < end { assert data[last] != '/'; }
-    if end < last { assert data[end] != '/'; }
+    var i := |text|;
+    encoded := [];
+    while i > 0
+      invariant 0 <= i <= |text|
+      invariant encoded == Utf8.Encode(text[i..])
+      decreases i
+    {
+      i := i - 1;
+      assert text[i..][1..] == text[i + 1..];
+      encoded := Utf8.EncodeChar(text[i]) + encoded;
+    }
+  }
+
+  method CQuoteBody(bytes: BenchWorld.Bytes) returns (quoted: BenchWorld.Bytes)
+    ensures quoted == Quote.SpecCQuoteBytes(bytes)
+  {
+    var i := |bytes|;
+    quoted := [];
+    while i > 0
+      invariant 0 <= i <= |bytes|
+      invariant quoted == Quote.SpecCQuoteBytes(bytes[i..])
+      decreases i
+    {
+      i := i - 1;
+      assert bytes[i..][1..] == bytes[i + 1..];
+      quoted := Quote.SpecCQuoteByte(bytes[i]) + quoted;
+    }
+  }
+
+  method ShellCompatibleTail(bytes: BenchWorld.Bytes) returns (compatible: bool)
+    ensures compatible == Quote.SpecShellCompatibleTail(bytes)
+  {
+    var i := |bytes|;
+    compatible := true;
+    while i > 0
+      invariant 0 <= i <= |bytes|
+      invariant compatible == Quote.SpecShellCompatibleTail(bytes[i..])
+      decreases i
+    {
+      i := i - 1;
+      assert bytes[i..][1..] == bytes[i + 1..];
+      compatible := Quote.SpecShellCompatibleByte(bytes[i], false, false) && compatible;
+    }
+  }
+
+  method ShellEscapeTail(bytes: BenchWorld.Bytes) returns (plain: BenchWorld.Bytes)
+    ensures plain == Quote.SpecShellEscapeTail(bytes, false)
+  {
+    var i := |bytes|;
+    plain := "'";
+    var active: BenchWorld.Bytes := "'";
+    while i > 0
+      invariant 0 <= i <= |bytes|
+      invariant plain == Quote.SpecShellEscapeTail(bytes[i..], false)
+      invariant active == Quote.SpecShellEscapeTail(bytes[i..], true)
+      decreases i
+    {
+      i := i - 1;
+      assert bytes[i..][1..] == bytes[i + 1..];
+      var byte := bytes[i];
+      if byte == '\'' {
+        plain := "'\\''" + plain;
+        active := plain;
+      } else if Quote.SpecNeedsAnsiEscape(byte) {
+        active := Quote.SpecAnsiEscape(byte) + active;
+        plain := "'$'" + active;
+      } else {
+        plain := [byte] + plain;
+        active := "''" + plain;
+      }
+    }
+  }
+
+  method QuoteAf(bytes: BenchWorld.Bytes) returns (quoted: BenchWorld.Bytes)
+    ensures quoted == Quote.SpecQuoteAfBytes(bytes)
+  {
+    var compatible := true;
+    if |bytes| > 0 {
+      compatible := ShellCompatibleTail(bytes[1..]);
+      compatible := Quote.SpecShellCompatibleByte(bytes[0], true, |bytes| == 1) && compatible;
+    }
+    if Quote.SpecContainsApostrophe(bytes) && compatible {
+      var body := CQuoteBody(bytes);
+      quoted := "\"" + body + "\"";
+    } else {
+      var body := ShellEscapeTail(bytes);
+      quoted := "'" + body;
+    }
   }
 
   method ScanLeadingHyphen(data: BenchWorld.Bytes) returns (found: bool)
@@ -113,7 +185,7 @@ module PathchkCore {
           ensures Spec.Component(data, first, last) ==> last - first <= Spec.ComponentByteLimit
         {
           if Spec.Component(data, first, last) && first >= start {
-            ComponentUnique(data, start, end, first, last);
+            Proof.ComponentUnique(data, start, end, first, last);
           }
         }
         start := end;
@@ -127,19 +199,26 @@ module PathchkCore {
     ensures valid == Spec.ValidName(Utf8.Encode(path), extra)
   {
     reveal Spec.NameDiagnostic(), Spec.ValidName();
-    var data := Utf8.Encode(path);
+    var data := Encode(path);
     valid := false;
     if extra {
       var found := ScanLeadingHyphen(data);
-      if found { return Spec.LeadingHyphenText(path), false; }
+      if found {
+        var quotedPath := QuoteAf(data);
+        return Spec.LeadingHyphenMessage(quotedPath), false;
+      }
     }
     if |data| == 0 { return Spec.EmptyNameText(), false; }
     var index := ScanPortable(data);
-    if index < |data| { return Spec.NonPortableCharacterText(data[index], path), false; }
+    if index < |data| {
+      var quotedPath := QuoteAf(data);
+      return Spec.NonPortableCharacterMessage(data[index], quotedPath), false;
+    }
     if |data| > Spec.PathByteLimit {
       var limitText := Decimal(Spec.PathByteLimit);
       var lengthText := Decimal(|data|);
-      return Spec.PathLengthText(limitText, lengthText, path), false;
+      var quotedPath := QuoteAf(data);
+      return Spec.PathLengthMessage(limitText, lengthText, quotedPath), false;
     }
     var start, end, componentsValid := ScanComponents(data);
     if !componentsValid {
@@ -154,9 +233,8 @@ module PathchkCore {
       exit: int, plannedStdout: BenchWorld.Bytes, plannedStderr: BenchWorld.Bytes
     )
     requires Spec.AllowedInput(raw)
-    ensures PreparedSummary(raw, exit, plannedStdout, plannedStderr)
+    ensures Spec.PreparedSpec(raw, exit, plannedStdout, plannedStderr)
   {
-    reveal PreparedSummary();
     plannedStdout := [];
     plannedStderr := [];
     if raw.mode == Schema.ModeHelp {
@@ -174,60 +252,24 @@ module PathchkCore {
       ghost var cuts: seq<nat> := [0];
       while i < |raw.operands|
         invariant 0 <= i <= |raw.operands|
-        invariant |cuts| == i + 1 && cuts[0] == 0 && cuts[i] == |plannedStderr|
-        invariant forall j: nat {:trigger cuts[j]} | j < i ::
-                    cuts[j] <= cuts[j + 1] <= |plannedStderr| &&
-                    Spec.NameDiagnostic(raw.operands[j], raw.checkExtraPortability,
-                                        plannedStderr[cuts[j]..cuts[j + 1]])
+        invariant Spec.OrderedDiagnostics(raw.operands[..i], raw.checkExtraPortability,
+                                          plannedStderr, cuts)
         invariant allValid == (forall j: nat | j < i ::
                                  Spec.ValidName(Utf8.Encode(raw.operands[j]), raw.checkExtraPortability))
         decreases |raw.operands| - i
       {
         var piece, valid := CheckName(raw.operands[i], raw.checkExtraPortability);
-        ghost var previous := plannedStderr;
-        ghost var previousCuts := cuts;
-        ghost var previousAllValid := allValid;
+        Proof.ExtendDiagnostics(raw.operands[..i], raw.checkExtraPortability,
+                                plannedStderr, cuts, raw.operands[i], piece);
+        Proof.ExtendValidity(raw.operands, raw.checkExtraPortability, i);
+        assert raw.operands[..i + 1] == raw.operands[..i] + [raw.operands[i]];
         plannedStderr := plannedStderr + piece;
         cuts := cuts + [|plannedStderr|];
-        forall j: nat {:trigger cuts[j]} | j < i + 1
-          ensures cuts[j] <= cuts[j + 1] <= |plannedStderr|
-          ensures Spec.NameDiagnostic(raw.operands[j], raw.checkExtraPortability,
-                                      plannedStderr[cuts[j]..cuts[j + 1]])
-        {
-          if j < i {
-            assert cuts[j] == previousCuts[j] && cuts[j + 1] == previousCuts[j + 1];
-            assert previousCuts[j] <= previousCuts[j + 1] <= |previous|;
-            assert Spec.NameDiagnostic(raw.operands[j], raw.checkExtraPortability,
-                                       previous[previousCuts[j]..previousCuts[j + 1]]);
-            assert plannedStderr[..|previous|] == previous;
-            assert plannedStderr[cuts[j]..cuts[j + 1]] ==
-                   previous[previousCuts[j]..previousCuts[j + 1]];
-          } else {
-            assert plannedStderr[cuts[j]..cuts[j + 1]] == piece;
-          }
-        }
         allValid := allValid && valid;
-        assert allValid == (forall j: nat | j < i + 1 ::
-                              Spec.ValidName(Utf8.Encode(raw.operands[j]), raw.checkExtraPortability)) by {
-          if allValid {
-            forall j: nat | j < i + 1
-              ensures Spec.ValidName(Utf8.Encode(raw.operands[j]), raw.checkExtraPortability)
-            {
-              if j < i {
-                assert Spec.ValidName(Utf8.Encode(raw.operands[j]), raw.checkExtraPortability);
-              } else { assert j == i; }
-            }
-          } else if !previousAllValid {
-            var j: nat :| j < i && !Spec.ValidName(Utf8.Encode(raw.operands[j]), raw.checkExtraPortability);
-            assert j < i + 1;
-          } else {
-            assert !Spec.ValidName(Utf8.Encode(raw.operands[i]), raw.checkExtraPortability);
-          }
-        }
         i := i + 1;
       }
       exit := if allValid then 0 else 1;
-      assert Spec.PathchkResult(raw, plannedStderr, exit);
+      Proof.AssembleResult(raw, plannedStderr, cuts, allValid);
     }
   }
 
@@ -268,10 +310,11 @@ module PathchkCore {
 
   method RunCore(raw: Schema.PathchkCmdRaw, io: BenchIO.IO) returns (exit: int)
     modifies io.stdoutRegion, io.stderrRegion
-    ensures CoreSummary(raw, io, exit)
+    ensures Spec.Spec(raw, io, exit)
   {
     if !Spec.AllowedInput(raw) { return 1; }
     var normalExit, output, diagnostics := Prepare(raw);
     exit := Flush(output, diagnostics, normalExit, io);
+    Proof.Complete(raw, io, output, diagnostics, normalExit, exit);
   }
 }

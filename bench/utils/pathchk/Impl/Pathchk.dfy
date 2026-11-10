@@ -1,7 +1,6 @@
 include "CliSupport.dfy"
 include "../Spec/PathchkSpec.dfy"
 include "../Impl/PathchkCore.dfy"
-include "../Proof/PathchkProof.dfy"
 
 module Pathchk {
   import BenchIO
@@ -11,7 +10,6 @@ module Pathchk {
   import S = PathchkSchema
   import Core = PathchkCore
   import Spec = PathchkSpec
-  import Proof = PathchkProof
   import opened CliExtern
 
   class PathchkBenchmarkItem extends BenchItem.BenchmarkItemTwostate<S.PathchkCmdRaw> {
@@ -33,8 +31,11 @@ module Pathchk {
       raw := S.Decode(parsed);
     }
 
-    method FormatParseError(err: CliTypes.ParseError) returns (msg: BenchWorld.Bytes) {
-      msg := Spec.ParseErrorText(err);
+    method FormatParseError(err: CliTypes.ParseError) returns (msg: BenchWorld.Bytes)
+      ensures msg == Spec.ParseErrorText(err)
+    {
+      var token := Core.Encode(err.rawToken);
+      msg := Spec.ParseErrorMessage(err, token);
     }
 
     method PlanParseFailure(
@@ -55,7 +56,8 @@ module Pathchk {
           case ParseFailure(_) =>
         }
       }
-      return CliTypes.CliEarlyExit(1, [], Spec.ParseErrorText(err));
+      var msg := FormatParseError(err);
+      return CliTypes.CliEarlyExit(1, [], msg);
     }
 
     method RunCore(raw: S.PathchkCmdRaw, io: BenchIO.IO) returns (exit: int)
@@ -63,7 +65,6 @@ module Pathchk {
       ensures Spec.Spec(raw, io, exit)
     {
       exit := Core.RunCore(raw, io);
-      Proof.CoreSummaryImpliesSpec(raw, io, exit);
     }
   }
 }

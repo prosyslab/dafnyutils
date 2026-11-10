@@ -2,7 +2,6 @@ include "../Spec/PathchkSchema.dfy"
 include "../../../core/IO.dfy"
 include "../../../core/Utf8.dfy"
 include "../../../core/StringEscaping.dfy"
-include "../../wc/Spec/WcSpec.dfy"
 
 module PathchkSpec {
   import BenchIO
@@ -11,11 +10,25 @@ module PathchkSpec {
   import Schema = PathchkSchema
   import Utf8 = Utf8Semantics
   import Quote = StringEscaping
-  import Numbers = WcSpec
   import StreamContract = IOContract
 
   const PathByteLimit: nat := 255
   const ComponentByteLimit: nat := 14
+
+  ghost predicate DecimalTextWitness(n: nat, text: BenchWorld.Bytes, values: seq<nat>)
+  {
+    |text| > 0 &&
+    (|text| == 1 || text[0] != '0') &&
+    |values| == |text| + 1 && values[0] == 0 && values[|text|] == n &&
+    forall i: nat | i < |text| ::
+      '0' <= text[i] <= '9' &&
+      values[i + 1] == values[i] * 10 + (text[i] as int - '0' as int)
+  }
+
+  ghost predicate DecimalText(n: nat, text: BenchWorld.Bytes)
+  {
+    exists values: seq<nat> :: DecimalTextWitness(n, text, values)
+  }
 
   function HelpTextSpec(): BenchWorld.Bytes
   {
@@ -66,9 +79,14 @@ module PathchkSpec {
 
   function ParseErrorText(err: CliTypes.ParseError): BenchWorld.Bytes
   {
+    ParseErrorMessage(err, Utf8.Encode(err.rawToken))
+  }
+
+  function ParseErrorMessage(err: CliTypes.ParseError, token: BenchWorld.Bytes): BenchWorld.Bytes
+  {
     if err.kind == CliTypes.UnknownOption then
       if |err.rawToken| > 2 && err.rawToken[..2] == "--" then
-        "pathchk: unrecognized option '" + Utf8.Encode(err.rawToken) + "'\n" + TryHelpText()
+        "pathchk: unrecognized option '" + token + "'\n" + TryHelpText()
       else if |err.rawToken| > 1 && err.rawToken[0] == '-' then
         "pathchk: invalid option -- '" + InvalidShortText(err.rawToken, 1) + "'\n" + TryHelpText()
       else "pathchk: invalid option\n" + TryHelpText()
@@ -76,11 +94,11 @@ module PathchkSpec {
       "pathchk: option '" + Utf8.Encode(LongOptionName(err.rawToken)) +
       "' doesn't allow an argument\n" + TryHelpText()
     else if err.kind == CliTypes.Ambiguous then
-      "pathchk: option '" + Utf8.Encode(err.rawToken) +
+      "pathchk: option '" + token +
       "' is ambiguous; possibilities: '--portability' '--help' '--version'\n" + TryHelpText()
     else
       "pathchk: " + Utf8.Encode(if err.kind == CliTypes.MissingValue then "missing option value" else "parse error") +
-      " at token '" + Utf8.Encode(err.rawToken) + "'\n"
+      " at token '" + token + "'\n"
   }
 
   function TryHelpText(): BenchWorld.Bytes
@@ -94,14 +112,23 @@ module PathchkSpec {
 
   function LeadingHyphenText(path: string): BenchWorld.Bytes
   {
-    "pathchk: leading '-' in a component of file name " +
-    Quote.SpecQuoteAfBytes(Utf8.Encode(path)) + "\n"
+    LeadingHyphenMessage(Quote.SpecQuoteAfBytes(Utf8.Encode(path)))
+  }
+
+  function LeadingHyphenMessage(quotedPath: BenchWorld.Bytes): BenchWorld.Bytes
+  {
+    "pathchk: leading '-' in a component of file name " + quotedPath + "\n"
   }
 
   function NonPortableCharacterText(byte: BenchWorld.RawByte, path: string): BenchWorld.Bytes
   {
+    NonPortableCharacterMessage(byte, Quote.SpecQuoteAfBytes(Utf8.Encode(path)))
+  }
+
+  function NonPortableCharacterMessage(byte: BenchWorld.RawByte, quotedPath: BenchWorld.Bytes): BenchWorld.Bytes
+  {
     "pathchk: non-portable character " + Quote.SpecLocaleQuoteBytes([byte]) +
-    " in file name " + Quote.SpecQuoteAfBytes(Utf8.Encode(path)) + "\n"
+    " in file name " + quotedPath + "\n"
   }
 
   function PathLengthText(
@@ -110,8 +137,15 @@ module PathchkSpec {
     path: string
   ): BenchWorld.Bytes
   {
+    PathLengthMessage(limitText, lengthText, Quote.SpecQuoteAfBytes(Utf8.Encode(path)))
+  }
+
+  function PathLengthMessage(
+    limitText: BenchWorld.Bytes, lengthText: BenchWorld.Bytes, quotedPath: BenchWorld.Bytes
+  ): BenchWorld.Bytes
+  {
     "pathchk: limit " + limitText + " exceeded by length " + lengthText +
-    " of file name " + Quote.SpecQuoteAfBytes(Utf8.Encode(path)) + "\n"
+    " of file name " + quotedPath + "\n"
   }
 
   function ComponentLengthText(
@@ -176,26 +210,33 @@ module PathchkSpec {
                        diagnostics == NonPortableCharacterText(data[i], path)
     else if |data| > PathByteLimit then
       exists limitText: BenchWorld.Bytes, lengthText: BenchWorld.Bytes ::
-        Numbers.DecimalText(PathByteLimit, limitText) && Numbers.DecimalText(|data|, lengthText) &&
+        DecimalText(PathByteLimit, limitText) && DecimalText(|data|, lengthText) &&
         diagnostics == PathLengthText(limitText, lengthText, path)
     else if exists start: nat, end: nat ::
               start < end <= |data| && Component(data, start, end) && end - start > ComponentByteLimit
     then
       exists start: nat, end: nat, limitText: BenchWorld.Bytes, lengthText: BenchWorld.Bytes ::
         FirstLongComponent(data, start, end) &&
-        Numbers.DecimalText(ComponentByteLimit, limitText) && Numbers.DecimalText(end - start, lengthText) &&
+        DecimalText(ComponentByteLimit, limitText) && DecimalText(end - start, lengthText) &&
         diagnostics == ComponentLengthText(limitText, lengthText, data[start..end])
     else diagnostics == []
+  }
+
+  ghost predicate OrderedDiagnostics(
+    paths: seq<string>, extra: bool, diagnostics: BenchWorld.Bytes, cuts: seq<nat>
+  )
+  {
+    |cuts| == |paths| + 1 && cuts[0] == 0 && cuts[|paths|] == |diagnostics| &&
+    forall i: nat {:trigger cuts[i]} | i < |paths| ::
+      cuts[i] <= cuts[i + 1] <= |diagnostics| &&
+      NameDiagnostic(paths[i], extra, diagnostics[cuts[i]..cuts[i + 1]])
   }
 
   ghost predicate PathchkResult(raw: Schema.PathchkCmdRaw, diagnostics: BenchWorld.Bytes, exit: int)
   {
     |raw.operands| > 0 &&
     exists cuts: seq<nat> ::
-      |cuts| == |raw.operands| + 1 && cuts[0] == 0 && cuts[|raw.operands|] == |diagnostics| &&
-      (forall i: nat {:trigger cuts[i]} | i < |raw.operands| ::
-         cuts[i] <= cuts[i + 1] <= |diagnostics| &&
-         NameDiagnostic(raw.operands[i], raw.checkExtraPortability, diagnostics[cuts[i]..cuts[i + 1]])) &&
+      OrderedDiagnostics(raw.operands, raw.checkExtraPortability, diagnostics, cuts) &&
       exit == (if forall i: nat | i < |raw.operands| ::
                     ValidName(Utf8.Encode(raw.operands[i]), raw.checkExtraPortability)
                then 0 else 1)
