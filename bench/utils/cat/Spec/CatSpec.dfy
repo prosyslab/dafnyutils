@@ -372,6 +372,12 @@ module CatSpec {
     if index > 0 { StdinStatePrefixFunctional(cmd, before, observations, first, second, index - 1); }
   }
 
+  // Check the initializer's domain outside the IO-heavy lemma context.
+  ghost function CompleteStdinStates(inputs: seq<CatSchema.Input>, before: BenchWorld.Bytes): seq<BenchWorld.Bytes>
+  {
+    seq(|inputs| + 1, i requires 0 <= i <= |inputs| => if CatSchema.Stdin in inputs[..i] then [] else before)
+  }
+
   lemma CompleteStdinTrace(cmd: CatSchema.CatCmd, preFs: BenchWorld.FileSystem,
                            observations: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
                            before: BenchWorld.Bytes, results: seq<BenchWorld.IOResult<BenchWorld.Bytes>>)
@@ -379,7 +385,7 @@ module CatSpec {
     requires |results| == |cmd.inputs|
     requires forall i: nat | i < |cmd.inputs| :: CompleteReadResultRelation(cmd, preFs, observations, before, i, results[i])
     ensures StdinTraceRelation(cmd, before, if CatSchema.Stdin in cmd.inputs then [] else before, observations,
-                               seq(|cmd.inputs| + 1, i requires 0 <= i <= |cmd.inputs| => if CatSchema.Stdin in cmd.inputs[..i] then [] else before))
+                               CompleteStdinStates(cmd.inputs, before))
     ensures forall i: nat | i < |cmd.inputs| :: InputReadOutcomeRelation(cmd, preFs, observations,
                                                                          if CatSchema.Stdin in cmd.inputs[..i] then [] else before, i, results[i])
   {
@@ -768,26 +774,24 @@ module CatSpec {
   }
 
 
-  ghost predicate EmitFields(
-    observations: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
-    beforeStdout: BenchWorld.Bytes, beforeStderr: BenchWorld.Bytes,
-    afterStdout: BenchWorld.Bytes, afterStderr: BenchWorld.Bytes,
-    out: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes,
-    normalExit: int, exit: int
-  )
+  twostate predicate Emit(io: BenchIO.IO,
+                         out: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes,
+                         normalExit: int, exit: int)
+    reads io.stdoutRegion, io.stderrRegion
   {
-    var stdoutResult := if out == [] then BenchWorld.StreamWriteResult(0, beforeStdout, 0)
-                        else observations(BenchWorld.StreamWriteStdout(beforeStdout, out));
+    var observations := old(io.trustedStreams());
+    var stdoutResult := if out == [] then BenchWorld.StreamWriteResult(0, old(io.stdout()), 0)
+                        else observations(BenchWorld.StreamWriteStdout(old(io.stdout()), out));
     stdoutResult.StreamWriteResult? &&
     var errors := diagnostics + (if stdoutResult.err == 0 then [] else
                                  StreamWriteErrorMessage(StreamContract.CLocaleErrnoTextResult(stdoutResult.err)));
-    var stderrResult := if errors == [] then BenchWorld.StreamWriteResult(0, beforeStderr, 0)
-                        else observations(BenchWorld.StreamWriteStderr(beforeStderr, errors));
+    var stderrResult := if errors == [] then BenchWorld.StreamWriteResult(0, old(io.stderr()), 0)
+                        else observations(BenchWorld.StreamWriteStderr(old(io.stderr()), errors));
     stderrResult.StreamWriteResult? &&
-    (if out == [] then afterStdout == beforeStdout else StreamContract.WriteStdoutSpec(
-       beforeStdout, observations, afterStdout, out, stdoutResult.committed, stdoutResult.err)) &&
-    (if errors == [] then afterStderr == beforeStderr else StreamContract.WriteStderrSpec(
-       beforeStderr, observations, afterStderr, errors, stderrResult.committed, stderrResult.err)) &&
+    (if out == [] then io.stdout() == old(io.stdout()) else StreamContract.WriteStdoutSpec(
+       old(io.stdout()), observations, io.stdout(), out, stdoutResult.committed, stdoutResult.err)) &&
+    (if errors == [] then io.stderr() == old(io.stderr()) else StreamContract.WriteStderrSpec(
+       old(io.stderr()), observations, io.stderr(), errors, stderrResult.committed, stderrResult.err)) &&
     exit == (if stdoutResult.err != 0 || stderrResult.err != 0 then 1 else normalExit)
   }
 
@@ -797,8 +801,7 @@ module CatSpec {
     reads io.stdoutRegion, io.stderrRegion
   {
     if Emits(raw) then
-      EmitFields(old(io.trustedStreams()), old(io.stdout()), old(io.stderr()),
-                 io.stdout(), io.stderr(), out, diagnostics, normalExit, exit)
+      Emit(io, out, diagnostics, normalExit, exit)
     else
       io.stdout() == old(io.stdout()) && io.stderr() == old(io.stderr()) &&
       exit == normalExit

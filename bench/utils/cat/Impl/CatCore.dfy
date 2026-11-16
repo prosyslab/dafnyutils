@@ -526,6 +526,7 @@ module CatCore {
                 (observations + [observation])[i]
               )
   {
+    hide InputObservationRelation();
     forall i: nat | i < |observations + [observation]|
       ensures InputObservationRelation(
                 cmd,
@@ -535,6 +536,12 @@ module CatCore {
                 (observations + [observation])[i]
               )
     {
+      if i < |observations| {
+        assert (observations + [observation])[i] == observations[i];
+      } else {
+        assert i == |observations|;
+        assert (observations + [observation])[i] == observation;
+      }
     }
   }
 
@@ -1048,9 +1055,9 @@ module CatCore {
       observations := observations + [observation];
       dataCuts := dataCuts + [|combined|];
       errorCuts := errorCuts + [|err|];
-      assert InputTraceWitnessRelation(cmd, preFs, preStreams, preStdin, i + 1, io.stdin(),
-                                       observations, combined, dataCuts, err, errorCuts, hadError) by { hide *; }
       i := i + 1;
+      assert InputTraceWitnessRelation(cmd, preFs, preStreams, preStdin, i, io.stdin(),
+                                       observations, combined, dataCuts, err, errorCuts, hadError) by { hide *; }
     }
 
     var initialState := Model.InitState();
@@ -1104,8 +1111,7 @@ module CatCore {
   method Flush(io: BenchIO.IO, out: BenchWorld.Bytes,
                diagnostics: BenchWorld.Bytes, normalExit: int) returns (exit: int)
     modifies io.stdoutRegion, io.stderrRegion
-    ensures Spec.EmitFields(old(io.trustedStreams()), old(io.stdout()), old(io.stderr()),
-                            io.stdout(), io.stderr(), out, diagnostics, normalExit, exit)
+    ensures Spec.Emit(io, out, diagnostics, normalExit, exit)
   {
     var outErr := 0;
     if out != [] {
