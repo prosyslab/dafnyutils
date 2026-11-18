@@ -238,6 +238,7 @@ fn validate_replay_case(case: &super::GeneratedCase) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::run_replay;
+    use crate::fuzz::comparison::compare::stream_evidence;
     use crate::fuzz::repro::{save_repro_at, ReproManifest, REPRO_SCHEMA_VERSION};
     use crate::fuzz::shrink::{evaluate_case_with_seed, shrink_mismatch};
     use crate::fuzz::{
@@ -421,7 +422,7 @@ mod tests {
         assert!(saved_result.get("exit_code").is_none());
         assert_eq!(
             saved_result["stdout"],
-            serde_json::to_value(&evaluation.reference.stdout).unwrap()
+            serde_json::to_value(stream_evidence(&evaluation.reference.stdout)).unwrap()
         );
         assert!(fs::read_to_string(bundle.join("reproduce.sh"))
             .unwrap()
@@ -1138,9 +1139,9 @@ mod tests {
         assert!(error.contains("unknown variant `ExitCode`"), "{error}");
     }
 
-    // Current schema8 requires placement provenance instead of treating absence as a default.
+    // The current schema requires placement provenance instead of treating absence as a default.
     #[test]
-    fn schema8_rejects_missing_work_root_base() {
+    fn current_schema_rejects_missing_work_root_base() {
         let mut value = metadata_manifest_fixture();
         value["execution_context"]
             .as_object_mut()
@@ -1150,9 +1151,9 @@ mod tests {
         assert!(error.contains("missing work-root base"), "{error}");
     }
 
-    // Current schema8 rejects explicit null separately from an absent placement field.
+    // The current schema rejects explicit null separately from an absent placement field.
     #[test]
-    fn schema8_rejects_null_work_root_base() {
+    fn current_schema_rejects_null_work_root_base() {
         let mut value = metadata_manifest_fixture();
         value["execution_context"]["work_root_base"] = serde_json::Value::Null;
         let error = super::decode_manifest(&serde_json::to_vec(&value).unwrap()).unwrap_err();
@@ -1161,7 +1162,7 @@ mod tests {
 
     // Duplicate placement fields are rejected directly from original manifest bytes.
     #[test]
-    fn schema8_rejects_duplicate_work_root_base() {
+    fn current_schema_rejects_duplicate_work_root_base() {
         let value = metadata_manifest_fixture();
         let encoded = String::from_utf8(serde_json::to_vec(&value).unwrap()).unwrap();
         let duplicated = encoded.replacen(
@@ -1177,9 +1178,9 @@ mod tests {
         );
     }
 
-    // Current schema8 requires the configured container image as replay provenance.
+    // The current schema requires the configured container image as replay provenance.
     #[test]
-    fn schema8_rejects_missing_container_image() {
+    fn current_schema_rejects_missing_container_image() {
         let mut value = metadata_manifest_fixture();
         value["execution_context"]
             .as_object_mut()
@@ -1189,9 +1190,9 @@ mod tests {
         assert!(error.contains("missing field `container_image`"), "{error}");
     }
 
-    // Current schema8 requires the numeric target UID rather than adopting the replay host UID.
+    // The current schema requires the numeric target UID rather than adopting the replay host UID.
     #[test]
-    fn schema8_rejects_missing_target_uid() {
+    fn current_schema_rejects_missing_target_uid() {
         let mut value = metadata_manifest_fixture();
         value["execution_context"]
             .as_object_mut()
@@ -1204,7 +1205,7 @@ mod tests {
     // Unknown versions are diagnosed before attempting the current version's required fields.
     #[test]
     fn replay_reports_unsupported_version_before_payload_shape() {
-        for version in [1, 2, 3, 4, 5, 6, 7, 999] {
+        for version in [1, 2, 3, 4, 5, 6, 7, 8, 999] {
             let bytes = format!(r#"{{"schema_version":{version}}}"#);
             let error = super::decode_manifest(bytes.as_bytes()).unwrap_err();
             assert!(
@@ -1213,5 +1214,61 @@ mod tests {
             );
             assert!(error.contains("--case-set"), "{error}");
         }
+    }
+
+    // A candidate that crashes with a long stderr leaves a bounded bundle that still replays.
+    #[cfg(unix)]
+    #[test]
+    fn long_crash_output_is_saved_bounded_and_replays() {
+        use crate::fuzz::comparison::compare::ReplayStreamEvidence;
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = tempfile::tempdir().unwrap();
+        let dut = root.path().join("dut.sh");
+        fs::write(
+            &dut,
+            b"#!/bin/sh\nyes '   at CatCore.ConcatPieces' | head -c 200000 >&2\nexit 3\n",
+        )
+        .unwrap();
+        fs::set_permissions(&dut, fs::Permissions::from_mode(0o755)).unwrap();
+        let args = mismatch_args(PathBuf::from("/bin/cat"), dut.clone());
+        let mut paths = native_paths();
+        paths.dut.path = dut;
+        let case = GeneratedCase {
+            file_size_limit: None,
+            argv: Vec::new(),
+            fixture: FixtureBlueprint {
+                directories: Vec::new(),
+                files: Vec::new(),
+                symlinks: Vec::new(),
+                hardlinks: Vec::new(),
+            },
+            stdin: Vec::new(),
+            cwd: PathBuf::from("."),
+        };
+        let bundle = save_case_bundle(root.path(), &args, &paths, &case);
+        let manifest: ReproManifest =
+            serde_json::from_slice(&fs::read(bundle.join("manifest.json")).unwrap()).unwrap();
+        let ReplayStreamEvidence::Bounded(saved) =
+            &manifest.comparison.expected_replay_verdict.dut_stderr
+        else {
+            panic!("long stderr must be bounded");
+        };
+        assert_eq!(saved.length, 200_000);
+        assert!(fs::metadata(bundle.join("manifest.json")).unwrap().len() < 2 * 1024 * 1024);
+        let result: serde_json::Value =
+            serde_json::from_slice(&fs::read(bundle.join("dut_result.json")).unwrap()).unwrap();
+        assert_eq!(result["stderr"]["bounded"]["length"], 200_000);
+        let raw = fs::read(bundle.join("dut.stderr")).unwrap();
+        let marker = b"\n[coreutils-fuzzer: 134464 of 200000 bytes omitted]\n";
+        assert_eq!(raw.len(), 64 * 1024 + marker.len());
+        assert_eq!(&raw[32 * 1024..32 * 1024 + marker.len()], marker);
+        let error = run_replay(parse_replay(&bundle)).unwrap_err();
+        assert!(
+            error.contains(&format!(
+                "{FUZZER_OUTCOME_MARKER_PREFIX}{SEMANTIC_MISMATCH}"
+            )),
+            "{error}"
+        );
     }
 }

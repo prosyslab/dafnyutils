@@ -91,6 +91,43 @@ pub(crate) enum ReplayStreamEvidence {
     CanonicalBytes(Vec<u8>),
     RawBytes(Vec<u8>),
     Records(Vec<Vec<u8>>),
+    Bounded(BoundedStreamEvidence),
+}
+
+/// Streams longer than this are saved as their length, digest and both ends.
+/// A crashing candidate can print megabytes of stack trace, which every bundle copy repeats.
+pub(crate) const STREAM_EVIDENCE_LIMIT_BYTES: usize = 64 * 1024;
+
+/// A stream too long to save whole. The digest covers every byte, so replay still
+/// detects a change in the omitted middle.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct BoundedStreamEvidence {
+    pub(crate) length: u64,
+    pub(crate) fnv1a64: String,
+    pub(crate) head: Vec<u8>,
+    pub(crate) tail: Vec<u8>,
+}
+
+/// Saves a stream whole up to the limit and bounded above it.
+pub(crate) fn stream_evidence(data: &[u8]) -> ReplayStreamEvidence {
+    if data.len() <= STREAM_EVIDENCE_LIMIT_BYTES {
+        return ReplayStreamEvidence::RawBytes(data.to_vec());
+    }
+    let half = STREAM_EVIDENCE_LIMIT_BYTES / 2;
+    ReplayStreamEvidence::Bounded(BoundedStreamEvidence {
+        length: data.len() as u64,
+        fnv1a64: format!("{:016x}", fnv1a64(data)),
+        head: data[..half].to_vec(),
+        tail: data[data.len() - half..].to_vec(),
+    })
+}
+
+/// 64-bit FNV-1a. Not cryptographic: it only tells replayed output from saved output.
+fn fnv1a64(data: &[u8]) -> u64 {
+    data.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -662,10 +699,7 @@ fn replay_stderr_evidence(
     reference: &[u8],
     dut: &[u8],
 ) -> (ReplayStreamEvidence, ReplayStreamEvidence) {
-    (
-        ReplayStreamEvidence::RawBytes(reference.to_vec()),
-        ReplayStreamEvidence::RawBytes(dut.to_vec()),
-    )
+    (stream_evidence(reference), stream_evidence(dut))
 }
 
 fn replay_stdout_evidence(
@@ -675,23 +709,28 @@ fn replay_stdout_evidence(
     dut: &[u8],
 ) -> (ReplayStreamEvidence, ReplayStreamEvidence) {
     if requests_help_or_version(util, argv) {
-        return (
-            ReplayStreamEvidence::RawBytes(reference.to_vec()),
-            ReplayStreamEvidence::RawBytes(dut.to_vec()),
-        );
+        return (stream_evidence(reference), stream_evidence(dut));
     }
     if util == "printenv" {
         if let Some(separator) = printenv_environment_separator(argv) {
             return (
-                ReplayStreamEvidence::Records(normalized_printenv_records(reference, separator)),
-                ReplayStreamEvidence::Records(normalized_printenv_records(dut, separator)),
+                printenv_stdout_evidence(reference, separator),
+                printenv_stdout_evidence(dut, separator),
             );
         }
     }
-    (
-        ReplayStreamEvidence::RawBytes(reference.to_vec()),
-        ReplayStreamEvidence::RawBytes(dut.to_vec()),
-    )
+    (stream_evidence(reference), stream_evidence(dut))
+}
+
+/// Environment records in sorted order, bounded like other streams. A record never holds
+/// the separator, so the sorted join is equal exactly when the record lists are equal.
+fn printenv_stdout_evidence(data: &[u8], separator: u8) -> ReplayStreamEvidence {
+    let records = normalized_printenv_records(data, separator);
+    let canonical = records.join(&separator);
+    if canonical.len() > STREAM_EVIDENCE_LIMIT_BYTES {
+        return stream_evidence(&canonical);
+    }
+    ReplayStreamEvidence::Records(records)
 }
 
 fn stdout_streams_differ(util: &str, argv: &[String], reference: &[u8], dut: &[u8]) -> bool {
@@ -821,8 +860,9 @@ fn diff_lines(left: &[String], right: &[String]) -> Vec<DiffOp> {
 #[cfg(test)]
 mod tests {
     use super::{
-        compare_results_with_roots, mismatch_signature, replay_stderr_evidence, MismatchSignature,
-        ProcessOutcomeEvidence, ReplayStreamEvidence,
+        compare_results_with_roots, mismatch_signature, replay_stderr_evidence, stream_evidence,
+        BoundedStreamEvidence, MismatchSignature, ProcessOutcomeEvidence, ReplayStreamEvidence,
+        STREAM_EVIDENCE_LIMIT_BYTES,
     };
     use crate::fuzz::comparison::fs_snapshot::IdentityTransitionEvidence;
     use crate::fuzz::comparison::CompareResult;
@@ -3365,6 +3405,105 @@ drwxr-xr-x 2 1000 1000  40 Oct  1  2026 empty\n\
                 ..
             }
         ));
+    }
+
+    // A stderr just past the limit, like a crash's stack trace, keeps its length and both ends.
+    #[test]
+    fn long_stream_is_saved_as_length_digest_and_ends() {
+        let half = STREAM_EVIDENCE_LIMIT_BYTES / 2;
+        let mut data = vec![b'h'; half];
+        data.push(b'm');
+        data.extend(vec![b't'; half]);
+        let ReplayStreamEvidence::Bounded(saved) = stream_evidence(&data) else {
+            panic!("a stream over the limit must be bounded");
+        };
+        assert_eq!(saved.length, data.len() as u64);
+        assert_eq!(saved.head, vec![b'h'; half]);
+        assert_eq!(saved.tail, vec![b't'; half]);
+        assert_eq!(saved.fnv1a64.len(), 16);
+    }
+
+    // A stream of exactly the limit is still saved byte for byte.
+    #[test]
+    fn stream_at_limit_is_saved_whole() {
+        let data = vec![7; STREAM_EVIDENCE_LIMIT_BYTES];
+        assert_eq!(stream_evidence(&data), ReplayStreamEvidence::RawBytes(data));
+    }
+
+    // The digest is standard 64-bit FNV-1a, so saved bundles stay comparable across builds.
+    #[test]
+    fn bounded_digest_matches_fnv1a_reference_vector() {
+        assert_eq!(super::fnv1a64(b""), 0xcbf2_9ce4_8422_2325);
+        assert_eq!(super::fnv1a64(b"foobar"), 0x8594_4171_f739_67e8);
+    }
+
+    // A long printenv listing is bounded in record order, so a reordered listing still matches.
+    #[test]
+    fn long_printenv_listing_is_bounded_in_record_order() {
+        let records: Vec<Vec<u8>> = (0..20_000)
+            .map(|index| format!("NAME_{index}=value").into_bytes())
+            .collect();
+        let forward = records.join(&b'\n');
+        let backward = records
+            .iter()
+            .rev()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(&b'\n');
+        let (reference, dut) = super::replay_stdout_evidence("printenv", &[], &forward, &backward);
+        assert!(matches!(reference, ReplayStreamEvidence::Bounded(_)));
+        assert_eq!(reference, dut);
+    }
+
+    fn crash_replay(dut_stderr: Vec<u8>) -> super::ReplayVerdict {
+        let reference = RunResult {
+            termination: crate::fuzz::comparison::process_outcome::Termination::test_exit(0),
+            stdout: b"ok\n".to_vec(),
+            stderr: vec![],
+        };
+        let dut = RunResult {
+            termination: crate::fuzz::comparison::process_outcome::Termination::test_exit(134),
+            stdout: vec![],
+            stderr: dut_stderr,
+        };
+        let mut verdict = raw_stream_replay(
+            "cat",
+            &[],
+            &reference,
+            &dut,
+            &FsSnapshot::new(),
+            &FsSnapshot::new(),
+            false,
+        );
+        verdict.execution = Some(execution_windows());
+        verdict
+    }
+
+    fn stack_trace() -> Vec<u8> {
+        b"   at CatCore.__default.ConcatPieces(Dafny.ISequence)\n".repeat(4096)
+    }
+
+    // Replaying the same long crash output reproduces the saved bounded evidence.
+    #[test]
+    fn replay_of_same_long_stream_reproduces() {
+        let saved = crash_replay(stack_trace());
+        assert!(matches!(
+            saved.dut_stderr,
+            ReplayStreamEvidence::Bounded(BoundedStreamEvidence { .. })
+        ));
+        let restored: super::ReplayVerdict =
+            serde_json::from_slice(&serde_json::to_vec(&saved).unwrap()).unwrap();
+        assert!(crash_replay(stack_trace()).reproduces(&restored).unwrap());
+    }
+
+    // A change only in the omitted middle of a long stream does not count as reproduced.
+    #[test]
+    fn replay_detects_change_in_omitted_middle() {
+        let saved = crash_replay(stack_trace());
+        let mut changed = stack_trace();
+        let middle = changed.len() / 2;
+        changed[middle] = b'X';
+        assert!(!crash_replay(changed).reproduces(&saved).unwrap());
     }
 
     fn node_with_times(times: FsTimes) -> FsNodeSnapshot {

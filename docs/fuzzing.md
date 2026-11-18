@@ -276,9 +276,22 @@ Diagnostic wording and paths vary. To show that a fix works, add a
 [regression expectation](#pin-it-as-a-regression); never rewrite the original
 bundle.
 
-Replay accepts bundle schema 8 only. Keep the recorded binaries and container
+Replay accepts bundle schema 9 only. Keep the recorded binaries and container
 image available; without an image override, replay uses the saved image. For
 older bundles, rerun their saved inputs with `--case-set` and keep the originals.
+
+A bundle keeps each stdout and stderr stream whole up to 64 KiB. A longer stream,
+such as the stack trace of a crashing candidate, keeps its exact length, a 64-bit
+FNV-1a digest of every byte and its first and last 32 KiB. For `printenv` listings
+the bound applies to the sorted records. This bound applies to `manifest.json`,
+`reference_result.json`, `dut_result.json` and the raw `reference.stdout`,
+`reference.stderr`, `dut.stdout` and `dut.stderr` files; a shortened raw file has a
+`[coreutils-fuzzer: N of M bytes omitted]` line between its two ends. Replay
+compares the same bounded evidence, so an accidental change anywhere in a long
+stream still gives `replay_not_reproduced`. The digest is not cryptographic, so it
+does not guard against output crafted to collide. The fuzzer compares full streams
+when it decides whether a case matches; the bound only limits what is saved. File
+contents in the filesystem snapshots and the saved case are not bounded.
 Bundles are unsigned and do not authenticate who produced them.
 
 ### Rerun an input saved after an execution error
@@ -596,7 +609,7 @@ small generic generator with fixed scenarios.
 | --- | --- |
 | Capabilities | schema 4 |
 | Metrics | `coreutils-fuzzer.metrics.v3` |
-| Replay bundle | schema 8 |
+| Replay bundle | schema 9 |
 | Failure-input bundle | `coreutils-fuzzer.failure-input.v2` |
 | Case set | `coreutils-fuzzer.case-set.v1` |
 | Regression suite | `coreutils-fuzzer.regression-suite.v1` |

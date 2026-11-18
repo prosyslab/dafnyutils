@@ -1,7 +1,10 @@
 use super::case_source::{CaseSetV1, ExplicitCaseV1, CASE_SET_SCHEMA_V1};
-use super::comparison::compare::{MismatchSignature, ReplayVerdict};
+use super::comparison::compare::{
+    stream_evidence, MismatchSignature, ReplayStreamEvidence, ReplayVerdict,
+};
 use super::comparison::evaluation::{CaseVerdict, EvaluatedComparison};
 use super::comparison::fs_snapshot::IdentityTransitionEvidence;
+use super::comparison::process_outcome::Termination;
 use super::comparison::CompareResult;
 use super::shrink::CaseEvaluation;
 use super::{FsSnapshot, GeneratedCase, ResolvedPaths, ResolvedTarget, RunResult};
@@ -15,7 +18,7 @@ use std::io;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
-pub(crate) const REPRO_SCHEMA_VERSION: u32 = 8;
+pub(crate) const REPRO_SCHEMA_VERSION: u32 = 9;
 const FAILURE_INPUT_SCHEMA_V2: &str = "coreutils-fuzzer.failure-input.v2";
 
 #[derive(Debug, Serialize)]
@@ -161,9 +164,9 @@ pub(crate) fn decode_manifest(bytes: &[u8]) -> Result<ReproManifest, String> {
             .trim()
             .is_empty()
     {
-        return Err(
-            "invalid version8 replay manifest: container image provenance is empty".to_string(),
-        );
+        return Err(format!(
+            "invalid version{REPRO_SCHEMA_VERSION} replay manifest: container image provenance is empty"
+        ));
     }
     Ok(manifest)
 }
@@ -406,8 +409,11 @@ pub(crate) fn save_repro_at(
     write_json(path.join("mismatch_signature.json"), &mismatch_signature)?;
     write_json(path.join("pre_fs.json"), pre_fs)?;
     write_json(path.join("dut_pre_fs.json"), dut_pre_fs)?;
-    write_json(path.join("reference_result.json"), reference)?;
-    write_json(path.join("dut_result.json"), dut)?;
+    write_json(
+        path.join("reference_result.json"),
+        &SavedRunResult::new(reference),
+    )?;
+    write_json(path.join("dut_result.json"), &SavedRunResult::new(dut))?;
     write_json(path.join("reference_fs.json"), reference_fs)?;
     write_json(path.join("dut_fs.json"), dut_fs)?;
     write_json(
@@ -416,10 +422,16 @@ pub(crate) fn save_repro_at(
     )?;
     write_json(path.join("dut_identity_transitions.json"), dut_identity)?;
     fs::write(path.join("stdin.bin"), &case.stdin)?;
-    fs::write(path.join("reference.stdout"), &reference.stdout)?;
-    fs::write(path.join("reference.stderr"), &reference.stderr)?;
-    fs::write(path.join("dut.stdout"), &dut.stdout)?;
-    fs::write(path.join("dut.stderr"), &dut.stderr)?;
+    fs::write(
+        path.join("reference.stdout"),
+        saved_stream_bytes(&reference.stdout),
+    )?;
+    fs::write(
+        path.join("reference.stderr"),
+        saved_stream_bytes(&reference.stderr),
+    )?;
+    fs::write(path.join("dut.stdout"), saved_stream_bytes(&dut.stdout))?;
+    fs::write(path.join("dut.stderr"), saved_stream_bytes(&dut.stderr))?;
     fs::write(
         path.join("reproduce.sh"),
         manifest.reproduce_one_liner.as_bytes(),
@@ -427,6 +439,43 @@ pub(crate) fn save_repro_at(
 
     eprintln!("  repro saved to {}", path.display());
     Ok(path)
+}
+
+/// A run's outcome with its streams bounded like the replay evidence.
+#[derive(Debug, Serialize)]
+struct SavedRunResult {
+    termination: Termination,
+    stdout: ReplayStreamEvidence,
+    stderr: ReplayStreamEvidence,
+}
+
+impl SavedRunResult {
+    fn new(run: &RunResult) -> Self {
+        Self {
+            termination: run.termination,
+            stdout: stream_evidence(&run.stdout),
+            stderr: stream_evidence(&run.stderr),
+        }
+    }
+}
+
+/// Raw stream file contents: the whole stream up to the evidence limit, otherwise both
+/// saved ends around a marker line that gives the omitted and total byte counts.
+fn saved_stream_bytes(data: &[u8]) -> Vec<u8> {
+    let ReplayStreamEvidence::Bounded(bounded) = stream_evidence(data) else {
+        return data.to_vec();
+    };
+    let omitted = data.len() - bounded.head.len() - bounded.tail.len();
+    let mut bytes = bounded.head;
+    bytes.extend_from_slice(
+        format!(
+            "\n[coreutils-fuzzer: {omitted} of {} bytes omitted]\n",
+            data.len()
+        )
+        .as_bytes(),
+    );
+    bytes.extend(bounded.tail);
+    bytes
 }
 
 fn repro_execution_context(
@@ -471,15 +520,19 @@ fn repro_execution_context(
 fn validate_manifest_work_root(manifest: &ReproManifest) -> Result<(), String> {
     match manifest.execution_context.work_root_base.as_ref() {
         Some(Some(path)) => validate_saved_work_root_path(path),
-        None => Err("invalid version8 replay manifest: missing work-root base".to_string()),
-        Some(None) => Err("invalid version8 replay manifest: null work-root base".to_string()),
+        None => Err(format!(
+            "invalid version{REPRO_SCHEMA_VERSION} replay manifest: missing work-root base"
+        )),
+        Some(None) => Err(format!(
+            "invalid version{REPRO_SCHEMA_VERSION} replay manifest: null work-root base"
+        )),
     }
 }
 
 fn validate_saved_work_root_path(path: &Path) -> Result<(), String> {
     if !path.is_absolute() {
         return Err(format!(
-            "invalid version8 replay manifest: work-root base must be absolute: `{}`",
+            "invalid version{REPRO_SCHEMA_VERSION} replay manifest: work-root base must be absolute: `{}`",
             path.display()
         ));
     }
@@ -491,7 +544,7 @@ fn validate_saved_work_root_path(path: &Path) -> Result<(), String> {
     }) || path.components().collect::<PathBuf>().as_os_str() != path.as_os_str()
     {
         return Err(format!(
-            "invalid version8 replay manifest: work-root base must be normalized: `{}`",
+            "invalid version{REPRO_SCHEMA_VERSION} replay manifest: work-root base must be normalized: `{}`",
             path.display()
         ));
     }
