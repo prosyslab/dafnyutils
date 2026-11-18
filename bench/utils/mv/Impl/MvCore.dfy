@@ -23,6 +23,11 @@ module MvCore {
   import Schema = MvSchema
   import Spec = MvSpec
 
+  datatype SameFileDecision =
+    | ContinueMove
+    | RejectSameFile
+    | FailedParentStat(path: string, err: int)
+
   datatype BackupCheckEvidence = BackupCheckEvidence(
     candidate: string,
     found: bool,
@@ -309,7 +314,7 @@ module MvCore {
         targetEntry: EntryNameEvidence,
         sourceReferentEntry: OptionalEntryNameEvidence,
         backupCollision: BackupCollisionEvidence,
-        decision: Spec.SameFileDecision
+        decision: SameFileDecision
       )
 
   datatype BackupSelectionEvidence =
@@ -681,7 +686,7 @@ module MvCore {
           (!sourceEntry.parentMetadata.ok || !targetEntry.parentMetadata.ok) then
          sourceFollowed == NoMetadataEvidence &&
          sourceReferentEntry == NoEntryNameEvidence &&
-         decision == Spec.FailedParentStat(
+         decision == FailedParentStat(
            if !sourceEntry.parentMetadata.ok then sourceEntry.parent else targetEntry.parent,
            if !sourceEntry.parentMetadata.ok then sourceEntry.parentMetadata.err else targetEntry.parentMetadata.err)
        else (if sourceMetadata.isSymlink then
@@ -707,7 +712,7 @@ module MvCore {
             if sourceReferentEntry.SomeEntryNameEvidence? &&
                sourceReferentEntry.value.leaf == targetEntry.leaf &&
                (!sourceReferentEntry.value.parentMetadata.ok || !targetEntry.parentMetadata.ok) then
-              Spec.FailedParentStat(
+              FailedParentStat(
                 if !sourceReferentEntry.value.parentMetadata.ok then sourceReferentEntry.value.parent else targetEntry.parent,
                 if !sourceReferentEntry.value.parentMetadata.ok then sourceReferentEntry.value.parentMetadata.err else targetEntry.parentMetadata.err)
             else if EvidenceNamesSame(sourceEntry, targetEntry) ||
@@ -718,8 +723,8 @@ module MvCore {
                       ReferentEvidenceNamesTarget(
                         sourceReferentEntry, targetEntry
                       )))
-            then Spec.RejectSameFile
-            else Spec.ContinueMove)
+            then RejectSameFile
+            else ContinueMove)
   }
 
   lemma PackageSameFileEvidence(
@@ -735,7 +740,7 @@ module MvCore {
     targetEntry: EntryNameEvidence,
     sourceReferentEntry: OptionalEntryNameEvidence,
     collision: BackupCollisionEvidence,
-    decision: Spec.SameFileDecision
+    decision: SameFileDecision
   )
     requires MetadataEvidenceFor(
                fs, source, false, sourceMetadata
@@ -771,7 +776,7 @@ module MvCore {
              if sourceReferentEntry.SomeEntryNameEvidence? &&
                 sourceReferentEntry.value.leaf == targetEntry.leaf &&
                 (!sourceReferentEntry.value.parentMetadata.ok || !targetEntry.parentMetadata.ok) then
-               Spec.FailedParentStat(
+               FailedParentStat(
                  if !sourceReferentEntry.value.parentMetadata.ok then sourceReferentEntry.value.parent else targetEntry.parent,
                  if !sourceReferentEntry.value.parentMetadata.ok then sourceReferentEntry.value.parentMetadata.err else targetEntry.parentMetadata.err)
              else if EvidenceNamesSame(sourceEntry, targetEntry) ||
@@ -782,8 +787,8 @@ module MvCore {
                        ReferentEvidenceNamesTarget(
                          sourceReferentEntry, targetEntry
                        )))
-             then Spec.RejectSameFile
-             else Spec.ContinueMove
+             then RejectSameFile
+             else ContinueMove
     ensures SameFileEvidenceFor(
               cmd,
               fs,
@@ -1293,7 +1298,7 @@ module MvCore {
              evidence.afterFs == evidence.beforeFs &&
              evidence.outcome == Spec.MoveOutcome([], Spec.ParentStatFailureMessageSpec(
                                                     decision.path, decision.err), true)
-           else if decision == Spec.RejectSameFile then
+           else if decision == RejectSameFile then
              evidence.backup == NoBackupSelection &&
              |evidence.renames| == 0 &&
              evidence.afterFs == evidence.beforeFs &&
@@ -1389,7 +1394,7 @@ module MvCore {
                       case NoEntryNameEvidence => false)
                    else
                      true) &&
-                  (if decision.FailedParentStat? || decision == Spec.RejectSameFile ||
+                  (if decision.FailedParentStat? || decision == RejectSameFile ||
                       (cmd.updateMode == Schema.UpdateOlder &&
                        !Spec.SourceNewerSpec(
                          sourceMetadata.times.mtimeSec,
@@ -1663,7 +1668,7 @@ module MvCore {
              cmd.updateMode != Schema.UpdateNoneFail
     requires step.sameFile == CheckedSameFile(sourceMetadata, targetMetadata, NoMetadataEvidence,
                                               sourceEntry, targetEntry, NoEntryNameEvidence, NoBackupCollisionCheck,
-                                              Spec.FailedParentStat(
+                                              FailedParentStat(
                                                 if !sourceEntry.parentMetadata.ok then sourceEntry.parent else targetEntry.parent,
                                                 if !sourceEntry.parentMetadata.ok then sourceEntry.parentMetadata.err else targetEntry.parentMetadata.err))
     requires step.backup == NoBackupSelection && step.renames == [] && step.afterFs == step.beforeFs
@@ -1737,7 +1742,7 @@ module MvCore {
                evidence.sameFile
              )
     requires evidence.sameFile.CheckedSameFile?
-    requires evidence.sameFile.decision == Spec.RejectSameFile
+    requires evidence.sameFile.decision == RejectSameFile
     requires evidence.backup == NoBackupSelection
     requires |evidence.renames| == 0
     requires evidence.afterFs == evidence.beforeFs
@@ -1786,7 +1791,7 @@ module MvCore {
                evidence.sameFile
              )
     requires evidence.sameFile.CheckedSameFile?
-    requires evidence.sameFile.decision == Spec.ContinueMove
+    requires evidence.sameFile.decision == ContinueMove
     requires !Spec.SourceNewerSpec(
                evidence.sameFile.source.times.mtimeSec,
                evidence.sameFile.source.times.mtimeNsec,
@@ -1842,7 +1847,7 @@ module MvCore {
                evidence.sameFile
              )
     requires evidence.sameFile.CheckedSameFile?
-    requires evidence.sameFile.decision == Spec.ContinueMove
+    requires evidence.sameFile.decision == ContinueMove
     requires cmd.updateMode != Schema.UpdateOlder ||
              Spec.SourceNewerSpec(
                evidence.sameFile.source.times.mtimeSec,
@@ -2747,18 +2752,254 @@ module MvCore {
       RunIntoDirectoryEvidenceFields(cmd.operands[..|cmd.operands| - 1], cmd.operands[|cmd.operands| - 1], false, cmd, preFs, preCwd, io.fs(), preStdout, preStderr, plannedStdout, plannedStderr, exit)
   }
 
+  twostate predicate CandidateSummary(
+    io: BenchIO.IO,
+    raw: Schema.MvCmdRaw,
+    exit: int,
+    plannedStdout: BenchWorld.Bytes,
+    plannedStderr: BenchWorld.Bytes
+  )
+    reads io.fsRegion
+  {
+    var cmd := Schema.Command(raw);
+    if cmd.mode == Schema.ModeInvalidBackup then
+      io.fs() == old(io.fs()) &&
+      exit == 1 &&
+      plannedStdout == [] &&
+      plannedStderr == [] + Spec.InvalidBackupArgumentMessageSpec(cmd.invalidBackupArg)
+    else if cmd.mode == Schema.ModeInvalidUpdate then
+      io.fs() == old(io.fs()) &&
+      exit == 1 &&
+      plannedStdout == [] &&
+      plannedStderr == [] + Spec.InvalidUpdateArgumentMessageSpec(cmd.invalidUpdateArg)
+    else if cmd.mode == Schema.ModeHelp then
+      io.fs() == old(io.fs()) &&
+      exit == 0 &&
+      plannedStdout == [] + Spec.HelpTextSpec() &&
+      plannedStderr == []
+    else if cmd.mode == Schema.ModeVersion then
+      io.fs() == old(io.fs()) &&
+      exit == 0 &&
+      plannedStdout == [] + Spec.VersionTextSpec() &&
+      plannedStderr == []
+    else if cmd.targetDirectory != "" && cmd.noTargetDirectory then
+      io.fs() == old(io.fs()) &&
+      exit == 1 &&
+      plannedStdout == [] &&
+      plannedStderr == [] + Spec.TargetDirectoryConflictMessageSpec()
+    else if |cmd.operands| == 0 then
+      io.fs() == old(io.fs()) &&
+      exit == 1 &&
+      plannedStdout == [] &&
+      plannedStderr == [] + Spec.MissingFileOperandMessageSpec()
+    else if cmd.targetDirectory != "" then
+      RunIntoDirectoryEvidenceFields(cmd.operands, cmd.targetDirectory, true, cmd, old(io.fs()), old(io.cwd()), io.fs(), [], [], plannedStdout, plannedStderr, exit)
+    else if |cmd.operands| == 1 then
+      io.fs() == old(io.fs()) &&
+      exit == 1 &&
+      plannedStdout == [] &&
+      plannedStderr == [] + Spec.MissingDestinationMessageSpec(cmd.operands[0])
+    else if cmd.noTargetDirectory && |cmd.operands| > 2 then
+      io.fs() == old(io.fs()) &&
+      exit == 1 &&
+      plannedStdout == [] &&
+      plannedStderr == [] + Spec.ExtraOperandMessageSpec(cmd.operands[2])
+    else if |cmd.operands| == 2 then
+      RunTwoOperandEvidenceFields(cmd, old(io.fs()), old(io.cwd()), io.fs(), [], [], plannedStdout, plannedStderr, exit)
+    else
+      RunIntoDirectoryEvidenceFields(cmd.operands[..|cmd.operands| - 1], cmd.operands[|cmd.operands| - 1], false, cmd, old(io.fs()), old(io.cwd()), io.fs(), [], [], plannedStdout, plannedStderr, exit)
+  }
+
+  twostate predicate RunIntoDirectorySummary(
+    io: BenchIO.IO,
+    sources: seq<string>,
+    directory: string,
+    explicitTargetDirectory: bool,
+    cmd: Schema.MvCmd,
+    plannedStdout: BenchWorld.Bytes,
+    plannedStderr: BenchWorld.Bytes,
+    exit: int
+  )
+    reads io.fsRegion
+  {
+    (exists
+       hadError: bool,
+       out: BenchWorld.Bytes,
+       err: BenchWorld.Bytes,
+       batch: BatchEvidence
+       ::
+         TargetDirectoryCheckSummaryFields(
+           directory, old(io.fs()), true, 0
+         ) &&
+         BatchEvidenceFor(
+           sources,
+           directory,
+           cmd,
+           old(io.fs()),
+           old(io.cwd()),
+           io.fs(),
+           hadError,
+           out,
+           err,
+           batch
+         ) &&
+         exit == (if hadError then 1 else 0) &&
+         plannedStdout == [] + out &&
+         plannedStderr == [] + err) ||
+    (exists directoryErr: int ::
+       TargetDirectoryCheckSummaryFields(
+         directory, old(io.fs()), false, directoryErr
+       ) &&
+       io.fs() == old(io.fs()) &&
+       exit == 1 &&
+       plannedStdout == [] &&
+       plannedStderr == [] +
+       Spec.TargetFailureMessageSpec(
+         directory, explicitTargetDirectory, directoryErr
+       ))
+  }
+
+  twostate predicate DirectoryStatusSummary(
+    io: BenchIO.IO,
+    sources: seq<string>,
+    directory: string,
+    cmd: Schema.MvCmd,
+    plannedStdout: BenchWorld.Bytes,
+    plannedStderr: BenchWorld.Bytes,
+    exit: int,
+    calls: seq<Spec.StatusCallEvidence>,
+    evidence: DirectoryStatusEvidence
+  )
+    reads io.fsRegion, io.statusObservationsRegion, io.trustedNativeFailuresRegion, io.nowRegion
+  {
+    match evidence
+    case FailedDirectoryStatus(call) =>
+      calls == [call] &&
+      Spec.StatusRequest(call, old(io.fs()), directory, true) &&
+      (!call.ok || call.status.kind != BenchWorld.DirectoryKind) &&
+      io.fs() == old(io.fs()) &&
+      plannedStdout == [] && exit == 1
+    case SuccessfulDirectoryStatus(call, batch) =>
+      calls == [call] + batch.statusCalls &&
+      Spec.StatusRequest(call, old(io.fs()), directory, true) &&
+      call.ok && call.status.kind == BenchWorld.DirectoryKind &&
+      batch.firstStatus == old(io.statusCursor()) + 1 &&
+      BatchMoveStatusEvidenceFor(
+        sources, directory, cmd, Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), batch
+      ) &&
+      exists hadError: bool, out: BenchWorld.Bytes, err: BenchWorld.Bytes ::
+        BatchEvidenceFor(
+          sources, directory, cmd, old(io.fs()), old(io.cwd()), io.fs(),
+          hadError, out, err, batch
+        ) &&
+        exit == (if hadError then 1 else 0) &&
+        plannedStdout == [] + out &&
+        plannedStderr == [] + err
+  }
+
+  twostate predicate RunStatusSummary(
+    io: BenchIO.IO,
+    raw: Schema.MvCmdRaw,
+    plannedStdout: BenchWorld.Bytes,
+    plannedStderr: BenchWorld.Bytes,
+    exit: int,
+    calls: seq<Spec.StatusCallEvidence>,
+    evidence: RunStatusEvidence
+  )
+    reads io.fsRegion, io.statusObservationsRegion, io.trustedNativeFailuresRegion, io.nowRegion
+  {
+    var cmd := Schema.Command(raw);
+    io.statusCursor() == old(io.statusCursor()) + |calls| &&
+    StatusCallsFor(Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), old(io.statusCursor()), calls) &&
+    (if cmd.mode != Schema.ModeRun ||
+        (cmd.targetDirectory != "" && cmd.noTargetDirectory) ||
+        |cmd.operands| == 0 ||
+        (cmd.targetDirectory == "" && |cmd.operands| == 1) ||
+        (cmd.targetDirectory == "" && cmd.noTargetDirectory &&
+         |cmd.operands| > 2) then
+       evidence == NoRunStatus && |calls| == 0
+     else if cmd.targetDirectory != "" then
+       match evidence
+       case DirectoryRunStatus(directoryEvidence) =>
+         DirectoryStatusEvidenceFor(
+           cmd.operands, cmd.targetDirectory, cmd,
+           old(io.fs()), old(io.cwd()), io.fs(),
+           [], plannedStdout, [], plannedStderr,
+           exit, Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), old(io.statusCursor()), calls, directoryEvidence
+         )
+       case _ => false
+     else if |cmd.operands| == 2 then
+       var source := Spec.NormalizeSourceSpec(
+                       cmd.operands[0], cmd.stripTrailingSlashes
+                     );
+       var destination := cmd.operands[1];
+       if cmd.noTargetDirectory then
+         match evidence
+         case DirectMoveStatus(step) =>
+           step.inputs == Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()) &&
+           calls == step.statusCalls &&
+           step.firstStatus == old(io.statusCursor()) &&
+           step.beforeFs == old(io.fs()) && step.afterFs == io.fs() &&
+           StepEvidenceFor(source, destination, cmd, old(io.cwd()), step) &&
+           StepStatusEvidenceFor(source, destination, cmd, step) &&
+           exit == (if step.outcome.failed then 1 else 0) &&
+           plannedStdout == [] + step.outcome.stdoutFragment &&
+           plannedStderr == [] + step.outcome.stderrFragment
+         case _ => false
+       else
+         match evidence
+         case ProbedMoveStatus(call, step) =>
+           step.inputs == Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()) &&
+           calls == [call] + step.statusCalls &&
+           Spec.StatusRequest(call, old(io.fs()), destination, true) &&
+           step.firstStatus == old(io.statusCursor()) + 1 &&
+           step.beforeFs == old(io.fs()) && step.afterFs == io.fs() &&
+           var target :=
+             if call.ok && call.status.kind == BenchWorld.DirectoryKind then
+               Spec.TargetInDirectorySpec(destination, source)
+             else destination;
+           StepEvidenceFor(source, target, cmd, old(io.cwd()), step) &&
+           StepStatusEvidenceFor(source, target, cmd, step) &&
+           exit == (if step.outcome.failed then 1 else 0) &&
+           plannedStdout == [] + step.outcome.stdoutFragment &&
+           plannedStderr == [] + step.outcome.stderrFragment
+         case _ => false
+     else
+       var directory := cmd.operands[|cmd.operands| - 1];
+       var sources := cmd.operands[..|cmd.operands| - 1];
+       match evidence
+       case DirectoryRunStatus(directoryEvidence) =>
+         DirectoryStatusEvidenceFor(
+           sources, directory, cmd,
+           old(io.fs()), old(io.cwd()), io.fs(),
+           [], plannedStdout, [], plannedStderr,
+           exit, Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), old(io.statusCursor()), calls, directoryEvidence
+         )
+       case _ => false)
+  }
+
+  twostate predicate RenamePhase(
+    io: BenchIO.IO,
+    source: string,
+    target: string,
+    cmd: Schema.MvCmd,
+    frame: RenameFrame,
+    outcome: Spec.MoveOutcome,
+    step: StepEvidence
+  )
+    reads io.fsRegion
+  {
+    StepEvidenceFor(source, target, cmd, old(io.cwd()), step) &&
+    StepStatusEvidenceFor(source, target, cmd, step) &&
+    step.beforeFs == old(io.fs()) && step.afterFs == io.fs() && step.outcome == outcome &&
+    step.firstStatus == frame.firstStatus && step.inputs == frame.inputs &&
+    step.statusCalls == frame.statusCalls && StatusCallsFor(frame.inputs, step.firstStatus, step.statusCalls)
+  }
+
   opaque twostate predicate PreparedSummary(raw: Schema.MvCmdRaw, io: BenchIO.IO, exit: int, plannedStdout: BenchWorld.Bytes, plannedStderr: BenchWorld.Bytes)
     reads io.fsRegion, io.cwdRegion, io.statusObservationsRegion, io.trustedNativeFailuresRegion, io.nowRegion
   {
-    PreparedSummaryIO(
-      raw,
-      old(io.fs()),
-      old(io.cwd()),
-      [],
-      [],
-      io,
-      exit, plannedStdout, plannedStderr
-    ) &&
+    CandidateSummary(io, raw, exit, plannedStdout, plannedStderr) &&
     exists calls: seq<Spec.StatusCallEvidence> ::
       io.statusCursor() == old(io.statusCursor()) + |calls| &&
       StatusCallsFor(Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), old(io.statusCursor()), calls)
@@ -2772,26 +3013,14 @@ module MvCore {
              plannedStdout: BenchWorld.Bytes, plannedStderr: BenchWorld.Bytes)
     modifies io.fsRegion, io.statusObservationsRegion
     ensures PreparedSummary(raw, io, exit, plannedStdout, plannedStderr)
-    ensures PreparedSummaryIO(
-              raw,
-              old(io.fs()),
-              old(io.cwd()),
-              [],
-              [],
-              io,
-              exit, plannedStdout, plannedStderr
-            )
+    ensures CandidateSummary(io, raw, exit, plannedStdout, plannedStderr)
     ensures io.statusCursor() == old(io.statusCursor()) + |calls|
     ensures StatusCallsFor(Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), old(io.statusCursor()), calls)
-    ensures RunStatusEvidenceFor(
-              raw, old(io.fs()), old(io.cwd()), io.fs(),
-              [], plannedStdout, [], plannedStderr,
-              exit, Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), old(io.statusCursor()),
-              io.statusCursor(), calls, runEvidence)
+    ensures RunStatusSummary(io, raw, plannedStdout, plannedStderr, exit, calls, runEvidence)
     decreases *
   {
     hide *;
-    reveal PreparedSummary(), PreparedSummaryIO(), RunStatusEvidenceFor(), Spec.ConcatenateFragments();
+    reveal PreparedSummary(), CandidateSummary(), RunStatusSummary(), PreparedSummaryIO(), RunStatusEvidenceFor(), Spec.ConcatenateFragments();
     plannedStdout, plannedStderr := [], [];
     ghost var preFs := io.fs();
     ghost var preCwd := io.cwd();
@@ -2810,7 +3039,12 @@ module MvCore {
       var err := Spec.InvalidBackupArgumentMessageSpec(cmd.invalidBackupArg);
       plannedStderr := plannedStderr + err;
       exit := 1;
-      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       return;
     }
 
@@ -2818,7 +3052,12 @@ module MvCore {
       var err := Spec.InvalidUpdateArgumentMessageSpec(cmd.invalidUpdateArg);
       plannedStderr := plannedStderr + err;
       exit := 1;
-      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       return;
     }
 
@@ -2826,7 +3065,12 @@ module MvCore {
       var out := Spec.HelpTextSpec();
       plannedStdout := plannedStdout + out;
       exit := 0;
-      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       return;
     }
 
@@ -2834,7 +3078,12 @@ module MvCore {
       var out := Spec.VersionTextSpec();
       plannedStdout := plannedStdout + out;
       exit := 0;
-      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       return;
     }
 
@@ -2842,7 +3091,12 @@ module MvCore {
       var err := Spec.TargetDirectoryConflictMessageSpec();
       plannedStderr := plannedStderr + err;
       exit := 1;
-      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       return;
     }
 
@@ -2850,7 +3104,12 @@ module MvCore {
       var err := Spec.MissingFileOperandMessageSpec();
       plannedStderr := plannedStderr + err;
       exit := 1;
-      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       return;
     }
 
@@ -2860,7 +3119,12 @@ module MvCore {
         cmd.operands, cmd.targetDirectory, true, cmd, io
       );
       runEvidence := DirectoryRunStatus(directoryEvidence);
-      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       assert cmd.mode == Schema.ModeRun;
       assert !cmd.noTargetDirectory;
       assert |cmd.operands| > 0;
@@ -2874,13 +3138,23 @@ module MvCore {
           preStdout, plannedStdout, preStderr, plannedStderr,
           exit, Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), firstStatus,
           calls, directoryEvidence
-        );
+        ) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       assert RunStatusEvidenceFor(
           raw, preFs, preCwd, io.fs(),
           preStdout, plannedStdout, preStderr, plannedStderr,
           exit, Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), firstStatus,
           io.statusCursor(), calls, runEvidence
-        );
+        ) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       StatusTranscriptWitness(Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()),
                               firstStatus, io.statusCursor(), calls);
       assert PreparedSummary(raw, io, exit, plannedStdout, plannedStderr);
@@ -2891,7 +3165,12 @@ module MvCore {
       var err := Spec.MissingDestinationMessageSpec(cmd.operands[0]);
       plannedStderr := plannedStderr + err;
       exit := 1;
-      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       return;
     }
 
@@ -2899,7 +3178,12 @@ module MvCore {
       var err := Spec.ExtraOperandMessageSpec(cmd.operands[2]);
       plannedStderr := plannedStderr + err;
       exit := 1;
-      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       return;
     }
 
@@ -3141,7 +3425,12 @@ module MvCore {
         reveal RunTwoOperandEvidenceFields();
       }
       hide RunTwoOperandEvidenceFields();
-      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+      assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       assert io.statusCursor() == firstStatus + |calls|;
       assert StatusCallsFor(
           Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), firstStatus, calls
@@ -3163,7 +3452,12 @@ module MvCore {
           preStdout, plannedStdout, preStderr, plannedStderr,
           exit, Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), firstStatus,
           io.statusCursor(), calls, runEvidence
-        );
+        ) by {
+        hide *;
+        reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+               RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+               RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+      }
       StatusTranscriptWitness(Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()),
                               firstStatus, io.statusCursor(), calls);
       assert PreparedSummary(raw, io, exit, plannedStdout, plannedStderr);
@@ -3177,13 +3471,23 @@ module MvCore {
       sources, directory, false, cmd, io
     );
     runEvidence := DirectoryRunStatus(directoryEvidence);
-    assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr);
+    assert PreparedSummaryIO(raw, preFs, preCwd, preStdout, preStderr, io, exit, plannedStdout, plannedStderr) by {
+      hide *;
+      reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+             RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+             RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+    }
     assert RunStatusEvidenceFor(
         raw, preFs, preCwd, io.fs(),
         preStdout, plannedStdout, preStderr, plannedStderr,
         exit, Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), firstStatus,
         io.statusCursor(), calls, runEvidence
-      );
+      ) by {
+      hide *;
+      reveal PreparedSummaryIO(), PreparedSummary(), CandidateSummary(),
+             RunIntoDirectorySummary(), DirectoryStatusSummary(), RunStatusSummary(),
+             RunIntoDirectoryEvidenceFields(), DirectoryStatusEvidenceFor(), RunStatusEvidenceFor();
+    }
     StatusTranscriptWitness(Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()),
                             firstStatus, io.statusCursor(), calls);
     assert PreparedSummary(raw, io, exit, plannedStdout, plannedStderr);
@@ -3226,28 +3530,10 @@ module MvCore {
              ghost evidence: DirectoryStatusEvidence,
              plannedStdout: BenchWorld.Bytes, plannedStderr: BenchWorld.Bytes)
     modifies io.fsRegion, io.statusObservationsRegion
-    ensures RunIntoDirectoryEvidenceFields(
-              sources,
-              directory,
-              explicitTargetDirectory,
-              cmd,
-              old(io.fs()),
-              old(io.cwd()),
-              io.fs(),
-              [],
-              [],
-              plannedStdout,
-              plannedStderr,
-              exit
-            )
+    ensures RunIntoDirectorySummary(io, sources, directory, explicitTargetDirectory, cmd, plannedStdout, plannedStderr, exit)
     ensures io.statusCursor() == old(io.statusCursor()) + |calls|
     ensures StatusCallsFor(Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), old(io.statusCursor()), calls)
-    ensures DirectoryStatusEvidenceFor(
-              sources, directory, cmd,
-              old(io.fs()), old(io.cwd()), io.fs(),
-              [], plannedStdout, [], plannedStderr,
-              exit, Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), old(io.statusCursor()),
-              calls, evidence)
+    ensures DirectoryStatusSummary(io, sources, directory, cmd, plannedStdout, plannedStderr, exit, calls, evidence)
     decreases *
   {
     plannedStdout, plannedStderr := [], [];
@@ -3356,7 +3642,7 @@ module MvCore {
       cmd.overwriteMode != Schema.OverwriteSkip && cmd.updateMode != Schema.UpdateNone &&
       cmd.updateMode != Schema.UpdateNoneFail &&
       SameFileEvidenceFor(cmd, frame.beforeFs, frame.cwd, source, target, frame.sameFile) &&
-      frame.sameFile.CheckedSameFile? && frame.sameFile.decision == Spec.ContinueMove &&
+      frame.sameFile.CheckedSameFile? && frame.sameFile.decision == ContinueMove &&
       (cmd.updateMode != Schema.UpdateOlder || Spec.SourceNewerSpec(
          frame.sameFile.source.times.mtimeSec, frame.sameFile.source.times.mtimeNsec,
          frame.sameFile.target.times.mtimeSec, frame.sameFile.target.times.mtimeNsec)) &&
@@ -3416,7 +3702,7 @@ module MvCore {
     } else {
       PackageMissingTargetStep(source, target, cmd, frame.cwd, step);
     }
-    reveal RenamePhaseSummary();
+    reveal RenamePhaseSummary(), RenamePhase();
   }
 
   method AttemptRename(source: string, target: string, io: BenchIO.IO)
@@ -3453,13 +3739,7 @@ module MvCore {
     var output: BenchWorld.Bytes := [];
     var diagnostics: BenchWorld.Bytes := [];
     if ok {
-      if cmd.verbose || cmd.debug {
-        if backupPath == "" {
-          output := Spec.VerboseRenameMessageSpec(source, target);
-        } else {
-          output := Spec.VerboseRenameWithBackupMessageSpec(source, target, backupPath);
-        }
-      }
+      output := Spec.StepSuccessStdoutSpec(source, target, backupPath, cmd.verbose, cmd.debug);
     } else {
       diagnostics := Spec.SourceRenameFailureMessageSpec(source, target,
                                                          Spec.SourceRenameDiagnosticErrSpec(target, sourceIsDir, err),
@@ -3476,8 +3756,9 @@ module MvCore {
     requires Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()) == frame.inputs
     requires io.statusCursor() == frame.firstStatus + |frame.statusCalls|
     modifies io.fsRegion
-    ensures RenamePhaseSummary(source, target, cmd, frame, io.fs(), Spec.MoveOutcome(out, errOut, hadError), step)
+    ensures RenamePhase(io, source, target, cmd, frame, Spec.MoveOutcome(out, errOut, hadError), step)
   {
+    reveal RenamePhaseSummary();
     hide IOContract.RenamePathSpec(), IOContract.RenamePathContractFields();
     hide StepStatusEvidenceFor(), StatusCallsFor(), Spec.StatusCallsFor();
     hide IOContract.IsDirectoryStrictContractFields(), Spec.StatusExistsOutcomeFields();
@@ -3601,7 +3882,7 @@ module MvCore {
     var decision := frame.sameFile.decision;
     if decision.FailedParentStat? then
       Spec.MoveOutcome([], Spec.ParentStatFailureMessageSpec(decision.path, decision.err), true)
-    else if decision == Spec.RejectSameFile then
+    else if decision == RejectSameFile then
       Spec.MoveOutcome([], Spec.SameFileMessageSpec(source, target), true)
     else Spec.MoveOutcome(Text.SkipStdoutSpec(target, cmd.debug), [], false)
   }
@@ -3612,7 +3893,7 @@ module MvCore {
   ) returns (step: StepEvidence)
     requires ComparisonFrameFields(source, target, cmd, frame)
     requires frame.sameFile.CheckedSameFile?
-    requires frame.sameFile.decision.FailedParentStat? || frame.sameFile.decision == Spec.RejectSameFile ||
+    requires frame.sameFile.decision.FailedParentStat? || frame.sameFile.decision == RejectSameFile ||
              (cmd.updateMode == Schema.UpdateOlder && !Spec.SourceNewerSpec(
                 frame.sameFile.source.times.mtimeSec, frame.sameFile.source.times.mtimeNsec,
                 frame.sameFile.target.times.mtimeSec, frame.sameFile.target.times.mtimeNsec))
@@ -3636,7 +3917,7 @@ module MvCore {
     }
     reveal StoppedComparisonOutcome();
     reveal StepEvidenceFor();
-    reveal RenamePhaseSummary();
+    reveal RenamePhaseSummary(), RenamePhase();
   }
 
   method ResolveSourceIdentity(source: string, io: BenchIO.IO)
@@ -3698,7 +3979,7 @@ module MvCore {
       var parentErr := if !sourceEntry.parentMetadata.ok then sourceEntry.parentMetadata.err else targetEntry.parentMetadata.err;
       same := CheckedSameFile(sourceMetadata, targetMetadata, NoMetadataEvidence,
                               sourceEntry, targetEntry, NoEntryNameEvidence, NoBackupCollisionCheck,
-                              Spec.FailedParentStat(failedPath, parentErr));
+                              FailedParentStat(failedPath, parentErr));
       assert SameFileEvidenceFor(cmd, preFs, preCwd, source, target, same) by {
         hide *;
         reveal ComparisonInputs();
@@ -3734,12 +4015,12 @@ module MvCore {
           sourceReferentEntry := FailedEntryNameEvidence(resolveErr);
         }
       }
-      var decision: Spec.SameFileDecision;
+      var decision: SameFileDecision;
       if sourceReferentEntry.SomeEntryNameEvidence? &&
          sourceReferentEntry.value.leaf == targetEntry.leaf &&
          (!sourceReferentEntry.value.parentMetadata.ok || !targetEntry.parentMetadata.ok) {
         var referentEntry := sourceReferentEntry.value;
-        decision := Spec.FailedParentStat(
+        decision := FailedParentStat(
           if !referentEntry.parentMetadata.ok then referentEntry.parent else targetEntry.parent,
           if !referentEntry.parentMetadata.ok then referentEntry.parentMetadata.err else targetEntry.parentMetadata.err);
       } else {
@@ -3753,7 +4034,7 @@ module MvCore {
         }
         var rejectSameFile := sameEntry || (cmd.backupMode == Schema.BackupOff &&
                                             (sourceMetadata.key == targetMetadata.key || referentSameEntry));
-        decision := if rejectSameFile then Spec.RejectSameFile else Spec.ContinueMove;
+        decision := if rejectSameFile then RejectSameFile else ContinueMove;
       }
       same := CheckedSameFile(sourceMetadata, targetMetadata, sourceFollowed,
                               sourceEntry, targetEntry, sourceReferentEntry, NoBackupCollisionCheck, decision);
@@ -3817,7 +4098,7 @@ module MvCore {
       reveal StepStatusEvidenceFor();
     }
     reveal SourceResolutionObservationFor(), RenameNativeObservationsFor(), StepEvidenceFor();
-    reveal RenamePhaseSummary();
+    reveal RenamePhaseSummary(), RenamePhase();
   }
 
   method CompleteComparedMove(source: string, target: string, cmd: Schema.MvCmd,
@@ -3844,7 +4125,7 @@ module MvCore {
     hide IOContract.IsDirectoryStrictContractFields(), Spec.StatusExistsOutcomeFields();
     hide MetadataEvidenceFor(), ObservedMetadataEvidenceFor(), EntryNameEvidenceFor();
     hide IOContract.ResolvePathIdentitySpec(), IOContract.ResolvePathIdentityContractFields();
-    reveal RenamePhaseSummary();
+    reveal RenamePhaseSummary(), RenamePhase();
     ghost var preFs := comparisonFrame.beforeFs;
     ghost var preCwd := comparisonFrame.cwd;
     ghost var firstStatus := comparisonFrame.firstStatus;
@@ -3870,25 +4151,25 @@ module MvCore {
     var sourceReferentEntry := comparison.sourceReferentEntry;
     var sameFileDecision := comparison.decision;
     ghost var afterEntries := |statusCalls|;
-    if sameFileDecision.FailedParentStat? || sameFileDecision == Spec.RejectSameFile ||
+    if sameFileDecision.FailedParentStat? || sameFileDecision == RejectSameFile ||
        (cmd.updateMode == Schema.UpdateOlder && !Spec.SourceNewerSpec(
           sourceMetadata.times.mtimeSec, sourceMetadata.times.mtimeNsec,
           targetMetadata.times.mtimeSec, targetMetadata.times.mtimeNsec)) {
       if sameFileDecision.FailedParentStat? {
         hadError := true;
         errOut := Text.ParentStatFailureMessageSpec(sameFileDecision.path, sameFileDecision.err);
-      } else if sameFileDecision == Spec.RejectSameFile {
+      } else if sameFileDecision == RejectSameFile {
         hadError := true;
         errOut := Spec.SameFileMessageSpec(source, target);
       } else if cmd.debug {
-        out := Spec.DebugSkipMessageSpec(target);
+        out := Spec.SkipStdoutSpec(target, true);
       }
       step := AssembleStoppedComparison(source, target, cmd, comparisonFrame,
                                         Spec.MoveOutcome(out, errOut, hadError));
-      reveal RenamePhaseSummary();
+      reveal RenamePhaseSummary(), RenamePhase();
       return;
     }
-    assert sameFileDecision == Spec.ContinueMove;
+    assert sameFileDecision == ContinueMove;
 
     ghost var collisionEvidence: BackupCollisionEvidence :=
       NoBackupCollisionCheck;
@@ -4032,7 +4313,7 @@ module MvCore {
       }
       assert io.statusCursor() == frame.firstStatus + |frame.statusCalls|;
       hadError, out, errOut, step := ExecuteRenameFrame(source, target, cmd, frame, io);
-      reveal RenamePhaseSummary();
+      reveal RenamePhaseSummary(), RenamePhase();
       return;
     }
 
@@ -4044,7 +4325,7 @@ module MvCore {
       reveal StepStatusEvidenceFor(), MetadataEvidenceFor(), MetadataStatusCall(), Spec.StatusRequest();
     }
     hadError, out, errOut, step := ExecuteRenameFrame(source, target, cmd, frame, io);
-    reveal RenamePhaseSummary();
+    reveal RenamePhaseSummary(), RenamePhase();
   }
 
   method {:isolate_assertions} MoveOne(
@@ -4071,7 +4352,7 @@ module MvCore {
     decreases *
   {
     hide *;
-    reveal RenamePhaseSummary();
+    reveal RenamePhaseSummary(), RenamePhase();
     ghost var preFs := io.fs();
     ghost var preCwd := io.cwd();
     ghost var firstStatus := io.statusCursor();
@@ -4110,7 +4391,7 @@ module MvCore {
       step := AssembleInitialMoveStep(source, target, cmd, sourceMetadata, NoMetadataEvidence, frame,
                                       Spec.MoveOutcome(out, errOut, hadError));
       assert RenamePhaseSummary(source, target, cmd, frame, preFs, Spec.MoveOutcome(out, errOut, hadError), step);
-      reveal RenamePhaseSummary();
+      reveal RenamePhaseSummary(), RenamePhase();
       return;
     }
 
@@ -4128,7 +4409,7 @@ module MvCore {
           hadError := true;
           errOut := Spec.NotReplacingMessageSpec(target);
         } else if cmd.debug {
-          out := Spec.DebugSkipMessageSpec(target);
+          out := Spec.SkipStdoutSpec(target, true);
         }
         var frame := RenameFrame(sourceIsDir, found, existsErr, "", NoSameFileCheck, NoBackupSelection,
                                  preFs, preCwd, firstStatus,
@@ -4139,7 +4420,7 @@ module MvCore {
         }
         step := AssembleInitialMoveStep(source, target, cmd, sourceMetadata, SomeMetadataEvidence(targetMetadata), frame,
                                         Spec.MoveOutcome(out, errOut, hadError));
-        reveal RenamePhaseSummary();
+        reveal RenamePhaseSummary(), RenamePhase();
         return;
       }
 
@@ -4165,7 +4446,7 @@ module MvCore {
       reveal MetadataStatusCall(), Spec.StatusRequest(), SourceResolutionObservationFor(), MetadataEvidenceFor();
     }
     hadError, out, errOut, step := ExecuteRenameFrame(source, target, cmd, frame, io);
-    reveal RenamePhaseSummary();
+    reveal RenamePhaseSummary(), RenamePhase();
   }
 
   method {:vcs_split_on_every_assert} MoveSourcesIntoDirectory(
@@ -4239,21 +4520,17 @@ module MvCore {
     reads io.Footprint()
   {
     PreparedSummary(raw, io, plan.normalExit, plan.stdout, plan.stderr) &&
-    Spec.EmissionFields(old(io.stdout()), old(io.stderr()), io.stdout(), io.stderr(),
-                        io.trustedStreams(), plan.stdout, plan.stderr, plan.normalExit, exit)
+    Spec.Emit(io, plan.stdout, plan.stderr, plan.normalExit, exit)
   }
 
   method Flush(output: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes,
                normalExit: int, io: BenchIO.IO) returns (exit: int)
     modifies io.stdoutRegion, io.stderrRegion
-    ensures Spec.EmissionFields(old(io.stdout()), old(io.stderr()), io.stdout(), io.stderr(),
-                                io.trustedStreams(), output, diagnostics, normalExit, exit)
+    ensures Spec.Emit(io, output, diagnostics, normalExit, exit)
   {
-    var committed: nat := 0;
     var outErr := 0;
     if |output| != 0 {
       var result := io.WriteStdout(output);
-      committed := IOContract.WriteResultCommitted(result);
       outErr := IOContract.ResultErrno(result);
     }
     var finalDiagnostics := diagnostics;
@@ -4263,18 +4540,14 @@ module MvCore {
     }
     assert finalDiagnostics == diagnostics + (if outErr == 0 then []
                                               else Spec.WriteErrorText(IOContract.CLocaleErrnoTextResult(outErr)));
-    var errCommitted: nat := 0;
     var errErr := 0;
     if |finalDiagnostics| != 0 {
       var result := io.WriteStderr(finalDiagnostics);
-      errCommitted := IOContract.WriteResultCommitted(result);
       errErr := IOContract.ResultErrno(result);
       assert IOContract.WriteStderrSpec(old(io.stderr()), io.trustedStreams(), io.stderr(),
-                                        finalDiagnostics, errCommitted, errErr);
+                                        finalDiagnostics, IOContract.WriteResultCommitted(result), errErr);
     }
     exit := if outErr != 0 || errErr != 0 then 1 else normalExit;
-    assert Spec.EmissionOutcomeFields(old(io.stdout()), old(io.stderr()), io.stdout(), io.stderr(),
-                                      io.trustedStreams(), output, diagnostics, normalExit, exit, committed, outErr, errCommitted, errErr);
   }
 
   method RunCore(raw: Schema.MvCmdRaw, io: BenchIO.IO)
@@ -4282,14 +4555,23 @@ module MvCore {
              ghost evidence: RunStatusEvidence, ghost plan: PlannedOutput)
     modifies io.fsRegion, io.stdoutRegion, io.stderrRegion, io.statusObservationsRegion
     ensures CoreSummary(raw, io, exit, plan)
-    ensures RunStatusEvidenceFor(raw, old(io.fs()), old(io.cwd()), io.fs(),
-                                 [], plan.stdout, [], plan.stderr, plan.normalExit,
-                                 Spec.NativeStatusInputs(io.statusObservations(), io.trustedNativeFailures(), io.now()), old(io.statusCursor()), io.statusCursor(), calls, evidence)
+    ensures RunStatusSummary(io, raw, plan.stdout, plan.stderr, plan.normalExit, calls, evidence)
     decreases *
   {
     var normalExit, output, diagnostics;
     normalExit, calls, evidence, output, diagnostics := Prepare(raw, io);
     plan := PlannedOutput(output, diagnostics, normalExit);
     exit := Flush(output, diagnostics, normalExit, io);
+    assert PreparedSummary(raw, io, normalExit, output, diagnostics) by {
+      hide *;
+    }
+    assert Spec.Emit(io, output, diagnostics, normalExit, exit) by {
+      hide *;
+      reveal Spec.Emit();
+    }
+    assert CoreSummary(raw, io, exit, plan) by {
+      hide *;
+      reveal CoreSummary();
+    }
   }
 }
