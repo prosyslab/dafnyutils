@@ -116,6 +116,7 @@ module ChmodObservationProof {
     hide *;
     Frame.DirectoryOperation(fs, native, observations, operation, handle, cursor, response, after);
     reveal C.ContextOperationSpec(), C.DirectoryRequestForContextFields(), C.DirectoryOperationSpec(),
+           C.DirectoryNextPositionFields(), C.DirectoryNextCapabilitiesFields(),
            C.DirectoryResponseFields(), C.CwdContextFields(), C.LiveDirectoryCapabilitiesFields();
     forall h | h in after.capabilities
       ensures var state := after.capabilities[h];

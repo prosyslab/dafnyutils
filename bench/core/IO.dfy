@@ -566,6 +566,10 @@ module BenchIO {
     {
       var data, err, stage := NativeReadFile(path, false);
       if err == 0 {
+        assert stage == ReadSucceeded by {
+          hide *;
+          reveal C.OpenReadFileSpec(), C.TrustedOpenReadFileContractFields();
+        }
         result := Result.Ok(data);
       } else {
         var message := GetCLocaleErrnoText(err);

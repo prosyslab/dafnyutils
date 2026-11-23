@@ -19,16 +19,8 @@ module PasteSpec {
 
   datatype Entry = Entry(lines: seq<BenchWorld.Bytes>, readOk: bool)
   type DelimiterResult = Result.Result<seq<BenchWorld.Bytes>, BenchWorld.Bytes>
-  datatype InputObservation = InputObservation(
-    result: BenchWorld.IOResult<BenchWorld.Bytes>,
-    entry: Entry,
-    errorPiece: BenchWorld.Bytes,
-    failed: bool,
-    blocking: bool
-  )
 
-  function HelpText(): BenchWorld.Bytes
-  {
+  const HelpText: BenchWorld.Bytes :=
     "Usage: paste [OPTION]... [FILE]...\n"
     + "Write lines consisting of the sequentially corresponding lines from\n"
     + "each FILE, separated by TABs, to standard output.\n"
@@ -45,10 +37,8 @@ module PasteSpec {
     + "General help using GNU software: <https://www.gnu.org/gethelp/>\n"
     + "Full documentation <https://www.gnu.org/software/coreutils/paste>\n"
     + "or available locally via: info '(coreutils) paste invocation'\n"
-  }
 
-  function VersionText(): BenchWorld.Bytes
-  {
+  const VersionText: BenchWorld.Bytes :=
     "paste (GNU coreutils) 9.10.13-2cf49\n"
     + "Copyright (C) 2026 Free Software Foundation, Inc.\n"
     + "License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\n"
@@ -56,7 +46,6 @@ module PasteSpec {
     + "There is NO WARRANTY, to the extent permitted by law.\n"
     + "\n"
     + "Written by David M. Ihnat and David MacKenzie.\n"
-  }
 
   function ErrnoText(err: BenchWorld.IOError): string
   {
@@ -106,20 +95,16 @@ module PasteSpec {
       (if data[|data| - 1] == recordDelimiter then [recordDelimiter] else [])
   }
 
-  ghost predicate ReadResultRelation(
-    cmd: PasteSchema.PasteCmd,
-    preFs: BenchWorld.FileSystem, preStreams: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
-    preStdin: BenchWorld.Bytes,
-    i: nat,
-    result: BenchWorld.IOResult<BenchWorld.Bytes>
-  )
-    requires i < |cmd.inputs|
+  ghost function ReadInput(
+    input: PasteSchema.Input,
+    fs: BenchWorld.FileSystem,
+    streams: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
+    stdin: BenchWorld.Bytes
+  ): BenchWorld.IOResult<BenchWorld.Bytes>
   {
-    match cmd.inputs[i]
-    case Stdin =>
-      result == IOContract.ObservedReadStdinResultFields(preStdin, preStreams)
-    case File(path) =>
-      result == IOContract.ObservedReadFileResultFields(preFs, preStreams, path)
+    match input
+    case Stdin => IOContract.ObservedReadStdinResultFields(stdin, streams)
+    case File(path) => IOContract.ObservedReadFileResultFields(fs, streams, path)
   }
 
   function BlockingReadFailure(err: BenchWorld.IOError): bool
@@ -138,46 +123,17 @@ module PasteSpec {
     LinesRelation(IOContract.ReadResultData(result), recordDelimiter, entry.lines)
   }
 
-  ghost predicate InputObservationRelation(
-    cmd: PasteSchema.PasteCmd,
-    preFs: BenchWorld.FileSystem, preStreams: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
-    preStdin: BenchWorld.Bytes,
-    i: nat,
-    observation: InputObservation
-  )
-    requires i < |cmd.inputs|
+  function InputDiagnostic(
+    input: PasteSchema.Input, result: BenchWorld.IOResult<BenchWorld.Bytes>
+  ): BenchWorld.Bytes
   {
-    ReadResultRelation(
-      cmd, preFs, preStreams, preStdin, i, observation.result) &&
-    EntryRelation(
-      observation.result,
-      RecordDelimiter(cmd.zeroTerminated),
-      observation.entry) &&
-    match cmd.inputs[i]
-    case Stdin =>
-      observation.errorPiece == (if observation.result.Ok? then []
-                                 else ErrorMessage("-", observation.result.e)) &&
-      observation.failed == observation.result.Err? &&
-      !observation.blocking
-    case File(path) =>
-      match observation.result
-      case Ok(_) =>
-        observation.errorPiece == [] &&
-        !observation.failed &&
-        !observation.blocking
-      case Err(err) =>
-        observation.errorPiece == ErrorMessage(path, err) &&
-        observation.failed &&
-        observation.blocking == BlockingReadFailure(err)
+    if result.Ok? then []
+    else ErrorMessage(if input.Stdin? then "-" else input.path, result.e)
   }
 
-  ghost function ObservationEntries(
-    observations: seq<InputObservation>
-  ): seq<Entry>
+  predicate IsBlockingInput(input: PasteSchema.Input, result: BenchWorld.IOResult<BenchWorld.Bytes>)
   {
-    seq(
-    |observations|,
-    i requires 0 <= i < |observations| => observations[i].entry)
+    input.File? && result.Err? && BlockingReadFailure(result.e)
   }
 
   ghost predicate SelectedLinesRelation(
@@ -224,62 +180,82 @@ module PasteSpec {
           else entries[i] == rawEntries[i]
   }
 
-  lemma FirstBlockingExists(observations: seq<InputObservation>)
-    requires exists i: nat :: i < |observations| && observations[i].blocking
+  lemma FirstBlockingExists(
+    inputs: seq<PasteSchema.Input>, results: seq<BenchWorld.IOResult<BenchWorld.Bytes>>
+  )
+    requires |inputs| == |results|
+    requires exists i: nat :: i < |inputs| && IsBlockingInput(inputs[i], results[i])
     ensures exists i: nat ::
-              i < |observations| && observations[i].blocking &&
-              (forall j: nat | j < i :: !observations[j].blocking)
-    decreases |observations|
+              i < |inputs| && IsBlockingInput(inputs[i], results[i]) &&
+              (forall j: nat | j < i :: !IsBlockingInput(inputs[j], results[j]))
+    decreases |inputs|
   {
-    if exists i: nat :: i < |observations| - 1 && observations[i].blocking {
-      FirstBlockingExists(observations[..|observations| - 1]);
+    var n := |inputs| - 1;
+    if exists i: nat :: i < n && IsBlockingInput(inputs[i], results[i]) {
+      var i: nat :| i < n && IsBlockingInput(inputs[i], results[i]);
+      assert IsBlockingInput(inputs[..n][i], results[..n][i]);
+      FirstBlockingExists(inputs[..n], results[..n]);
     }
   }
 
-  ghost function FirstBlocking(observations: seq<InputObservation>): (i: nat)
-    requires exists i: nat :: i < |observations| && observations[i].blocking
-    ensures i < |observations| && observations[i].blocking
-    ensures forall j: nat | j < i :: !observations[j].blocking
+  ghost function FirstBlocking(
+    inputs: seq<PasteSchema.Input>, results: seq<BenchWorld.IOResult<BenchWorld.Bytes>>
+  ): (i: nat)
+    requires |inputs| == |results|
+    requires exists i: nat :: i < |inputs| && IsBlockingInput(inputs[i], results[i])
+    ensures i < |inputs| && IsBlockingInput(inputs[i], results[i])
+    ensures forall j: nat | j < i :: !IsBlockingInput(inputs[j], results[j])
   {
-    FirstBlockingExists(observations);
-    var i: nat :| i < |observations| && observations[i].blocking &&
-                  (forall j: nat | j < i :: !observations[j].blocking);
+    FirstBlockingExists(inputs, results);
+    var i: nat :| i < |inputs| && IsBlockingInput(inputs[i], results[i]) &&
+                  (forall j: nat | j < i :: !IsBlockingInput(inputs[j], results[j]));
     i
   }
 
-  ghost function VisibleErrors(serial: bool,
-                               observations: seq<InputObservation>): BenchWorld.Bytes
+  ghost function VisibleErrors(
+    serial: bool, inputs: seq<PasteSchema.Input>, results: seq<BenchWorld.IOResult<BenchWorld.Bytes>>
+  ): BenchWorld.Bytes
+    requires |inputs| == |results|
   {
-    if !serial && (exists i: nat :: i < |observations| && observations[i].blocking) then
-      observations[FirstBlocking(observations)].errorPiece
+    if !serial && (exists i: nat :: i < |inputs| && IsBlockingInput(inputs[i], results[i])) then
+      var i := FirstBlocking(inputs, results);
+      InputDiagnostic(inputs[i], results[i])
     else
-      Concat<BenchWorld.RawByte>(seq(|observations|, i requires 0 <= i < |observations| =>
-                                   observations[i].errorPiece))
+      Concat<BenchWorld.RawByte>(InputDiagnostics(inputs, results))
   }
 
-  ghost predicate InputRelation(
+  ghost function InputDiagnostics(
+    inputs: seq<PasteSchema.Input>, results: seq<BenchWorld.IOResult<BenchWorld.Bytes>>
+  ): (pieces: seq<BenchWorld.Bytes>)
+    requires |inputs| == |results|
+    ensures |pieces| == |inputs|
+  {
+    seq(|inputs|, i requires 0 <= i < |inputs| => InputDiagnostic(inputs[i], results[i]))
+  }
+
+  twostate predicate InputRelation(
     cmd: PasteSchema.PasteCmd,
-    preFs: BenchWorld.FileSystem, preStreams: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
-    preStdin: BenchWorld.Bytes,
-    postStdin: BenchWorld.Bytes,
+    io: BenchIO.IO,
     entries: seq<Entry>,
     errorOutput: BenchWorld.Bytes,
     hadError: bool,
     hadBlockingError: bool
   )
+    reads io.stdinRegion
   {
-    exists observations: seq<InputObservation> ::
-      |observations| == |cmd.inputs| &&
-      postStdin == StdinAfterReads(preStdin, preStreams, StdinCount(cmd.inputs)) &&
-      (forall i: nat | i < |observations| ::
-         InputObservationRelation(cmd, preFs, preStreams,
-                                  StdinAfterReads(preStdin, preStreams, StdinCount(cmd.inputs[..i])),
-                                  i, observations[i])) &&
-      EntriesForOutputRelation(cmd, StdinData(cmd, observations),
-                               ObservationEntries(observations), entries) &&
-      errorOutput == VisibleErrors(cmd.serial, observations) &&
-      hadError == (exists i: nat :: i < |observations| && observations[i].failed) &&
-      hadBlockingError == (exists i: nat :: i < |observations| && observations[i].blocking)
+    var inputs := cmd.inputs;
+    var streams := old(io.trustedStreams());
+    var stdin := old(io.stdin());
+    var results := ReadResults(inputs, old(io.fs()), streams, stdin);
+    io.stdin() == StdinAfterReads(stdin, streams, StdinCount(inputs)) &&
+    errorOutput == VisibleErrors(cmd.serial, inputs, results) &&
+    hadError == (exists i: nat :: i < |inputs| && results[i].Err?) &&
+    hadBlockingError == (exists i: nat :: i < |inputs| && IsBlockingInput(inputs[i], results[i])) &&
+    exists rawEntries: seq<Entry> ::
+      |rawEntries| == |inputs| &&
+      (forall i: nat | i < |inputs| ::
+         EntryRelation(results[i], RecordDelimiter(cmd.zeroTerminated), rawEntries[i])) &&
+      EntriesForOutputRelation(cmd, StdinData(inputs, results), rawEntries, entries)
   }
 
   function StdinCount(inputs: seq<PasteSchema.Input>): nat
@@ -299,12 +275,33 @@ module PasteSpec {
            StdinAfterReads(before, observations, count - 1), observations)
   }
 
-  ghost function StdinData(cmd: PasteSchema.PasteCmd,
-                           observations: seq<InputObservation>): BenchWorld.Bytes
-    requires |observations| == |cmd.inputs|
+  ghost function ReadResults(
+    inputs: seq<PasteSchema.Input>, fs: BenchWorld.FileSystem,
+    streams: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
+    stdin: BenchWorld.Bytes
+  ): (results: seq<BenchWorld.IOResult<BenchWorld.Bytes>>)
+    ensures |results| == |inputs|
   {
-    Concat<BenchWorld.RawByte>(seq(|observations|, i requires 0 <= i < |observations| =>
-                                 if cmd.inputs[i].Stdin? then IOContract.ReadResultData(observations[i].result) else []))
+    seq(|inputs|, i requires 0 <= i < |inputs| =>
+      ReadInput(inputs[i], fs, streams, StdinAfterReads(stdin, streams, StdinCount(inputs[..i]))))
+  }
+
+  ghost function StdinData(
+    inputs: seq<PasteSchema.Input>, results: seq<BenchWorld.IOResult<BenchWorld.Bytes>>
+  ): BenchWorld.Bytes
+    requires |inputs| == |results|
+  {
+    Concat<BenchWorld.RawByte>(StdinPieces(inputs, results))
+  }
+
+  ghost function StdinPieces(
+    inputs: seq<PasteSchema.Input>, results: seq<BenchWorld.IOResult<BenchWorld.Bytes>>
+  ): (pieces: seq<BenchWorld.Bytes>)
+    requires |inputs| == |results|
+    ensures |pieces| == |inputs|
+  {
+    seq(|inputs|, i requires 0 <= i < |inputs| =>
+      if inputs[i].Stdin? then IOContract.ReadResultData(results[i]) else [])
   }
 
   function EscapedDelimiter(ch: BenchWorld.RawByte): BenchWorld.Bytes
@@ -427,16 +424,16 @@ module PasteSpec {
   }
 
   twostate predicate SpecCmd(cmd: PasteSchema.PasteCmd, io: BenchIO.IO, exit: int, resultStdout: BenchWorld.Bytes, resultStderr: BenchWorld.Bytes)
-    reads io.Footprint() - {io.stdoutRegion, io.stderrRegion}
+    reads io.stdinRegion
   {
     if cmd.mode == PasteSchema.ModeHelp then
       io.stdin() == old(io.stdin()) &&
-      resultStdout == old(io.stdout()) + HelpText() &&
+      resultStdout == old(io.stdout()) + HelpText &&
       resultStderr == old(io.stderr()) &&
       exit == 0
     else if cmd.mode == PasteSchema.ModeVersion then
       io.stdin() == old(io.stdin()) &&
-      resultStdout == old(io.stdout()) + VersionText() &&
+      resultStdout == old(io.stdout()) + VersionText &&
       resultStderr == old(io.stderr()) &&
       exit == 0
     else
@@ -454,9 +451,7 @@ module PasteSpec {
             errorOutput: BenchWorld.Bytes,
             hadError: bool,
             hadBlockingError: bool ::
-            InputRelation(
-              cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()), io.stdin(), entries,
-              errorOutput, hadError, hadBlockingError) &&
+            InputRelation(cmd, io, entries, errorOutput, hadError, hadBlockingError) &&
             resultStdout == old(io.stdout()) +
             (if hadBlockingError && !cmd.serial then [] else
              Output(cmd.serial, delims, RecordDelimiter(cmd.zeroTerminated), entries)) &&
@@ -465,8 +460,7 @@ module PasteSpec {
   }
 
   twostate predicate PreparedSpec(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO, exit: int, resultStdout: BenchWorld.Bytes, resultStderr: BenchWorld.Bytes)
-    reads io.Footprint() - {
-            io.stdoutRegion, io.stderrRegion}
+    reads io.stdinRegion
   {
     SpecCmd(PasteSchema.Command(raw), io, exit, resultStdout, resultStderr)
   }
@@ -476,38 +470,29 @@ module PasteSpec {
     StreamUtf8.Encode("paste: write error: " + message + "\n")
   }
 
-  ghost predicate EmitFields(
-    observations: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult,
-    beforeStdout: BenchWorld.Bytes, beforeStderr: BenchWorld.Bytes,
-    afterStdout: BenchWorld.Bytes, afterStderr: BenchWorld.Bytes,
+  twostate predicate Emission(
+    io: BenchIO.IO,
     out: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes,
     normalExit: int, exit: int
   )
+    reads io.stdoutRegion, io.stderrRegion
   {
-    var stdoutResult := observations(BenchWorld.StreamWriteStdout(beforeStdout, out));
+    var observations := old(io.trustedStreams());
+    var stdoutResult := observations(BenchWorld.StreamWriteStdout(old(io.stdout()), out));
     stdoutResult.StreamWriteResult? &&
     var errors := diagnostics + (if stdoutResult.err == 0 then [] else
                                  StreamWriteErrorMessage(StreamContract.CLocaleErrnoTextResult(stdoutResult.err)));
-    var stderrResult := observations(BenchWorld.StreamWriteStderr(beforeStderr, errors));
+    var stderrResult := observations(BenchWorld.StreamWriteStderr(old(io.stderr()), errors));
     stderrResult.StreamWriteResult? &&
     StreamContract.WriteStdoutSpec(
-      beforeStdout, observations, afterStdout, out, stdoutResult.committed, stdoutResult.err) &&
+      old(io.stdout()), observations, io.stdout(), out, stdoutResult.committed, stdoutResult.err) &&
     StreamContract.WriteStderrSpec(
-      beforeStderr, observations, afterStderr, errors, stderrResult.committed, stderrResult.err) &&
+      old(io.stderr()), observations, io.stderr(), errors, stderrResult.committed, stderrResult.err) &&
     exit == (if stdoutResult.err != 0 || stderrResult.err != 0 then 1 else normalExit)
   }
 
-  twostate predicate Emission(io: BenchIO.IO,
-                              out: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes,
-                              normalExit: int, exit: int)
-    reads io.Footprint()
-  {
-    EmitFields(old(io.trustedStreams()), old(io.stdout()), old(io.stderr()),
-               io.stdout(), io.stderr(), out, diagnostics, normalExit, exit)
-  }
-
   twostate predicate Spec(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO, exit: int)
-    reads io.Footprint()
+    reads io.stdinRegion, io.stdoutRegion, io.stderrRegion
   {
     exists out: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes, normalExit: int ::
       PreparedSpec(raw, io, normalExit,

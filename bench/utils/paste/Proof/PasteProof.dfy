@@ -49,34 +49,6 @@ module PasteProof {
        (i + 1 < |lines| ==> terminated[i]))
   }
 
-  ghost predicate StdinStatesRelation(
-    cmd: Schema.PasteCmd,
-    observations: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    before: BW.Bytes, after: BW.Bytes,
-    states: seq<BW.Bytes>
-  )
-  {
-    |states| == |cmd.inputs| + 1 && states[0] == before &&
-    states[|cmd.inputs|] == after &&
-    forall i: nat {:trigger states[i + 1]} | i < |cmd.inputs| ::
-      states[i + 1] == (if cmd.inputs[i].Stdin?
-                        then C.ObservedReadStdinRemainingFields(states[i], observations)
-                        else states[i])
-  }
-
-  ghost predicate StdinDataRelation(
-    cmd: Schema.PasteCmd, observations: seq<Spec.InputObservation>,
-    data: BW.Bytes, cuts: seq<nat>
-  )
-  {
-    |observations| == |cmd.inputs| && |cuts| == |cmd.inputs| + 1 &&
-    cuts[0] == 0 && cuts[|cmd.inputs|] == |data| &&
-    forall i: nat {:trigger cuts[i]} | i < |cmd.inputs| ::
-      cuts[i] <= cuts[i + 1] <= |data| &&
-      data[cuts[i]..cuts[i + 1]] == (if cmd.inputs[i].Stdin?
-                                     then C.ReadResultData(observations[i].result) else [])
-  }
-
   datatype DelimiterAssembly =
     DelimiterDone |
     DelimiterFailure |
@@ -121,74 +93,9 @@ module PasteProof {
         case Ok(delims) => Result.Ok([delimiter] + delims)
   }
 
-  datatype VisibleErrorAssembly =
-    VisibleErrorsDone |
-    VisibleErrorStep(
-      previous: BW.Bytes,
-      rest: VisibleErrorAssembly)
-
-  ghost predicate VisibleErrorPrefixRelation(
-    serial: bool,
-    observations: seq<Spec.InputObservation>,
-    i: nat,
-    output: BW.Bytes,
-    assembly: VisibleErrorAssembly
-  )
-    decreases assembly
-  {
-    i <= |observations| &&
-    match assembly
-    case VisibleErrorsDone =>
-      i == 0 && output == []
-    case VisibleErrorStep(previous, rest) =>
-      i > 0 &&
-      VisibleErrorPrefixRelation(
-        serial, observations, i - 1, previous, rest) &&
-      output ==
-      if serial then
-        previous + observations[i - 1].errorPiece
-      else if exists j: nat ::
-                j < i - 1 && observations[j].blocking then
-        previous
-      else if observations[i - 1].blocking then
-        observations[i - 1].errorPiece
-      else
-        previous + observations[i - 1].errorPiece
-  }
-
   ghost function ShiftCuts(cuts: seq<nat>, offset: nat): seq<nat>
   {
     seq(|cuts|, i requires 0 <= i < |cuts| => cuts[i] + offset)
-  }
-
-  ghost function ObservationAt(
-    cmd: Schema.PasteCmd,
-    preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    preStdin: BW.Bytes,
-    i: nat
-  ): Spec.InputObservation
-    requires i < |cmd.inputs|
-  {
-    var result := Core.ReadResultCore(cmd, preFs, preStreams, preStdin, i);
-    Spec.InputObservation(
-      result,
-      Core.EntryForRead(
-        result, Spec.RecordDelimiter(cmd.zeroTerminated)),
-      Core.ErrorPiece(cmd.inputs[i], result),
-      Core.HadErrorPiece(cmd.inputs[i], result),
-      Core.HadBlockingErrorPiece(cmd.inputs[i], result))
-  }
-
-  ghost function Observations(
-    cmd: Schema.PasteCmd,
-    preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    preStdin: BW.Bytes
-  ): seq<Spec.InputObservation>
-  {
-    seq(
-    |cmd.inputs|,
-    i requires 0 <= i < |cmd.inputs| =>
-      ObservationAt(cmd, preFs, preStreams, preStdin, i))
   }
 
   lemma SliceAfterPrefix<T>(
@@ -483,63 +390,6 @@ module PasteProof {
                             Core.EntryForRead(result, recordDelimiter).lines);
   }
 
-  lemma PrefixStdinCharacterization(
-    cmd: Schema.PasteCmd,
-    preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    preStdin: BW.Bytes,
-    states: seq<BW.Bytes>
-  )
-    requires states == seq(|cmd.inputs| + 1,
-                       j requires 0 <= j <= |cmd.inputs| => Core.PrefixStdinCore(cmd, preStreams, preStdin, j))
-    ensures StdinStatesRelation(cmd, preStreams, preStdin,
-                                Core.PrefixStdinCore(cmd, preStreams, preStdin, |cmd.inputs|), states)
-  {
-    forall i: nat | i < |cmd.inputs|
-      ensures states[i + 1] == (if cmd.inputs[i].Stdin?
-                                then C.ObservedReadStdinRemainingFields(states[i], preStreams) else states[i])
-    {
-      Core.PrefixStdinCoreStep(cmd, preStreams, preStdin, i);
-    }
-  }
-
-  lemma ReadResultRefines(
-    cmd: Schema.PasteCmd,
-    preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    preStdin: BW.Bytes,
-    i: nat
-  )
-    requires i < |cmd.inputs|
-    ensures Spec.ReadResultRelation(
-              cmd, preFs, preStreams, Core.PrefixStdinCore(cmd, preStreams, preStdin, i), i,
-              Core.ReadResultCore(cmd, preFs, preStreams, preStdin, i))
-  {
-    reveal Spec.ReadResultRelation();
-  }
-
-  lemma ObservationRefines(
-    cmd: Schema.PasteCmd,
-    preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    preStdin: BW.Bytes,
-    i: nat
-  )
-    requires i < |cmd.inputs|
-    ensures Spec.InputObservationRelation(
-              cmd, preFs, preStreams, Core.PrefixStdinCore(cmd, preStreams, preStdin, i), i,
-              ObservationAt(cmd, preFs, preStreams, preStdin, i))
-  {
-    var result := Core.ReadResultCore(cmd, preFs, preStreams, preStdin, i);
-    ReadResultRefines(cmd, preFs, preStreams, preStdin, i);
-
-    EntryRefines(result, Spec.RecordDelimiter(cmd.zeroTerminated));
-    reveal Spec.InputObservationRelation();
-    match cmd.inputs[i]
-    case Stdin =>
-    case File(_) =>
-      match result
-      case Ok(_) =>
-      case Err(_) =>
-  }
-
   lemma PrefixEntriesIndex(
     cmd: Schema.PasteCmd,
     preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
@@ -558,34 +408,6 @@ module PasteProof {
     reveal Core.PrefixEntriesCore();
     if j + 1 < i {
       PrefixEntriesIndex(cmd, preFs, preStreams, preStdin, i - 1, j);
-    }
-  }
-
-  lemma ObservationEntriesEq(
-    cmd: Schema.PasteCmd,
-    preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    preStdin: BW.Bytes
-  )
-    ensures Spec.ObservationEntries(
-              Observations(cmd, preFs, preStreams, preStdin)) ==
-            Core.EntriesCore(cmd, preFs, preStreams, preStdin)
-  {
-    hide *;
-    reveal Observations(), ObservationAt(), Spec.ObservationEntries(), Core.EntriesCore();
-    var observations := Observations(cmd, preFs, preStreams, preStdin);
-    var entries := Core.EntriesCore(cmd, preFs, preStreams, preStdin);
-    assert |observations| == |entries| == |cmd.inputs|;
-    assert forall i: nat :: i < |observations| ==>
-                              Spec.ObservationEntries(observations)[i] ==
-                              entries[i] by {
-      forall i: nat | i < |observations|
-        ensures Spec.ObservationEntries(observations)[i] ==
-                entries[i]
-      {
-        PrefixEntriesIndex(
-          cmd, preFs, preStreams, preStdin, |cmd.inputs|, i);
-
-      }
     }
   }
 
@@ -694,57 +516,6 @@ module PasteProof {
     }
   }
 
-  lemma PrefixHasStdinEq(
-    inputs: seq<Schema.Input>,
-    i: nat
-  )
-    requires i <= |inputs|
-    ensures Core.PrefixHadStdinCore(inputs, i) ==
-            (exists j: nat :: j < i && inputs[j] == Schema.Stdin)
-    decreases i
-  {
-    if i > 0 {
-      PrefixHasStdinEq(inputs, i - 1);
-    }
-  }
-
-  lemma HasStdinEq(inputs: seq<Schema.Input>)
-    ensures Core.PrefixHadStdinCore(inputs, |inputs|) ==
-            Spec.HasStdinInput(inputs)
-  {
-    PrefixHasStdinEq(inputs, |inputs|);
-    reveal Spec.HasStdinInput();
-  }
-
-  lemma VisibleErrorsRefine(
-    cmd: Schema.PasteCmd,
-    preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    preStdin: BW.Bytes,
-    i: nat
-  ) returns (assembly: VisibleErrorAssembly)
-    requires i <= |cmd.inputs|
-    ensures VisibleErrorPrefixRelation(
-              cmd.serial,
-              Observations(cmd, preFs, preStreams, preStdin),
-              i,
-              Core.PrefixVisibleErrorOutputCore(
-                cmd, preFs, preStreams, preStdin, i),
-              assembly)
-    decreases i
-  {
-    if i == 0 {
-      assembly := VisibleErrorsDone;
-    } else {
-      var rest :=
-        VisibleErrorsRefine(cmd, preFs, preStreams, preStdin, i - 1);
-      PrefixHadBlockingRefines(cmd, preFs, preStreams, preStdin, i - 1);
-      assembly := VisibleErrorStep(
-        Core.PrefixVisibleErrorOutputCore(
-          cmd, preFs, preStreams, preStdin, i - 1),
-        rest);
-    }
-  }
-
   lemma ConcatSnoc<T>(parts: seq<seq<T>>, last: seq<T>)
     ensures Spec.Concat<T>(parts + [last]) == Spec.Concat<T>(parts) + last
     decreases |parts|
@@ -752,166 +523,6 @@ module PasteProof {
     if |parts| > 0 {
       ConcatSnoc<T>(parts[1..], last);
       assert (parts + [last])[1..] == parts[1..] + [last];
-    }
-  }
-
-  lemma VisibleErrorsWithoutBlocking(serial: bool, observations: seq<Spec.InputObservation>, n: nat)
-    requires n <= |observations|
-    requires serial || (forall j: nat | j < n :: !observations[j].blocking)
-    ensures Spec.VisibleErrors(serial, observations[..n]) ==
-            Spec.Concat<BW.RawByte>(seq(n, k requires 0 <= k < n => observations[k].errorPiece))
-  {
-    hide *;
-    reveal Spec.VisibleErrors();
-    var prefix := observations[..n];
-    if !serial {
-      forall j: nat {:trigger prefix[j]} | j < |prefix|
-        ensures !prefix[j].blocking
-      {
-        assert prefix[j] == observations[j];
-      }
-    }
-    var pieces: seq<BW.Bytes> := seq(n, k requires 0 <= k < n => observations[k].errorPiece);
-    var projected: seq<BW.Bytes> := seq(|prefix|, k requires 0 <= k < |prefix| => prefix[k].errorPiece);
-    forall k | 0 <= k < n
-      ensures pieces[k] == projected[k]
-    {
-    }
-    assert pieces == projected;
-  }
-
-  lemma VisibleErrorsDenote(serial: bool, observations: seq<Spec.InputObservation>,
-                            i: nat, output: BW.Bytes,
-                            assembly: VisibleErrorAssembly)
-    requires i <= |observations|
-    requires VisibleErrorPrefixRelation(serial, observations, i, output, assembly)
-    ensures output == Spec.VisibleErrors(serial, observations[..i])
-    decreases assembly
-  {
-    reveal Spec.VisibleErrors();
-    match assembly
-    case VisibleErrorsDone =>
-    case VisibleErrorStep(previous, rest) =>
-      VisibleErrorsDenote(serial, observations, i - 1, previous, rest);
-      if !serial && (exists j: nat :: j < i - 1 && observations[j].blocking) {
-        var first := Spec.FirstBlocking(observations[..i - 1]);
-        var next := Spec.FirstBlocking(observations[..i]);
-        assert first == next;
-      } else if !serial && observations[i - 1].blocking {
-        assert Spec.FirstBlocking(observations[..i]) == i - 1;
-      } else {
-        var pieces: seq<BW.Bytes> := seq(i - 1, k requires 0 <= k < i - 1 => observations[k].errorPiece);
-        assert !serial ==> !(exists j: nat :: j < i && observations[j].blocking);
-        VisibleErrorsWithoutBlocking(serial, observations, i - 1);
-        VisibleErrorsWithoutBlocking(serial, observations, i);
-        assert (seq(i, k requires 0 <= k < i => observations[k].errorPiece)) ==
-               pieces + [observations[i - 1].errorPiece];
-        ConcatSnoc<BW.RawByte>(pieces, observations[i - 1].errorPiece);
-        assert previous == Spec.Concat<BW.RawByte>(pieces);
-        assert output == previous + observations[i - 1].errorPiece;
-        assert output == Spec.VisibleErrors(serial, observations[..i]);
-      }
-  }
-
-  lemma PrefixHadErrorRefines(
-    cmd: Schema.PasteCmd,
-    preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    preStdin: BW.Bytes,
-    i: nat
-  )
-    requires i <= |cmd.inputs|
-    ensures Core.PrefixHadErrorCore(cmd, preFs, preStreams, preStdin, i) ==
-            (exists j: nat ::
-               j < i &&
-               Observations(cmd, preFs, preStreams, preStdin)[j].failed)
-    decreases i
-  {
-    if i > 0 {
-      PrefixHadErrorRefines(cmd, preFs, preStreams, preStdin, i - 1);
-      assert Observations(cmd, preFs, preStreams, preStdin)[i - 1].failed ==
-             Core.HadErrorPiece(
-               cmd.inputs[i - 1],
-               Core.ReadResultCore(cmd, preFs, preStreams, preStdin, i - 1));
-      assert (exists j: nat ::
-                j < i &&
-                Observations(cmd, preFs, preStreams, preStdin)[j].failed) <==>
-             ((exists j: nat ::
-                 j < i - 1 &&
-                 Observations(cmd, preFs, preStreams, preStdin)[j].failed) ||
-              Observations(cmd, preFs, preStreams, preStdin)[i - 1].failed) by {
-      }
-    }
-  }
-
-  lemma PrefixHadBlockingRefines(
-    cmd: Schema.PasteCmd,
-    preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    preStdin: BW.Bytes,
-    i: nat
-  )
-    requires i <= |cmd.inputs|
-    ensures Core.PrefixHadBlockingErrorCore(
-              cmd, preFs, preStreams, preStdin, i) ==
-            (exists j: nat ::
-               j < i &&
-               Observations(cmd, preFs, preStreams, preStdin)[j].blocking)
-    decreases i
-  {
-    if i > 0 {
-      PrefixHadBlockingRefines(cmd, preFs, preStreams, preStdin, i - 1);
-      assert Observations(cmd, preFs, preStreams, preStdin)[i - 1].blocking ==
-             Core.HadBlockingErrorPiece(
-               cmd.inputs[i - 1],
-               Core.ReadResultCore(cmd, preFs, preStreams, preStdin, i - 1));
-      assert (exists j: nat ::
-                j < i &&
-                Observations(cmd, preFs, preStreams, preStdin)[j].blocking) <==>
-             ((exists j: nat ::
-                 j < i - 1 &&
-                 Observations(cmd, preFs, preStreams, preStdin)[j].blocking) ||
-              Observations(cmd, preFs, preStreams, preStdin)[i - 1].blocking) by {
-      }
-    }
-  }
-
-  lemma BuildStdinDataCuts(
-    cmd: Schema.PasteCmd, fs: BW.FileSystem,
-    streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    input: BW.Bytes, i: nat
-  ) returns (cuts: seq<nat>)
-    requires i <= |cmd.inputs|
-    ensures |cuts| == i + 1 && cuts[0] == 0
-    ensures cuts[i] == |Core.StdinDataPrefixCore(cmd, streams, input, i)|
-    ensures forall j: nat {:trigger cuts[j]} | j < i ::
-              cuts[j] <= cuts[j + 1] <= cuts[i] &&
-              Core.StdinDataPrefixCore(cmd, streams, input, i)[cuts[j]..cuts[j + 1]] ==
-              (if cmd.inputs[j].Stdin? then
-                 C.ReadResultData(ObservationAt(cmd, fs, streams, input, j).result) else [])
-    decreases i
-  {
-    if i == 0 {
-      cuts := [0];
-    } else {
-      var previous := BuildStdinDataCuts(cmd, fs, streams, input, i - 1);
-      var prefix := Core.StdinDataPrefixCore(cmd, streams, input, i - 1);
-      var piece := if cmd.inputs[i - 1].Stdin? then
-        C.ReadResultData(ObservationAt(cmd, fs, streams, input, i - 1).result) else [];
-      assert Core.StdinDataPrefixCore(cmd, streams, input, i) == prefix + piece;
-      cuts := previous + [|prefix + piece|];
-      forall j: nat {:trigger cuts[j]} | j < i
-        ensures cuts[j] <= cuts[j + 1] <= cuts[i] &&
-                Core.StdinDataPrefixCore(cmd, streams, input, i)[cuts[j]..cuts[j + 1]] ==
-                (if cmd.inputs[j].Stdin? then
-                   C.ReadResultData(ObservationAt(cmd, fs, streams, input, j).result) else [])
-      {
-        hide *;
-        if j < i - 1 {
-          assert (prefix + piece)[..|prefix|] == prefix;
-          assert (prefix + piece)[cuts[j]..cuts[j + 1]] == prefix[cuts[j]..cuts[j + 1]];
-        } else {
-          assert (prefix + piece)[|prefix|..] == piece;
-        }
-      }
     }
   }
 
@@ -938,52 +549,42 @@ module PasteProof {
     assert multiset(inputs[..i + 1]) == multiset(inputs[..i]) + multiset{inputs[i]};
   }
 
-  lemma StdinStatesDenote(cmd: Schema.PasteCmd,
-                          streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-                          before: BW.Bytes, after: BW.Bytes, states: seq<BW.Bytes>, i: nat)
-    requires StdinStatesRelation(cmd, streams, before, after, states)
+  lemma StdinAfterReadsRefines(
+    cmd: Schema.PasteCmd, streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
+    stdin: BW.Bytes, i: nat
+  )
     requires i <= |cmd.inputs|
-    ensures states[i] == Spec.StdinAfterReads(before, streams, Spec.StdinCount(cmd.inputs[..i]))
+    ensures Core.PrefixStdinCore(cmd, streams, stdin, i) ==
+            Spec.StdinAfterReads(stdin, streams, Spec.StdinCount(cmd.inputs[..i]))
     decreases i
   {
     hide *;
+    reveal Spec.StdinAfterReads();
     if i == 0 {
-      reveal StdinStatesRelation();
-      assert cmd.inputs[..0] == [];
-      assert Spec.StdinCount(cmd.inputs[..0]) == 0 by {
-        reveal Spec.StdinCount();
-      }
-      assert Spec.StdinAfterReads(before, streams, 0) == before by {
-        reveal Spec.StdinAfterReads();
-      }
+      reveal Core.PrefixStdinCore(), Spec.StdinCount();
     } else {
-      var k := i - 1;
-      var count := Spec.StdinCount(cmd.inputs[..k]);
-      StdinStatesDenote(cmd, streams, before, after, states, k);
-      StdinCountStep(cmd.inputs, k);
-      StdinStatesStep(cmd, streams, before, after, states, k);
-      if cmd.inputs[k].Stdin? {
-        assert Spec.StdinAfterReads(before, streams, count + 1) ==
-               C.ObservedReadStdinRemainingFields(
-                 Spec.StdinAfterReads(before, streams, count), streams) by {
-          reveal Spec.StdinAfterReads();
-        }
-      }
+      StdinAfterReadsRefines(cmd, streams, stdin, i - 1);
+      StdinCountStep(cmd.inputs, i - 1);
+      Core.PrefixStdinCoreStep(cmd, streams, stdin, i - 1);
     }
   }
 
-  lemma StdinStatesStep(cmd: Schema.PasteCmd,
-                        streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-                        before: BW.Bytes, after: BW.Bytes, states: seq<BW.Bytes>, k: nat)
-    requires StdinStatesRelation(cmd, streams, before, after, states)
-    requires k < |cmd.inputs|
-    ensures |states| == |cmd.inputs| + 1
-    ensures states[k + 1] == (if cmd.inputs[k].Stdin?
-                              then C.ObservedReadStdinRemainingFields(states[k], streams)
-                              else states[k])
+  lemma ReadResultsRefine(
+    cmd: Schema.PasteCmd, fs: BW.FileSystem,
+    streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult, stdin: BW.Bytes
+  )
+    ensures forall i: nat | i < |cmd.inputs| ::
+              Spec.ReadResults(cmd.inputs, fs, streams, stdin)[i] ==
+              Core.ReadResultCore(cmd, fs, streams, stdin, i)
   {
     hide *;
-    reveal StdinStatesRelation();
+    reveal Spec.ReadResults(), Spec.ReadInput(), Core.ReadResultCore();
+    forall i: nat | i < |cmd.inputs|
+      ensures Spec.ReadResults(cmd.inputs, fs, streams, stdin)[i] ==
+              Core.ReadResultCore(cmd, fs, streams, stdin, i)
+    {
+      StdinAfterReadsRefines(cmd, streams, stdin, i);
+    }
   }
 
   lemma FragmentsDenote<T>(fragments: seq<seq<T>>, combined: seq<T>, cuts: seq<nat>, i: nat)
@@ -1000,128 +601,204 @@ module PasteProof {
     }
   }
 
-  lemma StdinDataDenote(cmd: Schema.PasteCmd, observations: seq<Spec.InputObservation>,
-                        data: BW.Bytes, cuts: seq<nat>)
-    requires StdinDataRelation(cmd, observations, data, cuts)
-    ensures data == Spec.StdinData(cmd, observations)
+  lemma ConcatPrefixStep(parts: seq<BW.Bytes>, i: nat)
+    requires i < |parts|
+    ensures Spec.Concat<BW.RawByte>(parts[..i + 1]) ==
+            Spec.Concat<BW.RawByte>(parts[..i]) + parts[i]
   {
-    reveal Spec.StdinData();
-    var pieces: seq<BW.Bytes> := seq(|observations|, i requires 0 <= i < |observations| =>
-      if cmd.inputs[i].Stdin? then C.ReadResultData(observations[i].result) else []);
-    assert FragmentsConcatenate(pieces, data, cuts);
-    FragmentsDenote<BW.RawByte>(pieces, data, cuts, |pieces|);
-    assert data[..cuts[|pieces|]] == data;
-    assert pieces[..|pieces|] == pieces;
-    assert data == Spec.Concat<BW.RawByte>(pieces);
-    assert Spec.StdinData(cmd, observations) == Spec.Concat<BW.RawByte>(pieces);
+    assert parts[..i + 1] == parts[..i] + [parts[i]];
+    ConcatSnoc<BW.RawByte>(parts[..i], parts[i]);
   }
 
-  lemma InputRefinement(
+  lemma StdinDataRefines(
     cmd: Schema.PasteCmd, fs: BW.FileSystem,
-    streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    before: BW.Bytes, after: BW.Bytes, entries: seq<Spec.Entry>,
-    errors: BW.Bytes, failed: bool, blocking: bool,
-    observations: seq<Spec.InputObservation>, states: seq<BW.Bytes>,
-    data: BW.Bytes, cuts: seq<nat>
+    streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult, stdin: BW.Bytes,
+    results: seq<BW.IOResult<BW.Bytes>>, n: nat
   )
-    requires |observations| == |cmd.inputs|
-    requires |states| == |cmd.inputs| + 1
-    requires StdinStatesRelation(cmd, streams, before, after, states)
-    requires StdinDataRelation(cmd, observations, data, cuts)
-    requires forall i: nat | i < |observations| ::
-               Spec.InputObservationRelation(cmd, fs, streams, states[i], i, observations[i])
-    requires Spec.EntriesForOutputRelation(cmd, data, Spec.ObservationEntries(observations), entries)
-    requires errors == Spec.VisibleErrors(cmd.serial, observations)
-    requires failed == (exists i: nat :: i < |observations| && observations[i].failed)
-    requires blocking == (exists i: nat :: i < |observations| && observations[i].blocking)
-    ensures Spec.InputRelation(cmd, fs, streams, before, after, entries, errors, failed, blocking)
+    requires n <= |cmd.inputs| == |results|
+    requires forall i: nat | i < |results| ::
+               results[i] == Core.ReadResultCore(cmd, fs, streams, stdin, i)
+    ensures Core.StdinDataPrefixCore(cmd, streams, stdin, n) ==
+            Spec.Concat<BW.RawByte>(Spec.StdinPieces(cmd.inputs, results)[..n])
+    decreases n
   {
     hide *;
-    reveal StdinStatesRelation();
-    assert cmd.inputs[..|cmd.inputs|] == cmd.inputs;
-    StdinStatesDenote(cmd, streams, before, after, states, |cmd.inputs|);
-    assert after == states[|cmd.inputs|];
-    assert after == Spec.StdinAfterReads(before, streams, Spec.StdinCount(cmd.inputs));
-    forall i: nat | i < |observations|
-      ensures Spec.InputObservationRelation(cmd, fs, streams,
-                                            Spec.StdinAfterReads(before, streams, Spec.StdinCount(cmd.inputs[..i])), i, observations[i])
-    {
-      StdinStatesDenote(cmd, streams, before, after, states, i);
+    if n == 0 {
+      reveal Core.StdinDataPrefixCore(), Spec.Concat();
+    } else {
+      var i := n - 1;
+      StdinDataRefines(cmd, fs, streams, stdin, results, i);
+      Core.StdinDataPrefixCoreStep(cmd, streams, stdin, i);
+      var pieces := Spec.StdinPieces(cmd.inputs, results);
+      ConcatPrefixStep(pieces, i);
+      reveal Core.ReadResultCore(), Spec.StdinPieces();
+      assert results[i] == Core.ReadResultCore(cmd, fs, streams, stdin, i);
     }
-    StdinDataDenote(cmd, observations, data, cuts);
-    reveal Spec.InputRelation();
   }
 
-  lemma {:isolate_assertions} InputRefines(
-    cmd: Schema.PasteCmd,
-    preFs: BW.FileSystem, preStreams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult,
-    preStdin: BW.Bytes
+  lemma InputStatusRefines(
+    cmd: Schema.PasteCmd, fs: BW.FileSystem,
+    streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult, stdin: BW.Bytes,
+    results: seq<BW.IOResult<BW.Bytes>>, n: nat
   )
-    ensures Spec.InputRelation(
-              cmd,
-              preFs, preStreams,
-              preStdin,
-              Core.PrefixStdinCore(cmd, preStreams, preStdin, |cmd.inputs|),
-              Core.EntriesForOutputCore(
-                cmd, preFs, preStreams, preStdin),
-              Core.PrefixVisibleErrorOutputCore(
-                cmd, preFs, preStreams, preStdin, |cmd.inputs|),
-              Core.PrefixHadErrorCore(
-                cmd, preFs, preStreams, preStdin, |cmd.inputs|),
-              Core.PrefixHadBlockingErrorCore(
-                cmd, preFs, preStreams, preStdin, |cmd.inputs|))
+    requires n <= |cmd.inputs| == |results|
+    requires forall i: nat | i < |results| ::
+               results[i] == Core.ReadResultCore(cmd, fs, streams, stdin, i)
+    ensures Core.PrefixHadErrorCore(cmd, fs, streams, stdin, n) ==
+            (exists i: nat :: i < n && results[i].Err?)
+    ensures Core.PrefixHadBlockingErrorCore(cmd, fs, streams, stdin, n) ==
+            (exists i: nat :: i < n && Spec.IsBlockingInput(cmd.inputs[i], results[i]))
+    decreases n
   {
-    var observations := Observations(cmd, preFs, preStreams, preStdin);
-    assert |observations| == |cmd.inputs|;
-    assert observations[..|cmd.inputs|] == observations;
-    var states := seq(|cmd.inputs| + 1,
-    j requires 0 <= j <= |cmd.inputs| => Core.PrefixStdinCore(cmd, preStreams, preStdin, j));
-    PrefixStdinCharacterization(cmd, preStreams, preStdin, states);
-    var stdinData := Core.StdinDataForOutputCore(cmd, preStreams, preStdin);
-    var cuts := BuildStdinDataCuts(cmd, preFs, preStreams, preStdin, |cmd.inputs|);
-    assert StdinDataRelation(cmd, observations, stdinData, cuts);
-    assert forall i: nat :: i < |observations| ==>
-                              Spec.InputObservationRelation(
-                                cmd, preFs, preStreams, states[i], i, observations[i]) by {
-      forall i: nat | i < |observations|
-        ensures Spec.InputObservationRelation(
-                  cmd, preFs, preStreams, states[i], i, observations[i])
-      {
-        ObservationRefines(cmd, preFs, preStreams, preStdin, i);
-      }
-    }
-    ObservationEntriesEq(cmd, preFs, preStreams, preStdin);
-    HasStdinEq(cmd.inputs);
-    var rawEntries := Core.EntriesCore(cmd, preFs, preStreams, preStdin);
-    if !Spec.HasStdinInput(cmd.inputs) {
-      NoStdinData(cmd, preStreams, preStdin, |cmd.inputs|);
-    }
-    assert !Spec.HasStdinInput(cmd.inputs) ==> stdinData == [];
-    EntriesForOutputRefines(cmd, stdinData, rawEntries);
-    var entries := Core.EntriesForOutputCore(cmd, preFs, preStreams, preStdin);
-    assert entries == Core.EntriesForOutputFromEntries(cmd, rawEntries,
-                                                       if Spec.HasStdinInput(cmd.inputs) then stdinData else []);
-    assert Spec.EntriesForOutputRelation(cmd, stdinData, Spec.ObservationEntries(observations), entries);
-    var visibleAssembly :=
-      VisibleErrorsRefine(
-        cmd, preFs, preStreams, preStdin, |cmd.inputs|);
-    VisibleErrorsDenote(cmd.serial, observations, |cmd.inputs|,
-                        Core.PrefixVisibleErrorOutputCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
-                        visibleAssembly);
-    assert Core.PrefixVisibleErrorOutputCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|) ==
-           Spec.VisibleErrors(cmd.serial, observations);
-    PrefixHadErrorRefines(
-      cmd, preFs, preStreams, preStdin, |cmd.inputs|);
-    PrefixHadBlockingRefines(
-      cmd, preFs, preStreams, preStdin, |cmd.inputs|);
     hide *;
-    InputRefinement(cmd, preFs, preStreams, preStdin,
-                    Core.PrefixStdinCore(cmd, preStreams, preStdin, |cmd.inputs|),
-                    Core.EntriesForOutputCore(cmd, preFs, preStreams, preStdin),
-                    Core.PrefixVisibleErrorOutputCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
-                    Core.PrefixHadErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
-                    Core.PrefixHadBlockingErrorCore(cmd, preFs, preStreams, preStdin, |cmd.inputs|),
-                    observations, states, stdinData, cuts);
+    if n == 0 {
+      reveal Core.PrefixHadErrorCore(), Core.PrefixHadBlockingErrorCore();
+    } else {
+      var i := n - 1;
+      InputStatusRefines(cmd, fs, streams, stdin, results, i);
+      Core.PrefixHadErrorCoreStep(cmd, fs, streams, stdin, i);
+      Core.PrefixHadBlockingErrorCoreStep(cmd, fs, streams, stdin, i);
+      reveal Core.HadErrorPiece(), Core.HadBlockingErrorPiece();
+      assert results[i] == Core.ReadResultCore(cmd, fs, streams, stdin, i);
+      assert (exists j: nat :: j < n && results[j].Err?) <==>
+             ((exists j: nat :: j < i && results[j].Err?) || results[i].Err?);
+      assert (exists j: nat :: j < n && Spec.IsBlockingInput(cmd.inputs[j], results[j])) <==>
+             ((exists j: nat :: j < i && Spec.IsBlockingInput(cmd.inputs[j], results[j])) ||
+              Spec.IsBlockingInput(cmd.inputs[i], results[i]));
+    }
+  }
+
+  lemma FirstBlockingDiagnosticRefines(
+    cmd: Schema.PasteCmd, fs: BW.FileSystem,
+    streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult, stdin: BW.Bytes,
+    results: seq<BW.IOResult<BW.Bytes>>, first: nat, n: nat
+  )
+    requires !cmd.serial && first < n <= |cmd.inputs| == |results|
+    requires forall i: nat | i < |results| ::
+               results[i] == Core.ReadResultCore(cmd, fs, streams, stdin, i)
+    requires Spec.IsBlockingInput(cmd.inputs[first], results[first])
+    requires forall i: nat | i < first :: !Spec.IsBlockingInput(cmd.inputs[i], results[i])
+    ensures Core.PrefixVisibleErrorOutputCore(cmd, fs, streams, stdin, n) ==
+            Spec.InputDiagnostic(cmd.inputs[first], results[first])
+    decreases n
+  {
+    hide *;
+    var i := n - 1;
+    InputStatusRefines(cmd, fs, streams, stdin, results, i);
+    Core.PrefixVisibleErrorOutputCoreStep(cmd, fs, streams, stdin, i);
+    if first < i {
+      assert exists j: nat :: j < i && Spec.IsBlockingInput(cmd.inputs[j], results[j]);
+      FirstBlockingDiagnosticRefines(cmd, fs, streams, stdin, results, first, i);
+    } else {
+      reveal Core.HadBlockingErrorPiece(), Core.ErrorPiece();
+      assert results[i] == Core.ReadResultCore(cmd, fs, streams, stdin, i);
+    }
+  }
+
+  lemma OrderedDiagnosticsRefine(
+    cmd: Schema.PasteCmd, fs: BW.FileSystem,
+    streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult, stdin: BW.Bytes,
+    results: seq<BW.IOResult<BW.Bytes>>, n: nat
+  )
+    requires n <= |cmd.inputs| == |results|
+    requires forall i: nat | i < |results| ::
+               results[i] == Core.ReadResultCore(cmd, fs, streams, stdin, i)
+    requires cmd.serial || (forall i: nat | i < n :: !Spec.IsBlockingInput(cmd.inputs[i], results[i]))
+    ensures Core.PrefixVisibleErrorOutputCore(cmd, fs, streams, stdin, n) ==
+            Spec.Concat<BW.RawByte>(Spec.InputDiagnostics(cmd.inputs, results)[..n])
+    decreases n
+  {
+    hide *;
+    if n == 0 {
+      reveal Core.PrefixVisibleErrorOutputCore(), Spec.Concat();
+    } else {
+      var i := n - 1;
+      OrderedDiagnosticsRefine(cmd, fs, streams, stdin, results, i);
+      InputStatusRefines(cmd, fs, streams, stdin, results, i);
+      Core.PrefixVisibleErrorOutputCoreStep(cmd, fs, streams, stdin, i);
+      reveal Core.HadBlockingErrorPiece(), Core.ErrorPiece(), Spec.InputDiagnostics();
+      ConcatPrefixStep(Spec.InputDiagnostics(cmd.inputs, results), i);
+      assert results[i] == Core.ReadResultCore(cmd, fs, streams, stdin, i);
+    }
+  }
+
+  lemma VisibleErrorsRefine(
+    cmd: Schema.PasteCmd, fs: BW.FileSystem,
+    streams: (BW.TrustedStreamRequest) -> BW.TrustedStreamResult, stdin: BW.Bytes,
+    results: seq<BW.IOResult<BW.Bytes>>
+  )
+    requires |cmd.inputs| == |results|
+    requires forall i: nat | i < |results| ::
+               results[i] == Core.ReadResultCore(cmd, fs, streams, stdin, i)
+    ensures Core.PrefixVisibleErrorOutputCore(cmd, fs, streams, stdin, |cmd.inputs|) ==
+            Spec.VisibleErrors(cmd.serial, cmd.inputs, results)
+  {
+    hide *;
+    reveal Spec.VisibleErrors();
+    if !cmd.serial && (exists i: nat :: i < |results| && Spec.IsBlockingInput(cmd.inputs[i], results[i])) {
+      var first := Spec.FirstBlocking(cmd.inputs, results);
+      FirstBlockingDiagnosticRefines(cmd, fs, streams, stdin, results, first, |results|);
+    } else {
+      OrderedDiagnosticsRefine(cmd, fs, streams, stdin, results, |results|);
+      var pieces := Spec.InputDiagnostics(cmd.inputs, results);
+      assert pieces[..|results|] == pieces;
+    }
+  }
+
+  twostate lemma {:isolate_assertions} InputRefines(cmd: Schema.PasteCmd, io: BenchIO.IO)
+    requires io.stdin() ==
+             Core.PrefixStdinCore(cmd, old(io.trustedStreams()), old(io.stdin()), |cmd.inputs|)
+    ensures Spec.InputRelation(
+              cmd, io,
+              Core.EntriesForOutputCore(
+                cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin())),
+              Core.PrefixVisibleErrorOutputCore(
+                cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()), |cmd.inputs|),
+              Core.PrefixHadErrorCore(
+                cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()), |cmd.inputs|),
+              Core.PrefixHadBlockingErrorCore(
+                cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()), |cmd.inputs|))
+  {
+    hide *;
+    var preFs := old(io.fs());
+    var preStreams := old(io.trustedStreams());
+    var preStdin := old(io.stdin());
+    var n := |cmd.inputs|;
+    var results := Spec.ReadResults(cmd.inputs, preFs, preStreams, preStdin);
+    ReadResultsRefine(cmd, preFs, preStreams, preStdin);
+    StdinAfterReadsRefines(cmd, preStreams, preStdin, n);
+    assert cmd.inputs[..n] == cmd.inputs;
+    InputStatusRefines(cmd, preFs, preStreams, preStdin, results, n);
+    VisibleErrorsRefine(cmd, preFs, preStreams, preStdin, results);
+
+    var rawEntries := Core.EntriesCore(cmd, preFs, preStreams, preStdin);
+    var delimiter := Spec.RecordDelimiter(cmd.zeroTerminated);
+    reveal Core.EntriesCore();
+    forall i: nat | i < n
+      ensures Spec.EntryRelation(results[i], delimiter, rawEntries[i])
+    {
+      PrefixEntriesIndex(cmd, preFs, preStreams, preStdin, n, i);
+      assert results[i] == Core.ReadResultCore(cmd, preFs, preStreams, preStdin, i);
+      EntryRefines(results[i], delimiter);
+    }
+
+    StdinDataRefines(cmd, preFs, preStreams, preStdin, results, n);
+    var data := Spec.StdinData(cmd.inputs, results);
+    assert data == Core.StdinDataForOutputCore(cmd, preStreams, preStdin) by {
+      var pieces := Spec.StdinPieces(cmd.inputs, results);
+      assert pieces[..n] == pieces;
+      reveal Spec.StdinData(), Core.StdinDataForOutputCore();
+    }
+    if !Spec.HasStdinInput(cmd.inputs) {
+      reveal Spec.HasStdinInput(), Core.StdinDataForOutputCore();
+      NoStdinData(cmd, preStreams, preStdin, n);
+      assert data == [];
+    }
+    EntriesForOutputRefines(cmd, data, rawEntries);
+    reveal Core.EntriesForOutputCore();
+    var entries := Core.EntriesForOutputCore(cmd, preFs, preStreams, preStdin);
+    assert Spec.EntriesForOutputRelation(cmd, data, rawEntries, entries);
+    reveal Spec.InputRelation();
   }
 
   lemma EscapeDelimiterRefines(ch: BW.RawByte)
@@ -1161,8 +838,8 @@ module PasteProof {
     }
   }
 
-  lemma DelimiterParseDenote(text: BW.Bytes, i: nat, result: Spec.DelimiterResult,
-                             assembly: DelimiterAssembly) returns (cuts: seq<nat>)
+  lemma {:isolate_assertions} DelimiterParseDenote(text: BW.Bytes, i: nat, result: Spec.DelimiterResult,
+                                                   assembly: DelimiterAssembly) returns (cuts: seq<nat>)
     requires DelimiterParseRelation(text, i, result, assembly)
     ensures Spec.DelimiterCuts(text, i, cuts)
     ensures result == Spec.DelimiterValue(text, cuts)
@@ -1404,8 +1081,7 @@ module PasteProof {
       case Err(stderr) =>
       case Ok(delims) =>
         assert |delims| > 0;
-        InputRefines(
-          cmd, old(io.fs()), old(io.trustedStreams()), old(io.stdin()));
+        InputRefines(cmd, io);
 
         OutputRefines(
           cmd.serial,

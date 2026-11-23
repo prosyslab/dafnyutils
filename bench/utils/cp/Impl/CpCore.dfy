@@ -114,7 +114,6 @@ module CpCore {
       invariant handle in io.dirHandles()
       invariant io.dirHandles().Keys == openedHandles.Keys
       invariant forall other | other in initial :: io.dirHandles()[other] == initial[other]
-      invariant C.OpenDirSpec(io.fs(),initial,io.trustedNativeFailures(),openedHandles,path,false,true,handle,0)
       invariant |states| == |entries| + 1 && |kinds| == |entries|
       invariant states[0] == openedHandles && states[|entries|] == io.dirHandles()
       invariant forall i | 0 <= i < |entries| ::

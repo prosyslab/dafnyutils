@@ -36,7 +36,8 @@ module ChmodDirectoryRuntime {
   {
     hide *;
     reveal C.ContextOperationSpec(), C.DirectoryRequestForContextFields(), C.DirectoryOperationSpec(),
-           C.DirectoryResponseFields(), C.CwdContextFields(), C.LiveDirectoryTopologyFields(),
+           C.DirectoryNextCapabilitiesFields(), C.DirectoryResponseFields(),
+           C.CwdContextFields(), C.LiveDirectoryTopologyFields(),
            C.DirectoryCapabilityReadCurrentFields(), C.DirectoryCapabilityAnchorCurrentFields();
     if response.err == 0 && response.read.DirectoryItem? {
       assert response.read.name != "." && response.read.name != "..";
@@ -52,6 +53,7 @@ module ChmodDirectoryRuntime {
   {
     hide *;
     reveal C.ContextOperationSpec(), C.DirectoryRequestForContextFields(), C.DirectoryOperationSpec();
+    reveal C.DirectoryNextCapabilitiesFields();
   }
 
   method {:isolate_assertions} Read(scope: Spec.Scope, handle: int, io: BenchIO.IO)

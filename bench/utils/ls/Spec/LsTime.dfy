@@ -46,15 +46,10 @@ module LsTime {
     else NatText(value / 10) + [Digit(value % 10)]
   }
 
-  function ZeroesPart1(): string
-  {
-    "0"
-  }
-
   function Zeroes(count: nat): string
     decreases count
   {
-    if count == 0 then [] else ZeroesPart1() + Zeroes(count - 1)
+    if count == 0 then [] else "0" + Zeroes(count - 1)
   }
 
   function PaddedNat(value: nat, width: nat): string
@@ -63,86 +58,21 @@ module LsTime {
     if |text| < width then Zeroes(width - |text|) + text else text
   }
 
-  function YearTextPart1(): string
-  {
-    "-"
-  }
-
   function YearText(year: int): string
   {
     if 0 <= year < 10000 then PaddedNat(year as nat, 4)
-    else if year < 0 then YearTextPart1() + NatText((-year) as nat)
+    else if year < 0 then "-" + NatText((-year) as nat)
     else NatText(year as nat)
-  }
-
-  function MonthNamePart1(): string
-  {
-    "Jan"
-  }
-
-  function MonthNamePart2(): string
-  {
-    "Feb"
-  }
-
-  function MonthNamePart3(): string
-  {
-    "Mar"
-  }
-
-  function MonthNamePart4(): string
-  {
-    "Apr"
-  }
-
-  function MonthNamePart5(): string
-  {
-    "May"
-  }
-
-  function MonthNamePart6(): string
-  {
-    "Jun"
-  }
-
-  function MonthNamePart7(): string
-  {
-    "Jul"
-  }
-
-  function MonthNamePart8(): string
-  {
-    "Aug"
-  }
-
-  function MonthNamePart9(): string
-  {
-    "Sep"
-  }
-
-  function MonthNamePart10(): string
-  {
-    "Oct"
-  }
-
-  function MonthNamePart11(): string
-  {
-    "Nov"
-  }
-
-  function MonthNamePart12(): string
-  {
-    "Dec"
   }
 
   function MonthName(month: nat): string
   {
-    if month == 1 then MonthNamePart1() else if month == 2 then MonthNamePart2()
-    else if month == 3 then MonthNamePart3() else if month == 4 then MonthNamePart4()
-    else if month == 5 then MonthNamePart5() else if month == 6 then MonthNamePart6()
-    else if month == 7 then MonthNamePart7() else if month == 8 then MonthNamePart8()
-    else if month == 9 then MonthNamePart9() else if month == 10 then MonthNamePart10()
-    else if month == 11 then MonthNamePart11() else MonthNamePart12()
+    if month == 1 then "Jan" else if month == 2 then "Feb"
+    else if month == 3 then "Mar" else if month == 4 then "Apr"
+    else if month == 5 then "May" else if month == 6 then "Jun"
+    else if month == 7 then "Jul" else if month == 8 then "Aug"
+    else if month == 9 then "Sep" else if month == 10 then "Oct"
+    else if month == 11 then "Nov" else "Dec"
   }
 
   function TimeParts(seconds: int): UtcParts
@@ -162,39 +92,14 @@ module LsTime {
     seconds <= now
   }
 
-  function FullIsoPart1(): string
-  {
-    "-"
-  }
-
-  function FullIsoPart2(): string
-  {
-    " "
-  }
-
-  function FullIsoPart3(): string
-  {
-    ":"
-  }
-
-  function FullIsoPart4(): string
-  {
-    "."
-  }
-
-  function FullIsoPart5(): string
-  {
-    " +0000"
-  }
-
   function FullIso(seconds: int, nanoseconds: int): string
   {
     var parts := TimeParts(seconds);
     var date := parts.date;
-    YearText(date.year) + FullIsoPart1() + PaddedNat(date.month, 2) + FullIsoPart1() +
-    PaddedNat(date.day, 2) + FullIsoPart2() + PaddedNat(parts.hour, 2) + FullIsoPart3() +
-    PaddedNat(parts.minute, 2) + FullIsoPart3() + PaddedNat(parts.second, 2) + FullIsoPart4() +
-    PaddedNat(NormalizeNsec(nanoseconds), 9) + FullIsoPart5()
+    YearText(date.year) + "-" + PaddedNat(date.month, 2) + "-" +
+    PaddedNat(date.day, 2) + " " + PaddedNat(parts.hour, 2) + ":" +
+    PaddedNat(parts.minute, 2) + ":" + PaddedNat(parts.second, 2) + "." +
+    PaddedNat(NormalizeNsec(nanoseconds), 9) + " +0000"
   }
 
   function NormalizeNsec(nanoseconds: int): nat
@@ -202,42 +107,12 @@ module LsTime {
     if 0 <= nanoseconds < 1000000000 then nanoseconds as nat else 0
   }
 
-  function LongIsoPart1(): string
-  {
-    "-"
-  }
-
-  function LongIsoPart2(): string
-  {
-    " "
-  }
-
-  function LongIsoPart3(): string
-  {
-    ":"
-  }
-
   function LongIso(seconds: int): string
   {
     var parts := TimeParts(seconds);
     var date := parts.date;
-    YearText(date.year) + LongIsoPart1() + PaddedNat(date.month, 2) + LongIsoPart1() +
-    PaddedNat(date.day, 2) + LongIsoPart2() + PaddedNat(parts.hour, 2) + LongIsoPart3() + PaddedNat(parts.minute, 2)
-  }
-
-  function IsoPart1(): string
-  {
-    "-"
-  }
-
-  function IsoPart2(): string
-  {
-    " "
-  }
-
-  function IsoPart3(): string
-  {
-    ":"
+    YearText(date.year) + "-" + PaddedNat(date.month, 2) + "-" +
+    PaddedNat(date.day, 2) + " " + PaddedNat(parts.hour, 2) + ":" + PaddedNat(parts.minute, 2)
   }
 
   function Iso(seconds: int, nanoseconds: int, now: int): string
@@ -245,36 +120,21 @@ module LsTime {
     var parts := TimeParts(seconds);
     var date := parts.date;
     if IsRecent(seconds, nanoseconds, now) then
-      PaddedNat(date.month, 2) + IsoPart1() + PaddedNat(date.day, 2) + IsoPart2() +
-      PaddedNat(parts.hour, 2) + IsoPart3() + PaddedNat(parts.minute, 2)
+      PaddedNat(date.month, 2) + "-" + PaddedNat(date.day, 2) + " " +
+      PaddedNat(parts.hour, 2) + ":" + PaddedNat(parts.minute, 2)
     else
-      YearText(date.year) + IsoPart1() + PaddedNat(date.month, 2) + IsoPart1() + PaddedNat(date.day, 2) + IsoPart2()
-  }
-
-  function DefaultCPart1(): string
-  {
-    " "
-  }
-
-  function DefaultCPart2(): string
-  {
-    ":"
-  }
-
-  function DefaultCPart3(): string
-  {
-    "  "
+      YearText(date.year) + "-" + PaddedNat(date.month, 2) + "-" + PaddedNat(date.day, 2) + " "
   }
 
   function DefaultC(seconds: int, nanoseconds: int, now: int): string
   {
     var parts := TimeParts(seconds);
     var date := parts.date;
-    var dayText := if date.day < 10 then DefaultCPart1() + NatText(date.day) else NatText(date.day);
+    var dayText := if date.day < 10 then " " + NatText(date.day) else NatText(date.day);
     if IsRecent(seconds, nanoseconds, now) then
-      MonthName(date.month) + DefaultCPart1() + dayText + DefaultCPart1() +
-      PaddedNat(parts.hour, 2) + DefaultCPart2() + PaddedNat(parts.minute, 2)
+      MonthName(date.month) + " " + dayText + " " +
+      PaddedNat(parts.hour, 2) + ":" + PaddedNat(parts.minute, 2)
     else
-      MonthName(date.month) + DefaultCPart1() + dayText + DefaultCPart3() + YearText(date.year)
+      MonthName(date.month) + " " + dayText + "  " + YearText(date.year)
   }
 }

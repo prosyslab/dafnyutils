@@ -70,6 +70,7 @@ module LsNativeResourceProof {
     hide *;
     reveal Spec.CallFields(), C.ContextOperationSpec(), C.DirectoryRequestForContextFields();
     reveal C.DirectoryOperationSpec(), C.DirectoryResponseFields(), C.DirectoryRequestFields();
+    reveal C.DirectoryNextPositionFields(), C.DirectoryNextCapabilitiesFields();
     reveal C.DirectoryReadResultFields(), C.ResultErrno(), C.IOErrorErrno();
     reveal C.DirectoryOperationCapabilitiesCurrentFields(), C.DirectoryCapabilityReadCurrentFields();
     reveal C.DirectoryCapabilityAnchorCurrentFields();
@@ -123,5 +124,6 @@ module LsNativeResourceProof {
     hide *;
     reveal Spec.CallFields(), C.ContextOperationSpec(), C.DirectoryRequestForContextFields();
     reveal C.DirectoryOperationSpec(), C.DirectoryResponseFields();
+    reveal C.DirectoryNextPositionFields(), C.DirectoryNextCapabilitiesFields();
   }
 }

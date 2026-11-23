@@ -744,11 +744,11 @@ module LsCore {
                  io.statusObservations(), old(io.statusCursor()), io.trustedNativeFailures(),old(io.dirHandles()),old(io.cwd()),[old(NativeIO.Inputs(io))],[old(NativeIO.State(io))]);
     (cmd.mode != Schema.ModeRun ==> io.statusCursor() == old(io.statusCursor())) &&
     if cmd.mode == Schema.ModeHelp then
-      plannedStdout == [] + Spec.HelpTextSpec() &&
+      plannedStdout == [] + Spec.HelpTextSpec &&
       plannedStderr == [] &&
       exit == 0
     else if cmd.mode == Schema.ModeVersion then
-      plannedStdout == [] + Spec.VersionTextSpec() &&
+      plannedStdout == [] + Spec.VersionTextSpec &&
       plannedStderr == [] &&
       exit == 0
     else if cmd.mode != Schema.ModeRun then
@@ -1464,7 +1464,7 @@ module LsCore {
     DirectoryTraceProof.AppendReadEvidence(cmd,steps,step,raw,positions,nextRaw,nextPositions);
   }
 
-  method CollectDirectoryEntries(cmd: Schema.LsCmd, path: BenchWorld.Path,
+  method {:isolate_assertions} CollectDirectoryEntries(cmd: Schema.LsCmd, path: BenchWorld.Path,
                                  handle: int, io: BenchIO.IO)
     returns (observations: seq<Spec.EntryObservation>, readErr: int,
              ghost steps: seq<Spec.DirectoryReadStep>, ghost terminal: Spec.DirectoryReadStep,
@@ -3087,7 +3087,7 @@ module LsCore {
     var parsedCmd := Schema.Command(raw);
     var cmd := parsedCmd;
     if parsedCmd.mode == Schema.ModeHelp {
-      plannedStdout := plannedStdout + (Spec.HelpTextSpec());
+      plannedStdout := plannedStdout + Spec.HelpTextSpec;
       exit := 0;
       assert PreparedSummary(raw, io, exit, plannedStdout, plannedStderr) by {
         reveal PreparedSummary();
@@ -3095,7 +3095,7 @@ module LsCore {
       return;
     }
     if parsedCmd.mode == Schema.ModeVersion {
-      plannedStdout := plannedStdout + (Spec.VersionTextSpec());
+      plannedStdout := plannedStdout + Spec.VersionTextSpec;
       exit := 0;
       assert PreparedSummary(raw, io, exit, plannedStdout, plannedStderr) by {
         reveal PreparedSummary();

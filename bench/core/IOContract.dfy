@@ -4197,10 +4197,7 @@ module IOContract {
     var observed := beforeTrustedFilesystem(request);
     ValidFilesystemObservation(request, observed) &&
     ok == observed.ok && err == observed.err && afterFs == observed.postFs &&
-    committed == observed.writeCommitted && stage == observed.writeStage &&
-    WriteFileOutcomeFields(beforeFs, beforeNow, path, data, false, ok, err, committed, stage, afterFs) &&
-    CreatedRegularOwnershipFields(beforeFs, beforeCredentials, path, stage != WriteOpenFailed, afterFs) &&
-    CreatedRegularRequestedModeFields(beforeFs, beforeProps, path, stage != WriteOpenFailed, afterFs, requestedCreateMode)
+    committed == observed.writeCommitted && stage == observed.writeStage
   }
 
   ghost predicate AppendFileSpec(
@@ -4215,10 +4212,7 @@ module IOContract {
     var observed := beforeTrustedFilesystem(request);
     ValidFilesystemObservation(request, observed) &&
     ok == observed.ok && err == observed.err && afterFs == observed.postFs &&
-    committed == observed.writeCommitted && stage == observed.writeStage &&
-    WriteFileOutcomeFields(beforeFs, beforeNow, path, data, true, ok, err, committed, stage, afterFs) &&
-    CreatedRegularOwnershipFields(beforeFs, beforeCredentials, path, stage != WriteOpenFailed, afterFs) &&
-    CreatedRegularModeFields(beforeFs, beforeProps, path, stage != WriteOpenFailed, afterFs)
+    committed == observed.writeCommitted && stage == observed.writeStage
   }
 
   ghost predicate CreateSymlinkSpec(
@@ -5490,39 +5484,14 @@ module IOContract {
     afterStatusOrdinal == request.statusOrdinal +
     (if request.operation == DirectoryCurrentStatus || request.operation == DirectoryFstat ||
         request.operation == DirectoryEntryLstat then 1 else 0) &&
-    afterPosition ==
-    (if response.err != 0 then request.position
-     else if request.operation == DirectoryChdirParent then request.topology.nodes[request.position].parent
-     else if request.operation == DirectoryFchdir then
-       var handles := set handle | handle in request.capabilities &&
-                                   request.capabilities[handle].descriptor == [request.fd];
-       (var handle :| handle in handles; request.capabilities[handle].position)
-     else request.position) &&
+    afterPosition == DirectoryNextPositionFields(request,response) &&
+    afterCapabilities == DirectoryNextCapabilitiesFields(request,response) &&
     afterCwdHint ==
     (if response.err == 0 &&
         (request.operation == DirectoryFchdir || request.operation == DirectoryChdirParent) &&
         |request.topology.nodes[afterPosition].pathname| == 1
      then request.topology.nodes[afterPosition].pathname[0]
-     else request.cwdHint) &&
-    (if request.operation == DirectoryClose then
-       afterCapabilities == request.capabilities - {request.handle}
-     else if request.operation == DirectoryReadNext && response.err != 0 &&
-             request.handle in request.capabilities then
-       afterCapabilities == request.capabilities[request.handle :=
-       request.capabilities[request.handle].(remaining := response.remainingAfterReadError)]
-     else if response.err != 0 then afterCapabilities == request.capabilities
-     else if request.operation == DirectoryOpenParent then
-       var parent := request.topology.nodes[request.position].parent;
-       afterCapabilities == request.capabilities[response.handle :=
-       DirectoryCapabilityState(parent,request.topology.nodes[parent].entries.Keys,[],request.fs,request.topology)]
-     else if request.operation == DirectoryGetDescriptor then
-       afterCapabilities == request.capabilities[request.handle :=
-       request.capabilities[request.handle].(descriptor := [response.fd])]
-     else if request.operation == DirectoryReadNext && response.read.DirectoryItem? then
-       afterCapabilities == request.capabilities[request.handle :=
-       request.capabilities[request.handle].(remaining :=
-       request.capabilities[request.handle].remaining - {response.read.name})]
-     else afterCapabilities == request.capabilities)
+     else request.cwdHint)
   }
 
   ghost function DirectoryPathResultFields(response: DirectoryResponse): IOResult<Path>
@@ -5688,7 +5657,7 @@ module IOContract {
     {
       RootDirectoryNamedEntryFields(fs,name);
     }
-    reveal IsAbsolutePath(), NormalizePath(), ParentPath(), PathSegments(), StripLeadingSlash();
+    reveal IsAbsolutePath(), NormalizePath(), BuildPath(), ParentPath(), PathSegments(), StripLeadingSlash();
     reveal SplitSegments(), NormalizeSegments(), JoinSegments();
     assert NormalizePath("/") == "/";
     topology

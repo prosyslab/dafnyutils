@@ -109,22 +109,6 @@ module PasteCore {
       case File(_) => false;
   }
 
-  function PrefixHadStdinCore(inputs: seq<PasteSchema.Input>, i: nat): bool
-    requires i <= |inputs|
-    decreases i
-  {
-    if i == 0 then
-      false
-    else
-      PrefixHadStdinCore(inputs, i - 1) || IsStdinInput(inputs[i - 1])
-  } by method {
-    if i == 0 {
-      return false;
-    } else {
-      return PrefixHadStdinCore(inputs, i - 1) || IsStdinInput(inputs[i - 1]);
-    }
-  }
-
   function CountStdinInputs(inputs: seq<PasteSchema.Input>): nat
   {
     CountStdinPrefix(inputs, |inputs|)
@@ -246,20 +230,7 @@ module PasteCore {
 
   function ErrorPiece(input: PasteSchema.Input, result: BenchWorld.IOResult<BenchWorld.Bytes>): BenchWorld.Bytes
   {
-    match input
-    case Stdin => if result.Ok? then [] else Spec.ErrorMessage("-", result.e)
-    case File(path) =>
-      match result
-      case Ok(_) => []
-      case Err(err) => Spec.ErrorMessage(path, err)
-  } by method {
-    return
-      match input
-      case Stdin => if result.Ok? then [] else Spec.ErrorMessage("-", result.e)
-      case File(path) =>
-        match result
-        case Ok(_) => []
-        case Err(err) => Spec.ErrorMessage(path, err);
+    Spec.InputDiagnostic(input, result)
   }
 
   function HadErrorPiece(input: PasteSchema.Input, result: BenchWorld.IOResult<BenchWorld.Bytes>): bool
@@ -271,22 +242,7 @@ module PasteCore {
 
   function HadBlockingErrorPiece(input: PasteSchema.Input, result: BenchWorld.IOResult<BenchWorld.Bytes>): bool
   {
-    match input
-    case Stdin => false
-    case File(_) =>
-      match result
-      case Ok(_) => false
-      case Err(err) =>
-        Spec.BlockingReadFailure(err)
-  } by method {
-    return
-      match input
-      case Stdin => false
-      case File(_) =>
-        match result
-        case Ok(_) => false
-        case Err(err) =>
-          Spec.BlockingReadFailure(err);
+    Spec.IsBlockingInput(input, result)
   }
 
   ghost function PrefixEntriesCore(
@@ -586,16 +542,16 @@ module PasteCore {
   }
 
   twostate predicate CoreSummaryCmd(cmd: PasteSchema.PasteCmd, io: BenchIO.IO, exit: int, resultStdout: BenchWorld.Bytes, resultStderr: BenchWorld.Bytes)
-    reads io.Footprint() - {io.stdoutRegion, io.stderrRegion}
+    reads io.stdinRegion
   {
     if cmd.mode == PasteSchema.ModeHelp then
       io.stdin() == old(io.stdin()) &&
-      resultStdout == old(io.stdout()) + Spec.HelpText() &&
+      resultStdout == old(io.stdout()) + Spec.HelpText &&
       resultStderr == old(io.stderr()) &&
       exit == 0
     else if cmd.mode == PasteSchema.ModeVersion then
       io.stdin() == old(io.stdin()) &&
-      resultStdout == old(io.stdout()) + Spec.VersionText() &&
+      resultStdout == old(io.stdout()) + Spec.VersionText &&
       resultStderr == old(io.stderr()) &&
       exit == 0
     else
@@ -617,8 +573,7 @@ module PasteCore {
   }
 
   twostate predicate PreparedSummary(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO, exit: int, resultStdout: BenchWorld.Bytes, resultStderr: BenchWorld.Bytes)
-    reads io.Footprint() - {
-            io.stdoutRegion, io.stderrRegion}
+    reads io.stdinRegion
   {
     CoreSummaryCmd(PasteSchema.Command(raw), io, exit, resultStdout, resultStderr)
   }
@@ -642,17 +597,6 @@ module PasteCore {
             case Stdin => IOContract.ObservedReadStdinRemainingFields(PrefixStdinCore(cmd, preStreams, preStdin, i), preStreams)
             case File(_) => PrefixStdinCore(cmd, preStreams, preStdin, i)
   {
-  }
-
-  lemma PrefixStdinCoreNoStdinPrefix(cmd: PasteSchema.PasteCmd, preStreams: (BenchWorld.TrustedStreamRequest) -> BenchWorld.TrustedStreamResult, preStdin: BenchWorld.Bytes, i: nat)
-    requires i <= |cmd.inputs|
-    requires !PrefixHadStdinCore(cmd.inputs, i)
-    ensures PrefixStdinCore(cmd, preStreams, preStdin, i) == preStdin
-    decreases i
-  {
-    if i > 0 {
-      PrefixStdinCoreNoStdinPrefix(cmd, preStreams, preStdin, i - 1);
-    }
   }
 
   lemma PrefixEntriesCoreStep(
@@ -728,7 +672,7 @@ module PasteCore {
     out := RenderOutput(cmd.serial, delims, recordDelimiter, outputEntries);
   }
 
-  method Prepare(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO) returns (exit: int, resultOut: BenchWorld.Bytes, resultErr: BenchWorld.Bytes)
+  method {:isolate_assertions} Prepare(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO) returns (exit: int, resultOut: BenchWorld.Bytes, resultErr: BenchWorld.Bytes)
     modifies io.stdinRegion
     ensures PreparedSummary(raw, io, exit, old(io.stdout()) + resultOut, old(io.stderr()) + resultErr)
     decreases *
@@ -748,12 +692,12 @@ module PasteCore {
     hide PrefixStdinCore();
 
     if cmd.mode == PasteSchema.ModeHelp {
-      var help := Spec.HelpText();
+      var help := Spec.HelpText;
       resultOut := resultOut + help;
       exit := 0;
       assert io.stdin() == preStdin;
       assert (initialStderr + resultErr) == preStderr;
-      assert (initialStdout + resultOut) == preStdout + Spec.HelpText();
+      assert (initialStdout + resultOut) == preStdout + Spec.HelpText;
       assert PreparedSummary(raw, io, exit, old(io.stdout()) + resultOut, old(io.stderr()) + resultErr) by {
         hide *;
         reveal PreparedSummary(), CoreSummaryCmd();
@@ -762,12 +706,12 @@ module PasteCore {
     }
 
     if cmd.mode == PasteSchema.ModeVersion {
-      var version := Spec.VersionText();
+      var version := Spec.VersionText;
       resultOut := resultOut + version;
       exit := 0;
       assert io.stdin() == preStdin;
       assert (initialStderr + resultErr) == preStderr;
-      assert (initialStdout + resultOut) == preStdout + Spec.VersionText();
+      assert (initialStdout + resultOut) == preStdout + Spec.VersionText;
       assert PreparedSummary(raw, io, exit, old(io.stdout()) + resultOut, old(io.stderr()) + resultErr) by {
         hide *;
         reveal PreparedSummary(), CoreSummaryCmd();
@@ -911,7 +855,7 @@ module PasteCore {
   }
 
   twostate predicate CoreSummary(raw: PasteSchema.PasteCmdRaw, io: BenchIO.IO, exit: int)
-    reads io.Footprint()
+    reads io.stdinRegion, io.stdoutRegion, io.stderrRegion
   {
     exists out: BenchWorld.Bytes, diagnostics: BenchWorld.Bytes, normalExit: int ::
       PreparedSummary(raw, io, normalExit,
@@ -922,8 +866,7 @@ module PasteCore {
   method Flush(io: BenchIO.IO, out: BenchWorld.Bytes,
                diagnostics: BenchWorld.Bytes, normalExit: int) returns (exit: int)
     modifies io.stdoutRegion, io.stderrRegion
-    ensures Spec.EmitFields(old(io.trustedStreams()), old(io.stdout()), old(io.stderr()),
-                            io.stdout(), io.stderr(), out, diagnostics, normalExit, exit)
+    ensures Spec.Emission(io, out, diagnostics, normalExit, exit)
   {
     var written := io.WriteStdout(out);
     var outErr := StreamContract.ResultErrno(written);
@@ -948,8 +891,12 @@ module PasteCore {
     var normalExit, out, diagnostics := Prepare(raw, io);
 
     assert PreparedSummary(raw, io, normalExit, old(io.stdout()) + out, old(io.stderr()) + diagnostics);
+    label BeforeFlush:
     exit := Flush(io, out, diagnostics, normalExit);
     assert PreparedSummary(raw, io, normalExit, old(io.stdout()) + out, old(io.stderr()) + diagnostics);
-    assert Spec.Emission(io, out, diagnostics, normalExit, exit);
+    assert Spec.Emission(io, out, diagnostics, normalExit, exit) by {
+      assert Spec.Emission@BeforeFlush(io, out, diagnostics, normalExit, exit);
+      reveal Spec.Emission();
+    }
   }
 }

@@ -507,20 +507,12 @@ module BenchWorld {
 
   function NormalizePath(path: string): string
   {
-    var abs := IsAbsolutePath(path);
-    var segs := NormalizeSegments(SplitSegments(StripLeadingSlash(path), 0, 0), 0, []);
-    var joined := JoinSegments(segs);
-    if abs && joined != "" then
-      "/" + joined
-    else if abs then
-      "/"
-    else
-      joined
+    BuildPath(IsAbsolutePath(path), PathSegments(path))
   }
 
   function ParentSegments(path: string): seq<string>
   {
-    var segs := NormalizeSegments(SplitSegments(StripLeadingSlash(path), 0, 0), 0, []);
+    var segs := PathSegments(path);
     if |segs| == 0 then [] else segs[..|segs| - 1]
   }
 

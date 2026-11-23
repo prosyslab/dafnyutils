@@ -93,6 +93,7 @@ module PwdRecoveryIOProof {
   {
     hide *;
     reveal C.DirectoryOperationSpec(), C.DirectoryResponseFields(), C.DirectoryRequestFields();
+    reveal C.DirectoryNextCapabilitiesFields();
     reveal C.DirectoryCapabilityReadCurrentFields(), C.DirectoryCapabilityAnchorCurrentFields();
     reveal C.DirectoryCapabilityNamesFields(), C.DirectoryOperationCapabilitiesCurrentFields();
     if request.operation == DirectoryOpenParent && response.err == 0 {

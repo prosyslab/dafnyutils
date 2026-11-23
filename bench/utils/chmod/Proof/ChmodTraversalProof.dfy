@@ -111,7 +111,8 @@ module ChmodTraversalProof {
     ensures Spec.FrameFields(before, after)
   {
     hide *;
-    reveal C.ContextOperationSpec(), C.DirectoryRequestForContextFields(), C.DirectoryOperationSpec(), Spec.FrameFields(), W.NodeShapeUnchangedExceptMode();
+    reveal C.ContextOperationSpec(), C.DirectoryRequestForContextFields(), C.DirectoryOperationSpec(),
+           C.DirectoryNextPositionFields(), Spec.FrameFields(), W.NodeShapeUnchangedExceptMode();
   }
 
   lemma {:isolate_assertions} ReadCurrent(before: W.CwdContext, after: W.CwdContext,

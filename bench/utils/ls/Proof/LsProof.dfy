@@ -626,43 +626,19 @@ module LsProof {
       cmd, sorted, directPositions, |directPositions|);
     DirectoryGroupsCoreShape(
       sorted, directoryPositions, |directoryPositions|);
-    assert Spec.FragmentsConcatenate(directFragments, directBody, directCuts);
-    assert |directIndices| == |directPositions|;
-    assert |directFragments| == |directPositions|;
-    var groups := Core.OutputGroupsCore(cmd, sorted);
-    var offset := if |directPositions| == 0 then 0 else 1;
-    var queuedSuffix := if |directoryPositions| == 0 &&
-                           Core.HasQueuedDirectoryCore(sorted) then "\n" else [];
-    assert |groups| == |directoryPositions| + offset;
-    if |directPositions| > 0 {
-      assert groups[0] == Spec.OutputGroup(
-                            directIndices, directBody + queuedSuffix, false);
-    }
-    forall k: nat | k < |directoryPositions|
-      ensures groups[k + offset] == Spec.OutputGroup(
-                                      [sorted[directoryPositions[k]].index],
-                                      sorted[directoryPositions[k]].body, true)
-    {
-      if offset == 0 {
-        assert groups == Core.DirectoryGroupsCore(sorted, directoryPositions);
-      } else {
-        assert groups == [Spec.OutputGroup(
-                            directIndices, directBody + queuedSuffix, false)] +
-                         Core.DirectoryGroupsCore(sorted, directoryPositions);
+    assert directFragments == seq(|directPositions|, k requires 0 <= k < |directPositions| =>
+      Spec.RenderOperandSpec(cmd, sorted, directPositions[k])) by {
+      forall k: nat | k < |directPositions|
+        ensures directFragments[k] == Spec.RenderOperandSpec(cmd, sorted, directPositions[k])
+      {
       }
     }
-    forall k: nat | k < |directPositions|
-      ensures directFragments[k] == Spec.RenderOperandSpec(cmd, sorted, directPositions[k])
-    {
-    }
-    assert Spec.OutputGroupsWitnessRelation(
-        cmd, sorted, groups, directPositions, directoryPositions, directIndices,
-        directFragments, directCuts, directBody) by {
-      reveal Spec.OutputGroupsWitnessRelation();
-    }
-    assert Spec.OutputGroupsRelation(cmd, sorted, groups) by {
-      reveal Spec.OutputGroupsRelation();
-    }
+    assert directIndices == seq(|directPositions|, k requires 0 <= k < |directPositions| =>
+      sorted[directPositions[k]].index);
+    assert Core.DirectoryGroupsCore(sorted, directoryPositions) ==
+      seq(|directoryPositions|, k requires 0 <= k < |directoryPositions| =>
+        Spec.OutputGroup([sorted[directoryPositions[k]].index], sorted[directoryPositions[k]].body, true));
+    reveal Spec.OutputGroupsRelation();
   }
 
   lemma JoinOutputGroupsConcatenate(
@@ -697,6 +673,9 @@ module LsProof {
               groups, Core.JoinOutputGroupsCore(groups))
   {
     var cuts := JoinOutputGroupsConcatenate(groups, |groups|);
+    assert Core.GroupFragmentsPrefixCore(groups, |groups|) ==
+      seq(|groups|, i requires 0 <= i < |groups| =>
+        (if i == 0 then [] else "\n") + groups[i].body);
     reveal Spec.SeparatedGroupsRelation();
   }
 
@@ -757,6 +736,10 @@ module LsProof {
   {
     var accessCuts := AccessErrorsConcatenate(observations, |observations|);
     var sectionCuts := SectionErrorsConcatenate(sorted, |sorted|);
+    assert Core.AccessErrorFragmentsPrefixCore(observations, |observations|) ==
+      seq(|observations|, i requires 0 <= i < |observations| => observations[i].accessErrors);
+    assert Core.SectionErrorFragmentsPrefixCore(sorted, |sorted|) ==
+      seq(|sorted|, i requires 0 <= i < |sorted| => sorted[i].sectionErrors);
     reveal Spec.OperandErrorsRelation();
   }
 
@@ -801,8 +784,8 @@ module LsProof {
               cmd, displayPath, fs, path, firstStatus, afterStatus,
               observations, readErr, output, errors, hadError, nativeTrace)
   {
-    reveal Core.DirectoryListingSummary();
-    reveal Spec.DirectoryListingRelation();
+    hide *;
+    reveal Core.DirectoryListingSummary(), Spec.ReadCloseDirectoryTrace(), Spec.BoundOpenDirectoryTrace();
     var rawObservations: seq<Spec.EntryObservation>,
         outputFragments: seq<BenchWorld.Bytes>, outputCuts: seq<nat>,
         errorFragments: seq<BenchWorld.Bytes>, errorCuts: seq<nat>,
@@ -826,6 +809,7 @@ module LsProof {
                    exists i: nat :: i < |observations| && Spec.ObservationFailedSpec(observations[i]));
     SortEntriesCoreSatisfiesRelation(cmd, rawObservations);
     ObservationPiecesImpliesSpec(cmd, observations, outputFragments);
+    reveal Spec.DirectoryListingRelation();
   }
 
   lemma RecursiveOutputPrefixConcatenates(
@@ -883,7 +867,7 @@ module LsProof {
     }
   }
 
-  lemma RecursiveSummaryImpliesSpec(
+  lemma {:isolate_assertions} RecursiveSummaryImpliesSpec(
     cmd: Schema.LsCmd,
     fs: BenchWorld.FileSystem,
     displayPath: BenchWorld.Path,
@@ -1202,6 +1186,19 @@ module LsProof {
     ensures Spec.RunRelation(cmd, fs, cwd, firstStatus, afterStatus,
                              output,errors,exit,afterNative)
   {
+    assert Spec.OperandStatusIntervals(observations, firstStatus, afterStatus) by {
+      reveal Spec.OperandStatusIntervals();
+      if |observations| != 0 {
+        assert observations[0].firstStatus == statusCuts[0];
+        assert observations[|observations| - 1].afterStatus == statusCuts[|observations|];
+        forall i: nat | i + 1 < |observations|
+          ensures observations[i].afterStatus == observations[i + 1].firstStatus
+        {
+          assert observations[i].afterStatus == statusCuts[i + 1];
+          assert observations[i + 1].firstStatus == statusCuts[i + 1];
+        }
+      }
+    }
     reveal Spec.RunRelation();
   }
 
